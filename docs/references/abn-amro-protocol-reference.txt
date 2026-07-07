@@ -1,0 +1,3 @@
+# ABN AMRO download protocol
+
+Port from /Users/divya/projects/abn-download (abn_download.py, protocol/ docs): headed Playwright auth + mutationreporting/generations/v1.

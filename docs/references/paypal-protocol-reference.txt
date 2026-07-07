@@ -1,0 +1,3 @@
+# PayPal download protocol
+
+Port from /Users/divya/projects/abn-download (paypal_download.py, paypal-*.txt): CDP attach, CSRF extraction, QL API reportCreate/reports/download.
