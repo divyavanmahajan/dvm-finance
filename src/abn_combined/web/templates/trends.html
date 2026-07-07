@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Trends — abn-combined{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="/static/trends.css">
+<hgroup>
+  <h1>Category Trends</h1>
+  <p>Effective category × period. Click any cell or row label to open the matching transactions.</p>
+</hgroup>
+
+{# Window / granularity / account controls. State lives in the URL (Golden Principle 8):
+   every change swaps the table partial and pushes the query string. #}
+<form id="trends-controls" class="trends-controls"
+      hx-get="/trends/table"
+      hx-target="#trends-table"
+      hx-swap="innerHTML"
+      hx-push-url="true"
+      hx-trigger="change from:select, change from:input[type=date]">
+  <label>
+    <span>From</span>
+    <input type="date" name="date_from" value="{{ params.date_from.isoformat() if params.date_from else '' }}"
+           placeholder="{{ window_from.isoformat() }}">
+  </label>
+  <label>
+    <span>To</span>
+    <input type="date" name="date_to" value="{{ params.date_to.isoformat() if params.date_to else '' }}"
+           placeholder="{{ window_to.isoformat() }}">
+  </label>
+  <label>
+    <span>Granularity</span>
+    <select name="granularity">
+      <option value="month" {% if params.granularity == 'month' %}selected{% endif %}>Month</option>
+      <option value="year" {% if params.granularity == 'year' %}selected{% endif %}>Year</option>
+    </select>
+  </label>
+  <label>
+    <span>Account</span>
+    <select name="account">
+      <option value="">All accounts</option>
+      {% for account in accounts %}
+      <option value="{{ account }}" {% if account in params.accounts %}selected{% endif %}>{{ account }}</option>
+      {% endfor %}
+    </select>
+  </label>
+</form>
+
+<div id="trends-table">
+  {% include "_trends_table.html" %}
+</div>
+{% endblock %}
