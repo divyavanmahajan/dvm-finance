@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Transactions — abn-combined{% endblock %}
+{% block content %}
+<script src="/static/js/transactions.js"></script>
+<hgroup>
+  <h1>Transactions</h1>
+  <p>Filter, sort and categorize. The full filter state lives in the URL — bookmark or share any view.</p>
+</hgroup>
+
+{# Filter bar. Every control targets the table partial and pushes the URL so state
+   is always in the query string (Golden Principle 8). #}
+<form id="filter-bar" class="filter-bar"
+      hx-get="/transactions/table"
+      hx-target="#txn-table"
+      hx-swap="innerHTML"
+      hx-push-url="true"
+      hx-trigger="submit, change from:select, change from:input[type=date], change from:input[name=account]"
+      x-data="txnFilterBar()">
+
+  <div class="filter-row">
+    <label class="grow">
+      <input type="search" name="q" placeholder="Search description or counterparty…"
+             value="{{ filter.q or '' }}"
+             hx-get="/transactions/table" hx-target="#txn-table" hx-swap="innerHTML"
+             hx-push-url="true" hx-trigger="keyup changed delay:400ms, search">
+    </label>
+
+    <label>
+      <select name="preset">
+        <option value="">Any date</option>
+        {% for p in presets %}
+        <option value="{{ p }}" {% if filter.preset == p %}selected{% endif %}>{{ p.replace('-', ' ').title() }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label>Sort
+      <select name="sort">
+        <option value="date_desc" {% if filter.sort == 'date_desc' %}selected{% endif %}>Newest</option>
+        <option value="date_asc" {% if filter.sort == 'date_asc' %}selected{% endif %}>Oldest</option>
+        <option value="amount_desc" {% if filter.sort == 'amount_desc' %}selected{% endif %}>Amount ↓</option>
+        <option value="amount_asc" {% if filter.sort == 'amount_asc' %}selected{% endif %}>Amount ↑</option>
+        <option value="category_asc" {% if filter.sort == 'category_asc' %}selected{% endif %}>Category A→Z</option>
+        <option value="category_desc" {% if filter.sort == 'category_desc' %}selected{% endif %}>Category Z→A</option>
+      </select>
+    </label>
+
+    <button type="button" class="secondary outline" @click="advanced = !advanced"
+            x-text="advanced ? 'Fewer filters' : 'More filters'">More filters</button>
+  </div>
+
+  <div class="filter-row" x-show="advanced" x-cloak>
+    <label>From <input type="date" name="date_from" value="{{ filter.date_from.isoformat() if filter.date_from else '' }}"></label>
+    <label>To <input type="date" name="date_to" value="{{ filter.date_to.isoformat() if filter.date_to else '' }}"></label>
+    <label>Min € <input type="number" step="0.01" name="amount_min" value="{{ filter.amount_min if filter.amount_min is not none else '' }}"></label>
+    <label>Max € <input type="number" step="0.01" name="amount_max" value="{{ filter.amount_max if filter.amount_max is not none else '' }}"></label>
+
+    <label>Account
+      <select name="account">
+        <option value="">All accounts</option>
+        {% for a in accounts %}
+        <option value="{{ a }}" {% if a in filter.accounts %}selected{% endif %}>{{ a }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+
+  <div class="filter-row" x-show="advanced" x-cloak>
+    {# Category multi-select via checkboxes in an Alpine dropdown #}
+    <div class="multi" x-data="{ open: false }">
+      <button type="button" class="secondary outline" @click="open = !open">Categories ▾</button>
+      <div class="multi-menu" x-show="open" @click.outside="open = false" x-cloak>
+        <label><input type="checkbox" name="category" value="uncategorized"
+               {% if 'uncategorized' in filter.categories %}checked{% endif %}> Uncategorized</label>
+        {% for c in categories %}
+        <label><input type="checkbox" name="category" value="{{ c }}"
+               {% if c in filter.categories %}checked{% endif %}> {{ c }}</label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="multi" x-data="{ open: false }">
+      <button type="button" class="secondary outline" @click="open = !open">Tags ▾</button>
+      <div class="multi-menu" x-show="open" @click.outside="open = false" x-cloak>
+        {% for t in tags %}
+        <label><input type="checkbox" name="tag" value="{{ t }}"
+               {% if t in filter.tags %}checked{% endif %}> {{ t }}</label>
+        {% else %}
+        <small>No tags yet.</small>
+        {% endfor %}
+      </div>
+    </div>
+
+    <button type="submit">Apply</button>
+    <a href="/" role="button" class="secondary" hx-boost="false">Reset</a>
+  </div>
+</form>
+
+<datalist id="known-categories">
+  {% for c in categories %}<option value="{{ c }}"></option>{% endfor %}
+</datalist>
+
+<div id="txn-table">
+  {% include "_transactions_table.html" %}
+</div>
+{% endblock %}

@@ -5,3 +5,75 @@
 .nav-tabs a[aria-current="page"] {
   font-weight: 700;
 }
+
+[x-cloak] { display: none !important; }
+
+/* --- Transactions filter bar --- */
+.filter-bar { margin-bottom: 0.5rem; }
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: end;
+  margin-bottom: 0.5rem;
+}
+.filter-row label { margin: 0; }
+.filter-row .grow { flex: 1 1 16rem; }
+.filter-bar input, .filter-bar select { margin-bottom: 0; }
+.multi { position: relative; }
+.multi-menu {
+  position: absolute;
+  z-index: 20;
+  background: var(--pico-background-color, #fff);
+  border: 1px solid var(--pico-muted-border-color, #ccc);
+  border-radius: 0.25rem;
+  padding: 0.5rem;
+  min-width: 14rem;
+  max-height: 16rem;
+  overflow: auto;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+}
+.multi-menu label { display: block; margin: 0.15rem 0; font-size: 0.9rem; }
+
+/* --- Chips --- */
+.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 1rem;
+  background: var(--pico-primary-background, #e3edff);
+  color: var(--pico-primary, #1a56db);
+  font-size: 0.82rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+.chip:hover { filter: brightness(0.95); }
+.chip-clear { background: transparent; text-decoration: underline; }
+
+/* --- Table --- */
+.txn-table { font-size: 0.88rem; }
+.txn-table td, .txn-table th { padding: 0.35rem 0.5rem; vertical-align: top; }
+.txn-table .num { text-align: right; white-space: nowrap; }
+.txn-table .neg { color: #b3261e; }
+.txn-table .pos { color: #1a7f37; }
+.txn-table .desc { max-width: 22rem; }
+.txn-count { font-size: 0.85rem; color: var(--pico-muted-color); margin: 0.25rem 0; }
+.badge {
+  display: inline-block; font-size: 0.7rem; font-weight: 700;
+  background: #ffce54; color: #333; border-radius: 0.2rem; padding: 0 0.25rem;
+}
+button.link {
+  background: none; border: none; padding: 0 0.2rem; margin: 0;
+  color: var(--pico-primary, #1a56db); cursor: pointer; width: auto; display: inline;
+  font-size: 0.9rem;
+}
+.inline-edit { display: inline-flex; gap: 0.2rem; align-items: center; margin: 0; }
+.inline-edit input { margin: 0; padding: 0.1rem 0.3rem; font-size: 0.82rem; width: 10rem; }
+.detail-row td { background: var(--pico-code-background-color, #f6f8fa); }
+.txn-detail dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.15rem 1rem; }
+.txn-detail dt { font-weight: 600; }
+.pagination { display: flex; gap: 1rem; align-items: center; margin-top: 0.5rem; }
+.pagination .disabled { pointer-events: none; opacity: 0.4; }
+.page-indicator { font-size: 0.85rem; }

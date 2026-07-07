@@ -1,0 +1,81 @@
+{# One transaction = one <tbody> so the main row and its detail row can share
+   Alpine state (valid HTML: a table may contain multiple tbody elements). #}
+{% set t = row.txn %}
+<tbody x-data="{ open: false, editcat: false, edittags: false }">
+  <tr id="txn-row-{{ t.id }}" class="{% if row.is_manual %}manual{% endif %}">
+    <td>
+      <button class="link expand" title="Show detail"
+              @click="open = !open"
+              hx-get="/transactions/{{ t.id }}/detail"
+              hx-target="#txn-detail-body-{{ t.id }}"
+              hx-swap="innerHTML"
+              hx-trigger="click once"
+              x-text="open ? '▾' : '▸'">▸</button>
+    </td>
+    <td>{{ t.transactiondate.isoformat() }}</td>
+    <td class="acct">{{ t.accountNumber }}</td>
+    <td class="desc">{{ (t.description or '')[:80] }}</td>
+    <td class="num {% if t.amount < 0 %}neg{% else %}pos{% endif %}">
+      {{ '%.2f'|format(t.amount) }} {{ t.currency }}
+    </td>
+
+    {# ---- effective category (inline edit) ---- #}
+    <td class="cat">
+      <span x-show="!editcat">
+        {% if row.effective_category %}{{ row.effective_category }}{% else %}<em>uncategorized</em>{% endif %}
+        {% if row.is_manual %}<span class="badge" title="Manually set">M</span>{% endif %}
+        <button class="link" title="Edit category" @click="editcat = true">✎</button>
+      </span>
+      <form x-show="editcat" x-cloak class="inline-edit"
+            hx-post="/transactions/{{ t.id }}/category"
+            hx-target="#txn-row-{{ t.id }}" hx-swap="outerHTML">
+        <input name="manual_category" list="known-categories"
+               value="{{ row.effective_category or '' }}" autocomplete="off">
+        <button type="submit" class="link" title="Save">✓</button>
+        <button type="button" class="link" title="Cancel" @click="editcat = false">✕</button>
+        {% if row.txn.manual_category %}
+        <button type="button" class="link" title="Clear manual (restore rule)"
+                hx-delete="/transactions/{{ t.id }}/category"
+                hx-target="#txn-row-{{ t.id }}" hx-swap="outerHTML">↺</button>
+        {% endif %}
+      </form>
+    </td>
+
+    {# ---- effective tags (inline edit) ---- #}
+    <td class="tags">
+      <span x-show="!edittags">
+        {% if row.effective_tags %}{{ row.effective_tags }}{% else %}<em>—</em>{% endif %}
+        <button class="link" title="Edit tags" @click="edittags = true">✎</button>
+      </span>
+      <form x-show="edittags" x-cloak class="inline-edit"
+            hx-post="/transactions/{{ t.id }}/tags"
+            hx-target="#txn-row-{{ t.id }}" hx-swap="outerHTML">
+        <input name="manual_tags" value="{{ row.effective_tags or '' }}"
+               placeholder="comma,separated" autocomplete="off">
+        <button type="submit" class="link" title="Save">✓</button>
+        <button type="button" class="link" title="Cancel" @click="edittags = false">✕</button>
+        {% if row.txn.manual_tags %}
+        <button type="button" class="link" title="Clear manual (restore rule)"
+                hx-delete="/transactions/{{ t.id }}/tags"
+                hx-target="#txn-row-{{ t.id }}" hx-swap="outerHTML">↺</button>
+        {% endif %}
+      </form>
+    </td>
+
+    <td class="src">
+      {% if t.categorization_source == 'manual' %}manual
+      {% elif t.categorization_source %}rule #{{ t.categorization_source }}
+      {% else %}—{% endif %}
+    </td>
+    <td>
+      <a class="link create-rule" href="/rules/new?from_transaction={{ t.id }}"
+         title="Create rule from this transaction">+ rule</a>
+    </td>
+  </tr>
+
+  <tr class="detail-row" x-show="open" x-cloak>
+    <td colspan="9">
+      <div id="txn-detail-body-{{ t.id }}"><small>Loading…</small></div>
+    </td>
+  </tr>
+</tbody>
