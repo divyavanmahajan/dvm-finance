@@ -58,6 +58,10 @@ def create_app(settings: Settings) -> FastAPI:
     def health() -> dict:
         return {"status": "ok", "data_dir": str(settings.data_dir)}
 
+    # Real routers claim their paths first; nav tabs without a router get a placeholder.
+    _register_api_routers(app)
+    claimed = {getattr(r, "path", None) for r in app.routes}
+
     def _placeholder(title: str):
         def page(request: Request) -> HTMLResponse:
             return templates.TemplateResponse(
@@ -69,6 +73,8 @@ def create_app(settings: Settings) -> FastAPI:
         return page
 
     for path, label in NAV_TABS:
+        if path in claimed:
+            continue
         app.add_api_route(
             path,
             _placeholder(label),
@@ -76,8 +82,6 @@ def create_app(settings: Settings) -> FastAPI:
             response_class=HTMLResponse,
             include_in_schema=False,
         )
-
-    _register_api_routers(app)
 
     return app
 
