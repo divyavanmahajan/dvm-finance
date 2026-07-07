@@ -1,0 +1,65 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "abn-combined"
+version = "0.1.0"
+description = "Integrated personal-finance app: download, parse, categorize, and review bank statements."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "Divya van Mahajan" }]
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "jinja2",
+    "sqlalchemy>=2",
+    "alembic",
+    "platformdirs",
+    "python-multipart",
+    "structlog",
+    "pandas",
+    "openpyxl",
+    "xlrd",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "httpx",
+    "ruff",
+    "playwright",
+    "pytest-playwright",
+]
+
+[project.scripts]
+abn-combined = "abn_combined.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/abn_combined"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+ignore = ["E501", "B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q -m 'not slow and not e2e'"
+markers = [
+    "slow: long-running performance benchmarks",
+    "e2e: end-to-end browser tests",
+]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.coverage.run]
+source = ["abn_combined"]
+omit = ["*/downloaders/*", "*/tests/*"]
+
+[tool.coverage.report]
+fail_under = 0

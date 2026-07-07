@@ -3,6 +3,12 @@
 ## Spec
 [spec.md](./spec.md) — abn-combined init phase
 
+## Branch
+phase/init
+
+## Execution Mode
+Autonomous, parallel subagents (waves: [01→05] → [06,10] → [07,08,09] → [11,12] → [13])
+
 ## Summary
 Integrated local finance app merging abn-download + abn-analyst: UI-triggered downloads, rule-based categorization with audit, transactions/trends views, snapshot sharing, uvx packaging.
 
@@ -10,7 +16,7 @@ Integrated local finance app merging abn-download + abn-analyst: UI-triggered do
 
 | Step | Folder | Status |
 |------|--------|--------|
-| 01 - Project Setup | 01-project-setup | pending |
+| 01 - Project Setup | 01-project-setup | done |
 | 02 - Database Schema | 02-database-schema | pending |
 | 03 - Parsers and Dedup | 03-parsers-and-dedup | pending |
 | 04 - Rule Engine, Preview, Change Reports | 04-rule-engine | pending |
@@ -31,4 +37,4 @@ Status values: `pending` | `in-progress` | `done` | `blocked`
 - Real bank/PayPal download flows (step 10) require manual verification with live credentials — schedule with the user.
 
 ## Last Updated
-2026-07-07
+2026-07-07 (step 01 done)

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}abn-combined{% endblock %}</title>
+  <link rel="stylesheet" href="/static/vendor/pico.min.css">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/vendor/htmx.min.js" defer></script>
+  <script src="/static/vendor/alpine.min.js" defer></script>
+</head>
+<body>
+  <header class="container">
+    <nav>
+      <ul>
+        <li><strong>abn-combined</strong></li>
+      </ul>
+      <ul class="nav-tabs">
+        {% for path, label in nav_tabs %}
+        <li>
+          <a href="{{ path }}" {% if path == active_path %}aria-current="page"{% endif %}>{{ label }}</a>
+        </li>
+        {% endfor %}
+      </ul>
+    </nav>
+  </header>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
