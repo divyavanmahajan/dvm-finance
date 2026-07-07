@@ -7,7 +7,7 @@
 init (branch: phase/init)
 
 ## Status Summary
-3 of 13 steps complete.
+4 of 13 steps complete.
 
 ## Steps
 
@@ -16,7 +16,7 @@ init (branch: phase/init)
 | 01-project-setup | done | Package skeleton, CLI, app factory, vendored UI shell, 15 tests. |
 | 02-database-schema | done | 8-table SQLAlchemy 2.x schema + initial Alembic migration, startup upgrade. |
 | 03-parsers-and-dedup | done | Ported all parsers + generic CSV, dedup/id recipe, 53 tests. |
-| 04-rule-engine | pending | — |
+| 04-rule-engine | done | Ported matcher; apply_rules/preview/record_rule_change; 32 tests + 50k perf. |
 | 05-import-pipeline-and-upload | pending | — |
 | 06-transactions-view | pending | — |
 | 07-rules-ui | pending | — |
@@ -32,6 +32,7 @@ init (branch: phase/init)
 - 2026-07-07 Step 01 (project setup) complete: package, CLI, app shell, tooling.
 - 2026-07-07 Step 02 (database schema) complete: models + Alembic + startup upgrade.
 - 2026-07-07 Step 03 (parsers and dedup) complete: parsers ported, deterministic ids.
+- 2026-07-07 Step 04 (rule engine) complete: matcher, preview, auditable change reports.
 
 ## Blockers
 None.
