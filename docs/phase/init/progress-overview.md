@@ -7,7 +7,7 @@
 init (branch: phase/init)
 
 ## Status Summary
-6 of 13 steps complete.
+7 of 13 steps complete.
 
 ## Steps
 
@@ -22,7 +22,7 @@ init (branch: phase/init)
 | 07-rules-ui | in-progress | — |
 | 08-category-trends | in-progress | — |
 | 09-tags-budgets-cashflow | in-progress | — |
-| 10-downloads-from-ui | in-progress | — |
+| 10-downloads-from-ui | done | ABN/PayPal downloaders as background jobs, htmx status polling, Download page. 83 tests. Real flows pending manual verify. |
 | 11-snapshot-sharing | pending | — |
 | 12-legacy-migration | pending | — |
 | 13-e2e-and-release | pending | — |
@@ -36,6 +36,7 @@ init (branch: phase/init)
 - 2026-07-07 Step 05 (import pipeline + upload) complete: end-to-end upload works in browser.
 - 2026-07-07 Step 06 (transactions view) complete: filter bar, htmx table, inline edits. Committed.
 - 2026-07-07 Wave 3 dispatched: steps 07, 08, 09 in parallel; step 10 still in flight.
+- 2026-07-07 Step 10 (downloads from UI) complete and committed; real bank flows pending manual verification.
 
 ## Blockers
 - 2026-07-07: Wave 2 subagents (06, 10) were interrupted by the session usage limit (resets 04:40 Europe/Berlin) before writing any code. Relaunch wave 2 when the limit resets; no partial work to clean up.
