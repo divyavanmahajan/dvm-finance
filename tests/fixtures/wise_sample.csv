@@ -1,0 +1,5 @@
+ID,Status,Direction,Created on,Finished on,Source fee amount,Source fee currency,Source name,Source amount (after fees),Source currency,Target name,Target amount (after fees),Target currency,Exchange rate,Reference,Category,Note
+TRANSFER-1,COMPLETED,IN,2024-01-05 10:00:00,2024-01-05 10:05:00,0.50,EUR,Divya van Mahajan,100.00,EUR,Divya van Mahajan,1150.00,SEK,11.5,Top up,,
+TRANSFER-2,COMPLETED,OUT,2024-01-10 12:00:00,2024-01-10 12:05:00,0.10,SEK,Divya van Mahajan,230.00,SEK,ICA Supermarket,230.00,SEK,,Groceries,,
+TRANSFER-3,COMPLETED,OUT,2024-01-12 09:00:00,2024-01-12 09:05:00,0.20,EUR,Divya van Mahajan,50.00,EUR,Spotify,50.00,EUR,,Music,,
+TRANSFER-4,CANCELLED,OUT,2024-01-13 09:00:00,2024-01-13 09:05:00,0.00,EUR,Divya van Mahajan,10.00,EUR,Nobody,10.00,EUR,,,,
