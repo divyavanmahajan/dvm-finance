@@ -23,8 +23,8 @@ init (branch: phase/init)
 | 08-category-trends | in-progress | — |
 | 09-tags-budgets-cashflow | in-progress | — |
 | 10-downloads-from-ui | done | ABN/PayPal downloaders as background jobs, htmx status polling, Download page. 83 tests. Real flows pending manual verify. |
-| 11-snapshot-sharing | pending | — |
-| 12-legacy-migration | pending | — |
+| 11-snapshot-sharing | in-progress | — |
+| 12-legacy-migration | in-progress | — |
 | 13-e2e-and-release | pending | — |
 
 ## Recent Activity
@@ -40,6 +40,7 @@ init (branch: phase/init)
 
 ## Recent Activity (cont.)
 - 2026-07-07 Step 07 (rules UI) complete and committed.
+- 2026-07-07 Wave 4 dispatched: steps 11 and 12 in parallel (08, 09 still in flight).
 
 ## Blockers
 - 2026-07-07: Wave 2 subagents (06, 10) were interrupted by the Claude session usage limit (resets 04:40 Europe/Berlin) before writing any code. Relaunch wave 2 when the limit resets; no partial work to clean up.
