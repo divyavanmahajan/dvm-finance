@@ -1,0 +1,7 @@
+/* Custom styles for abn-combined. Intentionally minimal. */
+.nav-tabs {
+  flex-wrap: wrap;
+}
+.nav-tabs a[aria-current="page"] {
+  font-weight: 700;
+}
