@@ -20,7 +20,7 @@ Integrated local finance app merging abn-download + abn-analyst: UI-triggered do
 | 02 - Database Schema | 02-database-schema | done |
 | 03 - Parsers and Dedup | 03-parsers-and-dedup | done |
 | 04 - Rule Engine, Preview, Change Reports | 04-rule-engine | done |
-| 05 - Import Pipeline and Upload | 05-import-pipeline-and-upload | pending |
+| 05 - Import Pipeline and Upload | 05-import-pipeline-and-upload | done |
 | 06 - Transactions View + Filtering | 06-transactions-view | pending |
 | 07 - Rules UI | 07-rules-ui | pending |
 | 08 - Category Trends | 08-category-trends | pending |
@@ -37,4 +37,4 @@ Status values: `pending` | `in-progress` | `done` | `blocked`
 - Real bank/PayPal download flows (step 10) require manual verification with live credentials — schedule with the user.
 
 ## Last Updated
-2026-07-07 (step 04 done)
+2026-07-07 (step 05 done)

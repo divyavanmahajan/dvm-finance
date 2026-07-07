@@ -1,0 +1,14 @@
+<article>
+  <header><strong>Imported {{ summary.source_file }}</strong></header>
+  <ul>
+    <li><strong>{{ summary.new }}</strong> new transactions</li>
+    <li><strong>{{ summary.duplicates }}</strong> duplicates skipped</li>
+    <li><strong>{{ summary.categorized }}</strong> categorized by rules</li>
+    <li><strong>{{ summary.uncategorized }}</strong> uncategorized</li>
+  </ul>
+  {% if summary.new > 0 %}
+  <a href="/transactions?source_file={{ summary.source_file | urlencode }}" role="button">
+    View the new transactions
+  </a>
+  {% endif %}
+</article>
