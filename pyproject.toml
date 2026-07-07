@@ -25,6 +25,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+downloads = [
+    "playwright",
+]
 dev = [
     "pytest",
     "pytest-cov",

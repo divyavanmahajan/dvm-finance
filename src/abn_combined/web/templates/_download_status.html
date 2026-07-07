@@ -1,0 +1,59 @@
+{#
+  Status partial for a single download job.
+  Variables expected: source (str), job (DownloadJob | None)
+
+  When the job is non-terminal, htmx polls this endpoint every 2 s.
+  When the job reaches done/failed, polling stops automatically.
+#}
+{% if job %}
+  {% set is_terminal = job.state == "done" or job.state == "failed" %}
+  <div
+    class="download-status download-status--{{ job.state }}"
+    {% if not is_terminal %}
+      hx-get="/api/download/{{ source }}/status"
+      hx-trigger="every 2s"
+      hx-swap="outerHTML"
+    {% endif %}
+    role="status"
+    aria-live="polite">
+
+    <span class="download-state-badge">{{ job.state }}</span>
+    {% if job.message %}
+      <p class="download-message">{{ job.message }}</p>
+    {% endif %}
+
+    {% if job.state == "done" and job.import_summary %}
+      {% set s = job.import_summary %}
+      <div class="download-summary">
+        <p>
+          <strong>{{ s.new }}</strong> new &middot;
+          <strong>{{ s.duplicates }}</strong> duplicate(s) &middot;
+          <strong>{{ s.categorized }}</strong> categorized
+        </p>
+        {% if s.files %}
+          <ul class="download-file-links">
+            {% for f in s.files %}
+            <li>
+              <a href="/transactions?source_file={{ f | urlencode }}">View transactions from {{ f }}</a>
+            </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+        {% if s.failed_files %}
+          <details>
+            <summary>{{ s.failed_files | length }} file(s) failed to import</summary>
+            <ul>
+              {% for err in s.failed_files %}
+              <li>{{ err }}</li>
+              {% endfor %}
+            </ul>
+          </details>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if job.state == "waiting-for-auth" %}
+      <span aria-busy="true" class="htmx-indicator-inline">Waiting…</span>
+    {% endif %}
+  </div>
+{% endif %}
