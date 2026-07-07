@@ -1,0 +1,32 @@
+{# One rule row. Swapped via htmx on toggle (outerHTML) and removed on delete. #}
+<tr id="rule-row-{{ rule.id }}" class="{% if not rule.is_active %}inactive{% endif %}">
+  <td class="num">{{ rule.priority }}</td>
+  <td><span class="rule-type">{{ rule.rule_type }}</span>
+      {% if rule.field_target and rule.field_target != 'description' %}
+      <small class="field-target">{{ rule.field_target }}</small>{% endif %}</td>
+  <td>{{ rule.match_pattern }}</td>
+  <td class="match-value"><code>{{ rule.match_value }}</code>
+      {% if rule.conditions %}<small title="{{ rule.conditions|length }} extra condition(s)">
+        +{{ rule.conditions|length }} cond</small>{% endif %}</td>
+  <td>{{ rule.category }}</td>
+  <td>{{ rule.tags or '—' }}</td>
+  <td>
+    <input type="checkbox" role="switch" {% if rule.is_active %}checked{% endif %}
+           title="Toggle active (recorded in history)"
+           hx-post="/rules/{{ rule.id }}/toggle"
+           hx-target="#rule-row-{{ rule.id }}" hx-swap="outerHTML">
+  </td>
+  <td class="num">
+    {% if count %}
+    <a href="/transactions?rule_id={{ rule.id }}" title="Show matched transactions">{{ count }}</a>
+    {% else %}0{% endif %}
+  </td>
+  <td class="row-actions">
+    <a href="/rules/{{ rule.id }}/edit" title="Edit">✎</a>
+    <a href="/rules/{{ rule.id }}/history" title="History">🕘</a>
+    <button class="link danger" title="Delete rule"
+            hx-delete="/rules/{{ rule.id }}"
+            hx-confirm="Delete rule #{{ rule.id }} ({{ rule.category }})? Its transactions will be recategorized by the remaining rules."
+            hx-target="#rule-row-{{ rule.id }}" hx-swap="outerHTML">🗑</button>
+  </td>
+</tr>
