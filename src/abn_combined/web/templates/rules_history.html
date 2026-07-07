@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — abn-combined{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="/static/rules.css">
+<hgroup>
+  <h1>{{ title }}</h1>
+  <p>Audit trail of rule mutations and recategorization runs, newest first.
+     Each report records the rule snapshot diff and every transaction it touched.</p>
+</hgroup>
+
+<div class="rules-actions">
+  <a role="button" class="secondary" href="/rules">Back to rules</a>
+  {% if scope_rule_id %}
+  <a role="button" class="secondary outline" href="/rules/history">All history</a>
+  <a role="button" class="secondary outline" href="/rules/{{ scope_rule_id }}/edit">Edit rule #{{ scope_rule_id }}</a>
+  {% endif %}
+</div>
+
+{% if reports %}
+{% for report in reports %}
+{% include "_rule_report.html" %}
+{% endfor %}
+{% else %}
+<article><p>Nothing here yet — reports appear when rules change.</p></article>
+{% endif %}
+{% endblock %}
