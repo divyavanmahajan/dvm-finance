@@ -7,7 +7,7 @@
 init (branch: phase/init)
 
 ## Status Summary
-8 of 13 steps complete.
+9 of 13 steps complete.
 
 ## Steps
 
@@ -20,7 +20,7 @@ init (branch: phase/init)
 | 05-import-pipeline-and-upload | done | import_file pipeline + POST /api/upload + Upload page (htmx), 15 tests. |
 | 06-transactions-view | done | Transactions tab at /: filter model + chips/presets, htmx table, inline edits, detail rows. 56 tests. |
 | 07-rules-ui | done | Rules CRUD + preview diff + create-from-transaction + history; all mutations audited. 43 tests. |
-| 08-category-trends | in-progress | — |
+| 08-category-trends | done | Trends table, hyphen-hierarchy rollup, exact cell/row click-through. 36 tests. |
 | 09-tags-budgets-cashflow | in-progress | — |
 | 10-downloads-from-ui | done | ABN/PayPal downloaders as background jobs, htmx status polling, Download page. 83 tests. Real flows pending manual verify. |
 | 11-snapshot-sharing | in-progress | — |
@@ -41,6 +41,7 @@ init (branch: phase/init)
 ## Recent Activity (cont.)
 - 2026-07-07 Step 07 (rules UI) complete and committed.
 - 2026-07-07 Wave 4 dispatched: steps 11 and 12 in parallel (08, 09 still in flight).
+- 2026-07-07 Step 08 (category trends) complete and committed. Hierarchy separator confirmed: hyphen.
 
 ## Blockers
 - 2026-07-07: Wave 2 subagents (06, 10) were interrupted by the session usage limit (resets 04:40 Europe/Berlin) before writing any code. Relaunch wave 2 when the limit resets; no partial work to clean up.
