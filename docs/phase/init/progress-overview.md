@@ -7,14 +7,14 @@
 init (branch: phase/init)
 
 ## Status Summary
-1 of 13 steps complete.
+2 of 13 steps complete.
 
 ## Steps
 
 | Step | Status | Summary |
 |------|--------|---------|
 | 01-project-setup | done | Package skeleton, CLI, app factory, vendored UI shell, 15 tests. |
-| 02-database-schema | pending | — |
+| 02-database-schema | done | 8-table SQLAlchemy 2.x schema + initial Alembic migration, startup upgrade. |
 | 03-parsers-and-dedup | pending | — |
 | 04-rule-engine | pending | — |
 | 05-import-pipeline-and-upload | pending | — |
@@ -30,6 +30,7 @@ init (branch: phase/init)
 ## Recent Activity
 - 2026-07-07 Phase branch created; wave 1 (steps 01–05) dispatched to subagent.
 - 2026-07-07 Step 01 (project setup) complete: package, CLI, app shell, tooling.
+- 2026-07-07 Step 02 (database schema) complete: models + Alembic + startup upgrade.
 
 ## Blockers
 None.
