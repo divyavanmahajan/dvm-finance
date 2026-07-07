@@ -21,11 +21,11 @@ Integrated local finance app merging abn-download + abn-analyst: UI-triggered do
 | 03 - Parsers and Dedup | 03-parsers-and-dedup | done |
 | 04 - Rule Engine, Preview, Change Reports | 04-rule-engine | done |
 | 05 - Import Pipeline and Upload | 05-import-pipeline-and-upload | done |
-| 06 - Transactions View + Filtering | 06-transactions-view | pending |
+| 06 - Transactions View + Filtering | 06-transactions-view | in-progress |
 | 07 - Rules UI | 07-rules-ui | pending |
 | 08 - Category Trends | 08-category-trends | pending |
 | 09 - Tags, Budgets, Cash Flow | 09-tags-budgets-cashflow | pending |
-| 10 - Downloads from UI | 10-downloads-from-ui | pending |
+| 10 - Downloads from UI | 10-downloads-from-ui | in-progress |
 | 11 - Snapshot Sharing | 11-snapshot-sharing | pending |
 | 12 - Legacy Migration | 12-legacy-migration | pending |
 | 13 - E2E and Release | 13-e2e-and-release | pending |

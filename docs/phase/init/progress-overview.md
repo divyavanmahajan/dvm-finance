@@ -18,11 +18,11 @@ init (branch: phase/init)
 | 03-parsers-and-dedup | done | Ported all parsers + generic CSV, dedup/id recipe, 53 tests. |
 | 04-rule-engine | done | Ported matcher; apply_rules/preview/record_rule_change; 32 tests + 50k perf. |
 | 05-import-pipeline-and-upload | done | import_file pipeline + POST /api/upload + Upload page (htmx), 15 tests. |
-| 06-transactions-view | pending | — |
+| 06-transactions-view | in-progress | — |
 | 07-rules-ui | pending | — |
 | 08-category-trends | pending | — |
 | 09-tags-budgets-cashflow | pending | — |
-| 10-downloads-from-ui | pending | — |
+| 10-downloads-from-ui | in-progress | — |
 | 11-snapshot-sharing | pending | — |
 | 12-legacy-migration | pending | — |
 | 13-e2e-and-release | pending | — |
@@ -36,7 +36,7 @@ init (branch: phase/init)
 - 2026-07-07 Step 05 (import pipeline + upload) complete: end-to-end upload works in browser.
 
 ## Blockers
-None.
+- 2026-07-07: Wave 2 subagents (06, 10) were interrupted by the Claude session usage limit (resets 04:40 Europe/Berlin) before writing any code. Relaunch wave 2 when the limit resets; no partial work to clean up.
 
 ## Last Updated
 2026-07-07
