@@ -86,11 +86,28 @@ def create_app(settings: Settings) -> FastAPI:
     return app
 
 
+# Router modules under abn_combined.api; each exposes `router`. Modules that
+# don't exist yet are skipped so partial builds still boot.
+API_ROUTER_MODULES = [
+    "upload",
+    "transactions",
+    "rules",
+    "trends",
+    "tags",
+    "budgets",
+    "cash_flow",
+    "downloads",
+    "snapshots",
+]
+
+
 def _register_api_routers(app: FastAPI) -> None:
     """Register API routers. Guarded so partial builds still boot."""
-    try:
-        from .api.upload import router as upload_router
+    import importlib
 
-        app.include_router(upload_router)
-    except ImportError:  # pragma: no cover - defensive during incremental build
-        pass
+    for mod_name in API_ROUTER_MODULES:
+        try:
+            module = importlib.import_module(f".api.{mod_name}", __package__)
+        except ImportError:  # pragma: no cover - module not built yet
+            continue
+        app.include_router(module.router)
