@@ -22,7 +22,7 @@ Integrated local finance app merging abn-download + abn-analyst: UI-triggered do
 | 04 - Rule Engine, Preview, Change Reports | 04-rule-engine | done |
 | 05 - Import Pipeline and Upload | 05-import-pipeline-and-upload | done |
 | 06 - Transactions View + Filtering | 06-transactions-view | done |
-| 07 - Rules UI | 07-rules-ui | in-progress |
+| 07 - Rules UI | 07-rules-ui | done |
 | 08 - Category Trends | 08-category-trends | in-progress |
 | 09 - Tags, Budgets, Cash Flow | 09-tags-budgets-cashflow | in-progress |
 | 10 - Downloads from UI | 10-downloads-from-ui | done |
