@@ -43,6 +43,7 @@ packages = ["src/abn_combined"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+extend-exclude = ["alembic/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "UP", "B"]

@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from alembic import command
 from alembic.config import Config
+
+from alembic import command
 
 from .logging_config import get_logger
 from .settings import Settings
