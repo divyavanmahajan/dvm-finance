@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Rules — abn-combined{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="/static/rules.css">
+<hgroup>
+  <h1>Categorization Rules</h1>
+  <p>Rules run in priority order (lower first); the first matching rule assigns
+     category and tags. Every change is recorded in
+     <a href="/rules/history">History</a>.</p>
+</hgroup>
+
+<div class="rules-actions">
+  <a role="button" href="/rules/new">New rule</a>
+  <a role="button" class="secondary" href="/rules/history">History</a>
+  <form method="post" action="/rules/recategorize" class="inline-form"
+        onsubmit="return confirm('Reapply all active rules to every non-manual transaction?')">
+    <button type="submit" class="secondary outline">Recategorize all</button>
+  </form>
+</div>
+
+{% if rules %}
+<table class="rules-table">
+  <thead>
+    <tr>
+      <th>Priority</th>
+      <th>Type</th>
+      <th>Pattern</th>
+      <th>Match value</th>
+      <th>Category</th>
+      <th>Tags</th>
+      <th>Active</th>
+      <th>Matched</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for rule in rules %}
+    {% with count = counts.get(rule.id, 0) %}
+    {% include "_rules_row.html" %}
+    {% endwith %}
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<article>
+  <p>No rules yet. <a href="/rules/new">Create your first rule</a>, or use
+     “+ rule” next to any transaction to start from a real example.</p>
+</article>
+{% endif %}
+{% endblock %}
