@@ -7,7 +7,7 @@
 init (branch: phase/init)
 
 ## Status Summary
-7 of 13 steps complete.
+8 of 13 steps complete.
 
 ## Steps
 
@@ -19,7 +19,7 @@ init (branch: phase/init)
 | 04-rule-engine | done | Ported matcher; apply_rules/preview/record_rule_change; 32 tests + 50k perf. |
 | 05-import-pipeline-and-upload | done | import_file pipeline + POST /api/upload + Upload page (htmx), 15 tests. |
 | 06-transactions-view | done | Transactions tab at /: filter model + chips/presets, htmx table, inline edits, detail rows. 56 tests. |
-| 07-rules-ui | in-progress | — |
+| 07-rules-ui | done | Rules CRUD + preview diff + create-from-transaction + history; all mutations audited. 43 tests. |
 | 08-category-trends | in-progress | — |
 | 09-tags-budgets-cashflow | in-progress | — |
 | 10-downloads-from-ui | done | ABN/PayPal downloaders as background jobs, htmx status polling, Download page. 83 tests. Real flows pending manual verify. |
@@ -37,6 +37,9 @@ init (branch: phase/init)
 - 2026-07-07 Step 06 (transactions view) complete: filter bar, htmx table, inline edits. Committed.
 - 2026-07-07 Wave 3 dispatched: steps 07, 08, 09 in parallel; step 10 still in flight.
 - 2026-07-07 Step 10 (downloads from UI) complete and committed; real bank flows pending manual verification.
+
+## Recent Activity (cont.)
+- 2026-07-07 Step 07 (rules UI) complete and committed.
 
 ## Blockers
 - 2026-07-07: Wave 2 subagents (06, 10) were interrupted by the Claude session usage limit (resets 04:40 Europe/Berlin) before writing any code. Relaunch wave 2 when the limit resets; no partial work to clean up.
