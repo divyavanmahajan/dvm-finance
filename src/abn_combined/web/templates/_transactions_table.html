@@ -1,0 +1,65 @@
+{# Active-filter chips — each removes itself by swapping to a narrower URL. #}
+{% if chips %}
+<div class="chips">
+  {% for chip in chips %}
+  <a class="chip" href="/transactions/table?{{ chip.remove }}"
+     hx-get="/transactions/table?{{ chip.remove }}"
+     hx-target="#txn-table" hx-swap="innerHTML"
+     hx-push-url="/{% if chip.remove %}?{{ chip.remove }}{% endif %}">
+    {{ chip.label }} <span aria-hidden="true">✕</span>
+  </a>
+  {% endfor %}
+  <a class="chip chip-clear" href="/"
+     hx-get="/transactions/table" hx-target="#txn-table" hx-swap="innerHTML"
+     hx-push-url="/">Clear all</a>
+</div>
+{% endif %}
+
+<p class="txn-count">
+  {% if page.total %}
+  Showing <strong>{{ page.start_index }}–{{ page.end_index }}</strong> of <strong>{{ page.total }}</strong>
+  {% else %}
+  No transactions match these filters.
+  {% endif %}
+</p>
+
+<table class="txn-table">
+  <thead>
+    <tr>
+      <th></th>
+      <th>Date</th>
+      <th>Account</th>
+      <th>Description</th>
+      <th class="num">Amount</th>
+      <th>Category</th>
+      <th>Tags</th>
+      <th>Source</th>
+      <th></th>
+    </tr>
+  </thead>
+  {% for row in rows %}
+    {% include "_transactions_row.html" %}
+  {% else %}
+  <tbody><tr><td colspan="9"><em>Nothing here.</em></td></tr></tbody>
+  {% endfor %}
+</table>
+
+{% if page.pages > 1 %}
+<nav class="pagination" aria-label="Pagination">
+  <a role="button" class="secondary {% if not page.has_prev %}disabled{% endif %}"
+     {% if page.has_prev %}
+     hx-get="/transactions/table?{{ filter.with_page(page.page - 1).to_query_string() }}"
+     hx-target="#txn-table" hx-swap="innerHTML"
+     hx-push-url="/?{{ filter.with_page(page.page - 1).to_query_string() }}"
+     href="/?{{ filter.with_page(page.page - 1).to_query_string() }}"
+     {% endif %}>Prev</a>
+  <span class="page-indicator">Page {{ page.page }} / {{ page.pages }}</span>
+  <a role="button" class="secondary {% if not page.has_next %}disabled{% endif %}"
+     {% if page.has_next %}
+     hx-get="/transactions/table?{{ filter.with_page(page.page + 1).to_query_string() }}"
+     hx-target="#txn-table" hx-swap="innerHTML"
+     hx-push-url="/?{{ filter.with_page(page.page + 1).to_query_string() }}"
+     href="/?{{ filter.with_page(page.page + 1).to_query_string() }}"
+     {% endif %}>Next</a>
+</nav>
+{% endif %}
