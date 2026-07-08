@@ -1,0 +1,145 @@
+/* Category Trends view (step 08). Separate stylesheet — app.css is owned elsewhere. */
+
+.trends-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
+.trends-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.trends-controls input,
+.trends-controls select {
+  margin: 0;
+  padding: 0.3rem 0.5rem;
+  height: auto;
+  font-size: 0.9rem;
+  width: auto;
+}
+
+/* Scroll container: sticky header row + sticky first column */
+.trends-scroll {
+  overflow: auto;
+  max-height: 75vh;
+  border: 1px solid var(--pico-muted-border-color, #e0e0e0);
+  border-radius: 6px;
+}
+
+.trends-table {
+  margin: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.85rem;
+  width: max-content;
+  min-width: 100%;
+}
+
+.trends-table th,
+.trends-table td {
+  padding: 0.35rem 0.6rem;
+  white-space: nowrap;
+}
+
+.trends-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--pico-card-background-color, #fff);
+  box-shadow: inset 0 -2px 0 var(--pico-muted-border-color, #e0e0e0);
+}
+
+.trends-table .cat-col {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--pico-card-background-color, #fff);
+  text-align: left;
+  font-weight: 600;
+  box-shadow: inset -1px 0 0 var(--pico-muted-border-color, #e0e0e0);
+}
+
+.trends-table thead .cat-col {
+  z-index: 3;
+}
+
+.trends-table .cat-col.child {
+  font-weight: 400;
+  padding-left: 2rem;
+}
+
+.trends-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.trends-table .num a {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.trends-table .num a:hover {
+  text-decoration: underline;
+}
+
+.trends-table .neg,
+.trends-table .neg a {
+  color: #b00020;
+}
+
+.trends-table .total {
+  font-weight: 600;
+}
+
+.trends-table .total-col {
+  border-left: 1px solid var(--pico-muted-border-color, #e0e0e0);
+}
+
+.trends-table tfoot th,
+.trends-table tfoot td {
+  position: sticky;
+  bottom: 0;
+  background: var(--pico-card-background-color, #fff);
+  box-shadow: inset 0 2px 0 var(--pico-muted-border-color, #e0e0e0);
+}
+
+.trends-table tfoot .cat-col {
+  z-index: 3;
+}
+
+.trends-table .parent-row th,
+.trends-table .parent-row td {
+  background: color-mix(in srgb, var(--pico-card-background-color, #fff) 92%, #4a6fa5 8%);
+}
+
+.trends-table .toggle {
+  all: unset;
+  cursor: pointer;
+  display: inline-block;
+  width: 1.2rem;
+  text-align: center;
+  margin-right: 0.2rem;
+  color: inherit;
+}
+
+.trends-table .cat-col a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.trends-table .cat-col a:hover {
+  text-decoration: underline;
+}
+
+.trends-empty {
+  margin-top: 1rem;
+  color: var(--pico-muted-color, #777);
+}

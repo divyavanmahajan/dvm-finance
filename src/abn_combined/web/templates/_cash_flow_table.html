@@ -1,0 +1,30 @@
+{% if columns %}
+<table class="data-table cash-flow-table">
+  <thead>
+    <tr>
+      <th>Period</th>
+      <th class="num">Income €</th>
+      <th class="num">Expense €</th>
+      <th class="num">Net €</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for col in columns %}
+    <tr>
+      <td><a href="{{ col.txn_url }}">{{ col.label }}</a></td>
+      <td class="num pos"><a href="{{ col.txn_url }}">{{ "%.2f" | format(col.income) }}</a></td>
+      <td class="num neg"><a href="{{ col.txn_url }}">{{ "%.2f" | format(col.expense) }}</a></td>
+      <td class="num {{ 'pos' if col.net >= 0 else 'neg' }}">{{ "%.2f" | format(col.net) }}</td>
+    </tr>
+    {% endfor %}
+    <tr class="net-row">
+      <td><a href="{{ total_txn_url }}">Total</a></td>
+      <td class="num pos">{{ "%.2f" | format(result.total_income) }}</td>
+      <td class="num neg">{{ "%.2f" | format(result.total_expense) }}</td>
+      <td class="num {{ 'pos' if result.total_net >= 0 else 'neg' }}">{{ "%.2f" | format(result.total_net) }}</td>
+    </tr>
+  </tbody>
+</table>
+{% else %}
+<p><em>No periods in the selected window.</em></p>
+{% endif %}

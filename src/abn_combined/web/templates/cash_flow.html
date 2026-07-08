@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Cash Flow — abn-combined{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="/static/tables.css">
+<hgroup>
+  <h1>Cash Flow</h1>
+  <p>Income vs expense per period (transfers excluded). Amounts link to the matching transactions; filter state lives in the URL.</p>
+</hgroup>
+
+<form class="table-controls" method="get" action="/cash-flow"
+      hx-get="/cash-flow/table" hx-target="#cash-flow-table" hx-swap="innerHTML"
+      hx-push-url="/cash-flow" hx-trigger="change">
+  <label>Preset
+    <select name="preset">
+      <option value="">Custom range</option>
+      {% for p in presets %}
+      <option value="{{ p }}" {% if preset == p %}selected{% endif %}>{{ p.replace('-', ' ') | title }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>From <input type="date" name="date_from" value="{{ date_from.isoformat() }}"></label>
+  <label>To <input type="date" name="date_to" value="{{ date_to.isoformat() }}"></label>
+  <label>Breakdown
+    <select name="breakdown">
+      {% for b in breakdowns %}
+      <option value="{{ b }}" {% if breakdown == b %}selected{% endif %}>{{ b.title() }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Account
+    <select name="account">
+      <option value="">All accounts</option>
+      {% for a in known_accounts %}
+      <option value="{{ a }}" {% if a in accounts %}selected{% endif %}>{{ a }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <noscript><button type="submit">Apply</button></noscript>
+</form>
+
+<div id="cash-flow-table">
+  {% include "_cash_flow_table.html" %}
+</div>
+{% endblock %}

@@ -1,0 +1,94 @@
+/* Download page styles — do NOT edit app.css for these */
+
+.download-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.download-card {
+  padding: 1.25rem;
+}
+
+.download-dates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.download-hint {
+  color: var(--pico-muted-color);
+  font-size: 0.875rem;
+}
+
+.chrome-cmd {
+  font-size: 0.75rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.download-notice {
+  border-left: 3px solid var(--pico-color-amber-550, #f59e0b);
+  padding-left: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+/* Status area */
+.download-status {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border-radius: var(--pico-border-radius);
+  border: 1px solid var(--pico-muted-border-color);
+  font-size: 0.9rem;
+}
+
+.download-state-badge {
+  display: inline-block;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  padding: 0.1em 0.4em;
+  border-radius: 3px;
+  background: var(--pico-secondary-background);
+}
+
+.download-status--done .download-state-badge {
+  background: var(--pico-color-green-100, #d1fae5);
+  color: var(--pico-color-green-800, #065f46);
+}
+
+.download-status--failed .download-state-badge {
+  background: var(--pico-color-red-100, #fee2e2);
+  color: var(--pico-color-red-800, #991b1b);
+}
+
+.download-status--waiting-for-auth .download-state-badge,
+.download-status--downloading .download-state-badge,
+.download-status--importing .download-state-badge {
+  background: var(--pico-color-blue-100, #dbeafe);
+  color: var(--pico-color-blue-800, #1e40af);
+}
+
+.download-message {
+  margin: 0.4rem 0 0;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.download-summary {
+  margin-top: 0.5rem;
+}
+
+.download-file-links {
+  margin: 0.25rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.htmx-indicator-inline {
+  font-style: italic;
+  color: var(--pico-muted-color);
+  font-size: 0.8rem;
+}

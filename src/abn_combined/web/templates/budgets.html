@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Budgets — abn-combined{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="/static/tables.css">
+<hgroup>
+  <h1>Budgets</h1>
+  <p>Budget vs actual per category. Actuals use effective categories (manual precedence) within each budget's current period window.</p>
+</hgroup>
+
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+
+<form class="table-controls" method="get" action="/budgets">
+  <label>Period type
+    <select name="period" onchange="this.form.submit()">
+      <option value="">All</option>
+      {% for p in periods %}
+      <option value="{{ p }}" {% if period == p %}selected{% endif %}>{{ p.title() }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Reference date
+    <input type="date" name="ref" value="{{ ref.isoformat() }}" onchange="this.form.submit()">
+  </label>
+  <noscript><button type="submit">Apply</button></noscript>
+</form>
+
+{% include "_budgets_table.html" %}
+
+<h2>Add budget</h2>
+<form method="post" action="/budgets/create" class="form-grid">
+  <label>Category
+    <input type="text" name="category" list="known-categories" required>
+  </label>
+  <label>Amount €
+    <input type="number" name="amount" step="0.01" min="0" required>
+  </label>
+  <label>Period
+    <select name="period">
+      {% for p in periods %}
+      <option value="{{ p }}" {% if p == 'month' %}selected{% endif %}>{{ p.title() }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Valid from <input type="date" name="start_date"></label>
+  <label>Valid to <input type="date" name="end_date"></label>
+  <label>Notes <input type="text" name="notes"></label>
+  <button type="submit">Add budget</button>
+</form>
+
+<datalist id="known-categories">
+  {% for c in categories %}<option value="{{ c }}"></option>{% endfor %}
+</datalist>
+{% endblock %}

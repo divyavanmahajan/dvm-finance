@@ -7,3 +7,6 @@ htmlcov/
 dist/
 *.egg-info/
 .ruff_cache/
+data/
+*.db
+.DS_Store
