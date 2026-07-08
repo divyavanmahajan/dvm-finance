@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — abn-combined{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="/static/rules.css">
+<script src="/static/js/rules.js"></script>
+
+<hgroup>
+  <h1>{% if vm.id %}Edit rule #{{ vm.id }}{% else %}New rule{% endif %}</h1>
+  <p>Use “Preview matches” to dry-run the draft before saving — nothing is written
+     until you save, and every save is recorded in
+     <a href="{% if vm.id %}/rules/{{ vm.id }}/history{% else %}/rules/history{% endif %}">History</a>.</p>
+</hgroup>
+
+{% if errors %}
+<article class="rule-errors">
+  <strong>Please fix the following:</strong>
+  <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+</article>
+{% endif %}
+
+<form method="post"
+      action="{% if vm.id %}/rules/{{ vm.id }}{% else %}/rules{% endif %}"
+      class="rule-form"
+      x-data='ruleEditor({{ vm.conditions | tojson }})'>
+
+  {% if vm.id %}<input type="hidden" name="rule_id" value="{{ vm.id }}">{% endif %}
+
+  <div class="grid">
+    <label>Priority <small>(lower runs first)</small>
+      <input type="number" name="priority" value="{{ vm.priority }}" required>
+    </label>
+    <label>Rule type
+      <select name="rule_type">
+        {% for t in rule_types %}
+        <option value="{{ t }}" {% if vm.rule_type == t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Field
+      <input name="field_target" list="field-suggestions" value="{{ vm.field_target }}"
+             placeholder="description">
+    </label>
+  </div>
+
+  <div class="grid">
+    <label>Match pattern
+      <select name="match_pattern">
+        {% for p in patterns %}
+        <option value="{{ p }}" {% if vm.match_pattern == p %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="grow">Match value
+      <input name="match_value" value="{{ vm.match_value }}" required
+             placeholder="text, or a regular expression for the regex pattern">
+    </label>
+  </div>
+
+  <div class="grid">
+    <label>Category
+      <input name="category" list="known-categories" value="{{ vm.category }}" required>
+    </label>
+    <label>Tags <small>(comma-separated)</small>
+      <input name="tags" value="{{ vm.tags }}">
+    </label>
+    <label>Active
+      <input type="checkbox" role="switch" name="is_active"
+             {% if vm.is_active %}checked{% endif %}>
+    </label>
+  </div>
+
+  <label>Notes
+    <input name="notes" value="{{ vm.notes }}">
+  </label>
+
+  {# ---- additional conditions (dynamic rows, Alpine) ---- #}
+  <fieldset class="conditions">
+    <legend>Additional conditions <small>(combined with the primary match)</small></legend>
+    <template x-for="(c, i) in conditions" :key="i">
+      <div class="cond-row">
+        <select name="cond_operator" x-model="c.operator" aria-label="Operator">
+          {% for op in operators %}<option value="{{ op }}">{{ op }}</option>{% endfor %}
+        </select>
+        <input name="cond_field_target" x-model="c.field_target"
+               list="field-suggestions" placeholder="field" aria-label="Field">
+        <select name="cond_match_pattern" x-model="c.match_pattern" aria-label="Pattern">
+          {% for p in patterns %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+        </select>
+        <input name="cond_match_value" x-model="c.match_value"
+               placeholder="value" aria-label="Value">
+        <input type="hidden" name="cond_sort_order" :value="i">
+        <button type="button" class="link" title="Move up" @click="moveUp(i)"
+                :disabled="i === 0">↑</button>
+        <button type="button" class="link" title="Move down" @click="moveDown(i)"
+                :disabled="i === conditions.length - 1">↓</button>
+        <button type="button" class="link danger" title="Remove condition"
+                @click="removeCondition(i)">✕</button>
+      </div>
+    </template>
+    <button type="button" class="secondary outline" @click="addCondition()">+ Add condition</button>
+  </fieldset>
+
+  {# ---- context filters ---- #}
+  <fieldset>
+    <legend>Context filters <small>(optional — restrict where the rule applies)</small></legend>
+    <div class="grid">
+      <label>Account
+        <select name="filter_account">
+          <option value="">Any account</option>
+          {% for a in accounts %}
+          <option value="{{ a }}" {% if vm.filter_account == a %}selected{% endif %}>{{ a }}</option>
+          {% endfor %}
+          {% if vm.filter_account and vm.filter_account not in accounts %}
+          <option value="{{ vm.filter_account }}" selected>{{ vm.filter_account }}</option>
+          {% endif %}
+        </select>
+      </label>
+      <label>Currency
+        <input name="filter_currency" value="{{ vm.filter_currency }}" maxlength="3"
+               placeholder="EUR">
+      </label>
+      <label>Date from
+        <input type="date" name="filter_date_from" value="{{ vm.filter_date_from }}">
+      </label>
+      <label>Date to
+        <input type="date" name="filter_date_to" value="{{ vm.filter_date_to }}">
+      </label>
+    </div>
+  </fieldset>
+
+  <div class="rule-form-actions">
+    <button type="button" class="secondary" id="preview-btn"
+            hx-post="/rules/preview"
+            hx-target="#preview-panel" hx-swap="innerHTML"
+            hx-trigger="{% if auto_preview %}load, {% endif %}click">
+      Preview matches
+    </button>
+    <button type="submit">Save rule</button>
+    <a role="button" class="secondary outline" href="/rules">Cancel</a>
+  </div>
+</form>
+
+<datalist id="field-suggestions">
+  {% for f in field_suggestions %}<option value="{{ f }}"></option>{% endfor %}
+</datalist>
+<datalist id="known-categories">
+  {% for c in categories %}<option value="{{ c }}"></option>{% endfor %}
+</datalist>
+
+<section id="preview-panel" aria-live="polite"></section>
+{% endblock %}
