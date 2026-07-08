@@ -26,9 +26,9 @@ Integrated local finance app merging abn-download + abn-analyst: UI-triggered do
 | 08 - Category Trends | 08-category-trends | done |
 | 09 - Tags, Budgets, Cash Flow | 09-tags-budgets-cashflow | done |
 | 10 - Downloads from UI | 10-downloads-from-ui | done |
-| 11 - Snapshot Sharing | 11-snapshot-sharing | in-progress |
+| 11 - Snapshot Sharing | 11-snapshot-sharing | done |
 | 12 - Legacy Migration | 12-legacy-migration | done |
-| 13 - E2E and Release | 13-e2e-and-release | pending |
+| 13 - E2E and Release | 13-e2e-and-release | in-progress |
 
 Status values: `pending` | `in-progress` | `done` | `blocked`
 

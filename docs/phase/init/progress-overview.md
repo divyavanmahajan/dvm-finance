@@ -7,7 +7,7 @@
 init (branch: phase/init)
 
 ## Status Summary
-11 of 13 steps complete.
+12 of 13 steps complete.
 
 ## Steps
 
@@ -23,9 +23,9 @@ init (branch: phase/init)
 | 08-category-trends | done | Trends table, hyphen-hierarchy rollup, exact cell/row click-through. 36 tests. |
 | 09-tags-budgets-cashflow | done | Tags rename/delete with audit, budget-vs-actual, cash flow tables. 57 tests. |
 | 10-downloads-from-ui | done | ABN/PayPal downloaders as background jobs, htmx status polling, Download page. 83 tests. Real flows pending manual verify. |
-| 11-snapshot-sharing | in-progress | — |
+| 11-snapshot-sharing | done | Versioned gzip snapshots, incoming-wins import with backup + audit report. 33 tests. |
 | 12-legacy-migration | done | migrate-legacy CLI verified on real DB: 6019 txns, 701 rules, idempotent. 16 tests. |
-| 13-e2e-and-release | pending | — |
+| 13-e2e-and-release | in-progress | — |
 
 ## Recent Activity
 - 2026-07-07 Phase branch created; wave 1 (steps 01–05) dispatched to subagent.
@@ -44,6 +44,8 @@ init (branch: phase/init)
 - 2026-07-07 Step 08 (category trends) complete and committed. Hierarchy separator confirmed: hyphen.
 - 2026-07-08 Step 09 (tags/budgets/cash flow) complete and committed.
 - 2026-07-08 Step 12 (legacy migration) complete and committed; real-DB verification passed (6721 rows).
+- 2026-07-08 Step 11 (snapshot sharing) complete and committed; suite at 447 green.
+- 2026-07-08 Step 13 (e2e and release) dispatched.
 
 ## Blockers
 - 2026-07-07: Wave 2 subagents (06, 10) were interrupted by the Claude session usage limit (resets 04:40 Europe/Berlin) before writing any code. Relaunch wave 2 when the limit resets; no partial work to clean up.
