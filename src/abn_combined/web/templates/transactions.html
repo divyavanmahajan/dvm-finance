@@ -83,6 +83,18 @@
     </div>
 
     <div class="multi" x-data="{ open: false }">
+      <button type="button" class="secondary outline" @click="open = !open">Exclude ▾</button>
+      <div class="multi-menu" x-show="open" @click.outside="open = false" x-cloak>
+        <label><input type="checkbox" name="exclude_category" value="uncategorized"
+               {% if 'uncategorized' in filter.exclude_categories %}checked{% endif %}> Uncategorized</label>
+        {% for c in categories %}
+        <label><input type="checkbox" name="exclude_category" value="{{ c }}"
+               {% if c in filter.exclude_categories %}checked{% endif %}> {{ c }}</label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="multi" x-data="{ open: false }">
       <button type="button" class="secondary outline" @click="open = !open">Tags ▾</button>
       <div class="multi-menu" x-show="open" @click.outside="open = false" x-cloak>
         {% for t in tags %}

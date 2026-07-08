@@ -25,8 +25,8 @@ from sqlalchemy.orm import Session
 
 from .filters import UNCATEGORIZED, TransactionFilter, _parse_date
 from .models import Transaction
+from .utils import CATEGORY_SEPARATOR as SEPARATOR
 
-SEPARATOR = "-"
 UNCATEGORIZED_LABEL = "Uncategorized"
 
 GRANULARITIES = ("month", "year")
