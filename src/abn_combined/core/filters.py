@@ -18,6 +18,7 @@ from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Query, Session
 
 from .models import Transaction
+from .utils import CATEGORY_SEPARATOR
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -116,6 +117,7 @@ class TransactionFilter:
     date_to: date | None = None
     preset: str | None = None
     categories: list[str] = field(default_factory=list)
+    exclude_categories: list[str] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
     accounts: list[str] = field(default_factory=list)
     amount_min: float | None = None
@@ -144,6 +146,7 @@ class TransactionFilter:
             date_to=_parse_date(one("date_to")),
             preset=preset,
             categories=[c for c in many("category") if c],
+            exclude_categories=[c for c in many("exclude_category") if c],
             tags=[t for t in many("tag") if t],
             accounts=[a for a in many("account") if a],
             amount_min=_parse_float(one("amount_min")),
@@ -188,6 +191,8 @@ class TransactionFilter:
             pairs.append(("preset", self.preset))
         for c in self.categories:
             pairs.append(("category", c))
+        for c in self.exclude_categories:
+            pairs.append(("exclude_category", c))
         for t in self.tags:
             pairs.append(("tag", t))
         for a in self.accounts:
@@ -229,14 +234,17 @@ class TransactionFilter:
         return new.to_query_string()
 
     def _removed(self, kind: str, value: str | None) -> TransactionFilter:
-        f = replace(self, categories=list(self.categories), tags=list(self.tags),
-                    accounts=list(self.accounts), page=1)
+        f = replace(self, categories=list(self.categories),
+                    exclude_categories=list(self.exclude_categories),
+                    tags=list(self.tags), accounts=list(self.accounts), page=1)
         if kind == "q":
             f.q = None
         elif kind == "date":
             f.date_from = f.date_to = f.preset = None
         elif kind == "category" and value is not None:
             f.categories = [c for c in f.categories if c != value]
+        elif kind == "exclude_category" and value is not None:
+            f.exclude_categories = [c for c in f.exclude_categories if c != value]
         elif kind == "tag" and value is not None:
             f.tags = [t for t in f.tags if t != value]
         elif kind == "account" and value is not None:
@@ -268,6 +276,11 @@ class TransactionFilter:
             label = "Uncategorized" if c == UNCATEGORIZED else c
             chips.append({"kind": "category", "value": c, "label": f"Category: {label}",
                           "remove": self.without("category", c)})
+        for c in self.exclude_categories:
+            label = "Uncategorized" if c == UNCATEGORIZED else c
+            chips.append({"kind": "exclude_category", "value": c,
+                          "label": f"Exclude: {label}",
+                          "remove": self.without("exclude_category", c)})
         for t in self.tags:
             chips.append({"kind": "tag", "value": t, "label": f"Tag: {t}",
                           "remove": self.without("tag", t)})
@@ -322,17 +335,28 @@ def build_query(db: Session, f: TransactionFilter, today: date | None = None) ->
     if hi:
         query = query.filter(Transaction.transactiondate <= hi)
 
+    def _category_cond(cat: str):
+        """Match a category exactly or any hierarchical child (hyphen-separated)."""
+        if cat == UNCATEGORIZED:
+            return or_(eff_cat.is_(None), eff_cat == "")
+        c = cat.lower()
+        return or_(
+            func.lower(eff_cat) == c,
+            func.lower(eff_cat).like(f"{c}{CATEGORY_SEPARATOR}%"),
+        )
+
     if f.categories:
-        conds = []
-        for cat in f.categories:
+        query = query.filter(or_(*[_category_cond(cat) for cat in f.categories]))
+
+    if f.exclude_categories:
+        for cat in f.exclude_categories:
             if cat == UNCATEGORIZED:
-                conds.append(or_(eff_cat.is_(None), eff_cat == ""))
+                query = query.filter(~_category_cond(cat))
             else:
-                c = cat.lower()
-                conds.append(
-                    or_(func.lower(eff_cat) == c, func.lower(eff_cat).like(f"{c}:%"))
+                # NOT LIKE is NULL for uncategorized rows; keep them explicitly.
+                query = query.filter(
+                    or_(eff_cat.is_(None), eff_cat == "", ~_category_cond(cat))
                 )
-        query = query.filter(or_(*conds))
 
     if f.tags:
         conds = [eff_tags.ilike(f"%{tag}%") for tag in f.tags]
