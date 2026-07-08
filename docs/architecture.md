@@ -1,5 +1,3 @@
-> **Initial draft** — scaffolded from spec interview. Updated by spec-execute as each phase completes.
-
 # Architecture
 
 Single Python package `abn_combined` serving a local, single-user, server-rendered web app.
@@ -11,7 +9,7 @@ Single Python package `abn_combined` serving a local, single-user, server-render
 | Frontend | htmx + Alpine.js (vendored), Pico.css — no build step |
 | DB | SQLite (data dir via platformdirs), SQLAlchemy 2.x, Alembic migrations |
 | Browser automation | Playwright sync API (ABN download), CDP attach (PayPal download) |
-| Packaging | hatchling, `src/` layout, console script `abn-combined`, runnable via uvx |
+| Packaging | hatchling, `src/` layout, console script `abn-combined`, runnable via uvx; Alembic tree bundled into the wheel (`abn_combined/alembic{,.ini}` via force-include) so packaged installs migrate on startup |
 | Auth | None (binds 127.0.0.1) |
 
 ```
@@ -45,6 +43,18 @@ Dropped: users/auth tables, LLM/vector artifacts.
 - Rule matching normalization: lowercase, strip spaces, drop `WERO/` prefix (ported `normalize_string_for_matching`).
 - All schema changes via Alembic.
 - Snapshot merge: insert-or-overwrite (incoming wins), never deletes local rows; whole import is one transaction with a pre-import DB backup.
+
+## Category hierarchy convention
+
+**Separator: hyphen (`-`), up to three segments** — e.g. `groceries-ah`,
+`fixed-insurance-life`, `education-tuition-violin`. This is the convention the
+legacy `abn_analyst.db` data uses (627 of 701 rule categories contain a hyphen;
+none use `:`, `/` or `>` — verified read-only during the migration step, resolving
+the spec Open Question). Trends rolls categories up by the first hyphen segment;
+parent cell/row links enumerate the exact child categories as repeated `category=`
+params so linked transaction lists sum exactly to the displayed cell. The filter
+layer's prefix match also accepts `:`-separated names for forward compatibility,
+but new categories should follow the hyphen convention.
 
 ## Snapshot format
 

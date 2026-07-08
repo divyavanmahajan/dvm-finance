@@ -14,6 +14,7 @@
       hx-target="#trends-table"
       hx-swap="innerHTML"
       hx-push-url="true"
+      hx-indicator="#trends-loading"
       hx-trigger="change from:select, change from:input[type=date]">
   <label>
     <span>From</span>
@@ -42,6 +43,8 @@
     </select>
   </label>
 </form>
+
+<p id="trends-loading" class="htmx-indicator" role="status" aria-live="polite">Loading…</p>
 
 <div id="trends-table">
   {% include "_trends_table.html" %}

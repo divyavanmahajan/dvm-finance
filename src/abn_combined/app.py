@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -42,15 +44,16 @@ def create_app(settings: Settings) -> FastAPI:
     settings.ensure_data_dir()
     configure_engine(settings)
 
-    app = FastAPI(title="abn-combined")
-    app.state.settings = settings
-
-    @app.on_event("startup")
-    def _startup() -> None:
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         from .migrations import upgrade_to_head
 
         upgrade_to_head(settings)
         logger.info("app_started", data_dir=str(settings.data_dir))
+        yield
+
+    app = FastAPI(title="abn-combined", lifespan=lifespan)
+    app.state.settings = settings
 
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
