@@ -7,7 +7,7 @@
 init (branch: phase/init)
 
 ## Status Summary
-12 of 13 steps complete.
+13 of 13 steps complete.
 
 ## Steps
 
@@ -25,7 +25,7 @@ init (branch: phase/init)
 | 10-downloads-from-ui | done | ABN/PayPal downloaders as background jobs, htmx status polling, Download page. 83 tests. Real flows pending manual verify. |
 | 11-snapshot-sharing | done | Versioned gzip snapshots, incoming-wins import with backup + audit report. 33 tests. |
 | 12-legacy-migration | done | migrate-legacy CLI verified on real DB: 6019 txns, 701 rules, idempotent. 16 tests. |
-| 13-e2e-and-release | in-progress | — |
+| 13-e2e-and-release | done | 5-flow e2e suite, 88.84% coverage (gate 80), wheel/uvx verified, README + docs. |
 
 ## Recent Activity
 - 2026-07-07 Phase branch created; wave 1 (steps 01–05) dispatched to subagent.
@@ -46,6 +46,7 @@ init (branch: phase/init)
 - 2026-07-08 Step 12 (legacy migration) complete and committed; real-DB verification passed (6721 rows).
 - 2026-07-08 Step 11 (snapshot sharing) complete and committed; suite at 447 green.
 - 2026-07-08 Step 13 (e2e and release) dispatched.
+- 2026-07-08 Step 13 complete: all gates green. Phase implementation finished; end-of-phase docs next.
 
 ## Blockers
 - 2026-07-07: Wave 2 subagents (06, 10) were interrupted by the session usage limit (resets 04:40 Europe/Berlin) before writing any code. Relaunch wave 2 when the limit resets; no partial work to clean up.

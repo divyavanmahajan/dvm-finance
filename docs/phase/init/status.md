@@ -28,12 +28,12 @@ Integrated local finance app merging abn-download + abn-analyst: UI-triggered do
 | 10 - Downloads from UI | 10-downloads-from-ui | done |
 | 11 - Snapshot Sharing | 11-snapshot-sharing | done |
 | 12 - Legacy Migration | 12-legacy-migration | done |
-| 13 - E2E and Release | 13-e2e-and-release | in-progress |
+| 13 - E2E and Release | 13-e2e-and-release | done |
 
 Status values: `pending` | `in-progress` | `done` | `blocked`
 
 ## Blockers
-- PyPI name availability for `abn-combined` unverified (fallback: `uvx --from git+…`). Decide by step 13.
+- (resolved 2026-07-08) PyPI name `abn-combined` is unclaimed; not published yet — README documents `uvx --from git+…` until publication.
 - Real bank/PayPal download flows (step 10) require manual verification with live credentials — schedule with the user.
 
 ## Last Updated
