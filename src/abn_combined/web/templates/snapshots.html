@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Snapshots — abn-combined{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="/static/snapshots.css">
+<hgroup>
+  <h1>Snapshots</h1>
+  <p>Share the dataset with another machine: export a snapshot file here, import it there.
+     Import merges with incoming-wins on conflicts, never deletes local data, and backs up
+     the database first.</p>
+</hgroup>
+
+{% if error %}
+<article class="snapshot-error" role="alert">
+  <strong>Import rejected:</strong> {{ error }}
+</article>
+{% endif %}
+
+<section>
+  <h2>Export</h2>
+  <form method="post" action="/snapshots/export">
+    <button type="submit">Export snapshot</button>
+  </form>
+
+  {% if exports %}
+  <table class="snapshot-exports">
+    <thead><tr><th>File</th><th>Date</th><th>Size</th><th></th></tr></thead>
+    <tbody>
+      {% for e in exports %}
+      <tr>
+        <td><code>{{ e.name }}</code></td>
+        <td>{{ e.modified.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        <td>{{ '%.1f'|format(e.size / 1024) }} KB</td>
+        <td><a role="button" class="secondary outline" href="/snapshots/files/{{ e.name }}" download>Download</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p><small>No exports yet.</small></p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Import</h2>
+  <p><small>Upload a snapshot exported by abn-combined. Records that exist on both sides are
+     overwritten with the snapshot's values (including manual categorizations); everything
+     overwritten is listed in the import report. Local-only records are kept.</small></p>
+  <form method="post" action="/snapshots/import" enctype="multipart/form-data" class="snapshot-import-form">
+    <input type="file" name="file" accept=".gz,.json.gz,application/gzip" required>
+    <button type="submit">Import snapshot</button>
+  </form>
+</section>
+
+<section>
+  <h2>Import reports</h2>
+  {% if imports %}
+  {% for imp in imports %}
+  {% include "_snapshot_import_report.html" %}
+  {% endfor %}
+  {% else %}
+  <p><small>No imports yet.</small></p>
+  {% endif %}
+</section>
+{% endblock %}
