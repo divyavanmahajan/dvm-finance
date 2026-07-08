@@ -1,0 +1,75 @@
+{# Trends table partial: swapped by the controls form via htmx. #}
+{% macro amount_cell(row, period) -%}
+  {%- if period.key in row.cells -%}
+    {%- set value = row.cells[period.key] -%}
+    <td class="num {% if value < 0 %}neg{% else %}pos{% endif %}">
+      <a href="{{ link(row.categories, period.start, period.end, params.accounts) }}">{{ '%.2f'|format(value) }}</a>
+    </td>
+  {%- else -%}
+    <td class="num empty"></td>
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro total_cell(value) -%}
+  <td class="num total {% if value < 0 %}neg{% else %}pos{% endif %}">{{ '%.2f'|format(value) }}</td>
+{%- endmacro %}
+
+{% if table.rows %}
+<div class="trends-scroll">
+  <table class="trends-table">
+    <thead>
+      <tr>
+        <th class="cat-col">Category</th>
+        {% for period in table.periods %}
+        <th class="num">{{ period.label }}</th>
+        {% endfor %}
+        <th class="num total-col">Total</th>
+      </tr>
+    </thead>
+    {% for row in table.rows %}
+    <tbody {% if row.has_children %}x-data="{ open: false }"{% endif %}>
+      <tr class="{% if row.has_children %}parent-row{% endif %}">
+        <th class="cat-col" scope="row">
+          {% if row.has_children %}
+          <button type="button" class="toggle" @click="open = !open"
+                  :aria-expanded="open" aria-label="Toggle {{ row.label }} sub-categories">
+            <span x-text="open ? '▾' : '▸'">▸</span>
+          </button>
+          {% endif %}
+          <a href="{{ link(row.categories, window_from, window_to, params.accounts) }}">{{ row.label }}</a>
+        </th>
+        {% for period in table.periods %}{{ amount_cell(row, period) }}{% endfor %}
+        {{ total_cell(row.total) }}
+      </tr>
+      {% for child in row.children %}
+      <tr class="child-row" x-show="open" x-cloak>
+        <th class="cat-col child" scope="row">
+          <a href="{{ link(child.categories, window_from, window_to, params.accounts) }}">{{ child.label }}</a>
+        </th>
+        {% for period in table.periods %}{{ amount_cell(child, period) }}{% endfor %}
+        {{ total_cell(child.total) }}
+      </tr>
+      {% endfor %}
+    </tbody>
+    {% endfor %}
+    <tfoot>
+      <tr>
+        <th class="cat-col" scope="row">Total</th>
+        {% for period in table.periods %}
+        {% if period.key in table.column_totals %}
+        {{ total_cell(table.column_totals[period.key]) }}
+        {% else %}
+        <td class="num total empty"></td>
+        {% endif %}
+        {% endfor %}
+        {{ total_cell(table.grand_total) }}
+      </tr>
+    </tfoot>
+  </table>
+</div>
+{% else %}
+<article class="trends-empty">
+  <p>No transactions in this window. Adjust the date range, or import statements via
+     the <a href="/upload">Upload</a> or <a href="/download">Download</a> tabs.</p>
+</article>
+{% endif %}

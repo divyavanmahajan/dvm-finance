@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Download — abn-combined{% endblock %}
+{% block content %}
+{# base.html has no head block to extend; import the page stylesheet here instead. #}
+<style>@import url('/static/downloads.css');</style>
+<hgroup>
+  <h1>Download statements</h1>
+  <p>Trigger ABN AMRO or PayPal downloads. Jobs run in the background; status updates every 2 s.</p>
+</hgroup>
+
+<div class="download-grid">
+
+  {# ── ABN AMRO card ─────────────────────────────────────────────────── #}
+  <article class="download-card" id="abn-card">
+    <header><strong>ABN AMRO</strong></header>
+
+    {% if not playwright_available %}
+    <div class="download-notice" role="alert">
+      <p>Playwright / Chromium is not installed.  The ABN AMRO flow requires a headed browser.</p>
+      <p>Run in your terminal:</p>
+      <pre><code>playwright install chromium</code></pre>
+    </div>
+    {% else %}
+    <form
+      hx-post="/api/download/abn"
+      hx-target="#abn-status"
+      hx-swap="innerHTML"
+      hx-disabled-elt="button[type=submit]">
+
+      <div class="download-dates">
+        <label>
+          From (DD-MM-YYYY)
+          <input type="text" name="from_date" value="{{ abn_from }}" pattern="\d{2}-\d{2}-\d{4}"
+                 placeholder="DD-MM-YYYY">
+        </label>
+        <label>
+          To (DD-MM-YYYY)
+          <input type="text" name="to_date" value="{{ abn_to }}" pattern="\d{2}-\d{2}-\d{4}"
+                 placeholder="DD-MM-YYYY">
+        </label>
+      </div>
+
+      <p class="download-hint">
+        A headed Chromium window will open. Authenticate with the ABN AMRO app when prompted.
+      </p>
+
+      {% if abn_job and not abn_job.is_terminal() %}
+      <button type="submit" disabled>Running…</button>
+      {% else %}
+      <button type="submit">Start ABN download</button>
+      {% endif %}
+    </form>
+    {% endif %}
+
+    <div id="abn-status">
+      {% if abn_job %}
+        {% set source = "abn" %}
+        {% set job = abn_job %}
+        {% include "_download_status.html" %}
+      {% endif %}
+    </div>
+  </article>
+
+  {# ── PayPal card ────────────────────────────────────────────────────── #}
+  <article class="download-card" id="paypal-card">
+    <header><strong>PayPal</strong></header>
+
+    <p class="download-hint">
+      Start Chrome with remote debugging before clicking the button:
+    </p>
+    <pre class="chrome-cmd"><code>{{ chrome_launch_command }}</code></pre>
+
+    <form
+      hx-post="/api/download/paypal"
+      hx-target="#paypal-status"
+      hx-swap="innerHTML"
+      hx-disabled-elt="button[type=submit]">
+
+      <div class="download-dates">
+        <label>
+          From (YYYY-MM-DD)
+          <input type="text" name="from_date" value="{{ pp_from }}" pattern="\d{4}-\d{2}-\d{2}"
+                 placeholder="YYYY-MM-DD">
+        </label>
+        <label>
+          To (YYYY-MM-DD)
+          <input type="text" name="to_date" value="{{ pp_to }}" pattern="\d{4}-\d{2}-\d{2}"
+                 placeholder="YYYY-MM-DD">
+        </label>
+      </div>
+
+      <label>
+        CDP URL (optional)
+        <input type="text" name="cdp_url" value="http://127.0.0.1:9222" placeholder="http://127.0.0.1:9222">
+        <small>Default: http://127.0.0.1:9222</small>
+      </label>
+
+      {% if paypal_job and not paypal_job.is_terminal() %}
+      <button type="submit" disabled>Running…</button>
+      {% else %}
+      <button type="submit">Start PayPal download</button>
+      {% endif %}
+    </form>
+
+    <div id="paypal-status">
+      {% if paypal_job %}
+        {% set source = "paypal" %}
+        {% set job = paypal_job %}
+        {% include "_download_status.html" %}
+      {% endif %}
+    </div>
+  </article>
+
+</div>
+{% endblock %}
