@@ -1,0 +1,62 @@
+{# One snapshot-import report card. Context: `imp` (SnapshotImport row),
+   `imported_id` (highlight the just-completed import). #}
+<article class="snapshot-report {% if imp.id == imported_id %}just-imported{% endif %}"
+         id="import-{{ imp.id }}">
+  <header>
+    <span class="action action-import">import</span>
+    <strong>Import report #{{ imp.id }}</strong>
+    <small class="ts">{{ imp.created_at.strftime('%Y-%m-%d %H:%M:%S') if imp.created_at else '' }}</small>
+    {% if imp.source_machine_id %}
+    <small class="ts">from machine <code>{{ imp.source_machine_id[:8] }}</code></small>
+    {% endif %}
+  </header>
+
+  {% if imp.counts %}
+  <table class="snapshot-counts">
+    <thead><tr><th>Entity</th><th>Inserted</th><th>Updated</th><th>Unchanged</th></tr></thead>
+    <tbody>
+      {% for entity, c in imp.counts.items() %}
+      <tr>
+        <td>{{ entity.replace('_', ' ') }}</td>
+        <td>{{ c.inserted }}</td>
+        <td>{{ c.updated }}</td>
+        <td>{{ c.unchanged }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  {% set ns = namespace(total=0) %}
+  {% for entity, rows in (imp.overwrites or {}).items() %}{% set ns.total = ns.total + rows|length %}{% endfor %}
+  {% if ns.total %}
+  <details>
+    <summary>Overwritten local records ({{ ns.total }})</summary>
+    {% for entity, rows in imp.overwrites.items() %}
+    {% if rows %}
+    <h4>{{ entity.replace('_', ' ') }}</h4>
+    <table class="snapshot-overwrites">
+      <thead><tr><th>Record</th><th>Field</th><th>Local (overwritten)</th><th>Incoming</th></tr></thead>
+      <tbody>
+        {% for row in rows %}
+        {% for field, change in row.fields.items() %}
+        <tr>
+          <td><code>{{ row.id or row.uuid or row.key }}</code></td>
+          <td>{{ field }}</td>
+          <td class="before">{{ change.local if change.local is not none else '—' }}</td>
+          <td class="after">{{ change.incoming if change.incoming is not none else '—' }}</td>
+        </tr>
+        {% endfor %}
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+    {% endfor %}
+  </details>
+  {% else %}
+  <p><small>No local records were overwritten.</small></p>
+  {% endif %}
+
+  <p><small>Per-transaction category/tag changes are also recorded in the
+    <a href="/rules/history">rules History</a> (action: import).</small></p>
+</article>

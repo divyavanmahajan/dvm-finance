@@ -1,0 +1,103 @@
+/* Rules UI (step 07). Separate stylesheet — app.css is owned by other steps. */
+
+.rules-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.rules-actions .inline-form { display: inline; margin: 0; }
+
+.rules-table td, .rules-table th { vertical-align: middle; }
+.rules-table .num { text-align: right; }
+.rules-table .match-value code { word-break: break-all; }
+.rules-table tr.inactive td { opacity: 0.5; }
+.rules-table .row-actions { white-space: nowrap; }
+.rules-table .row-actions a, .rules-table .row-actions button {
+  margin-right: 0.35rem;
+  text-decoration: none;
+}
+.rules-table .field-target { display: block; opacity: 0.7; }
+
+button.link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--pico-primary, #1095c1);
+  cursor: pointer;
+  width: auto;
+  display: inline;
+}
+button.link.danger { color: #b71c1c; }
+
+/* --- Editor --- */
+.rule-form fieldset { margin-bottom: 1rem; }
+.rule-form .grow { flex: 1 1 20rem; }
+.rule-errors {
+  border-left: 4px solid #b71c1c;
+  background: #fdecea;
+  padding: 0.75rem 1rem;
+}
+.rule-errors ul { margin-bottom: 0; }
+
+.cond-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin-bottom: 0.4rem;
+}
+.cond-row select, .cond-row input { margin-bottom: 0; }
+.cond-row select[name="cond_operator"] { max-width: 6rem; }
+.cond-row select[name="cond_match_pattern"] { max-width: 9rem; }
+.rule-form-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
+
+/* --- Preview + reports --- */
+.rule-preview header { margin-bottom: 0.5rem; }
+.preview-error { color: #b71c1c; }
+.preview-counts { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.5rem 0; }
+.pill {
+  display: inline-block;
+  padding: 0.1rem 0.6rem;
+  border-radius: 1rem;
+  background: var(--pico-muted-border-color, #e0e0e0);
+  font-size: 0.85rem;
+}
+.pill.pos { background: #dcedc8; }
+.pill.neg { background: #ffcdd2; }
+
+.preview-table { font-size: 0.85rem; }
+.preview-table .desc { max-width: 28rem; overflow-wrap: anywhere; }
+.preview-table .num { text-align: right; white-space: nowrap; }
+.preview-table .num.neg { color: #b71c1c; }
+.preview-table .num.pos { color: #1b5e20; }
+.txn-id { font-size: 0.75rem; opacity: 0.7; }
+.txn-ids { font-size: 0.8rem; }
+
+.rule-report { padding: 1rem 1.25rem; margin-bottom: 1rem; }
+.rule-report header {
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+  margin-bottom: 0.5rem;
+}
+.rule-report .ts { margin-left: auto; opacity: 0.7; }
+.action {
+  display: inline-block;
+  padding: 0.05rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: #e0e0e0;
+}
+.action-create { background: #dcedc8; }
+.action-update { background: #bbdefb; }
+.action-delete { background: #ffcdd2; }
+.action-toggle { background: #fff9c4; }
+.action-recategorize { background: #d1c4e9; }
+.action-import { background: #b2dfdb; }
+
+.report-diff { font-size: 0.85rem; }
+.report-diff .before { color: #b71c1c; overflow-wrap: anywhere; }
+.report-diff .after { color: #1b5e20; overflow-wrap: anywhere; }

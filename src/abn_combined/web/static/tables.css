@@ -1,0 +1,96 @@
+/* Shared styles for the Tags / Budgets / Cash Flow table pages (step 09).
+   Kept separate from app.css (owned by step 06). */
+
+.data-table {
+  width: 100%;
+  font-size: 0.9rem;
+}
+
+.data-table th.num,
+.data-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.data-table td .inline-form {
+  display: inline;
+  margin: 0;
+}
+
+/* Budget-vs-actual status highlighting */
+tr.budget-over {
+  background: color-mix(in srgb, #d32f2f 12%, transparent);
+}
+
+tr.budget-over td.num.actual {
+  color: #c62828;
+  font-weight: 600;
+}
+
+tr.budget-near td.num.actual {
+  color: #b26a00;
+  font-weight: 600;
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 0.05rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.status-pill.over { background: #fde3e3; color: #b71c1c; }
+.status-pill.near { background: #fff3d6; color: #8a5300; }
+.status-pill.under { background: #e2f4e5; color: #1b5e20; }
+
+/* Cash flow */
+.cash-flow-table td.pos { color: #1b5e20; }
+.cash-flow-table td.neg { color: #b71c1c; }
+.cash-flow-table tr.net-row td { border-top: 2px solid var(--pico-muted-border-color, #ccc); font-weight: 600; }
+
+/* Compact inline rename form on the tags page */
+.tag-rename input[type="text"] {
+  width: 9rem;
+  display: inline-block;
+  margin: 0;
+  padding: 0.15rem 0.4rem;
+  height: auto;
+}
+
+.tag-rename button,
+.tag-actions button {
+  margin: 0;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.8rem;
+  width: auto;
+}
+
+/* Small control bars above tables (period / breakdown / account selectors) */
+.table-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+  margin-bottom: 1rem;
+}
+
+.table-controls label {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.table-controls select,
+.table-controls input {
+  margin: 0;
+  width: auto;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.75rem;
+  align-items: end;
+}

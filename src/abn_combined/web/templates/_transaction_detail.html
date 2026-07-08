@@ -1,0 +1,37 @@
+{% set t = row.txn %}
+<div class="txn-detail">
+  <dl>
+    <dt>Full description</dt><dd>{{ t.description or '—' }}</dd>
+    <dt>Value date</dt><dd>{{ t.valuedate.isoformat() if t.valuedate else '—' }}</dd>
+    <dt>Currency</dt><dd>{{ t.currency }}</dd>
+    <dt>Source file</dt><dd>{{ t.source_file or '—' }}{% if t.source_line %} : line {{ t.source_line }}{% endif %}</dd>
+    <dt>Categorization</dt>
+    <dd>
+      {% if t.categorization_source == 'manual' %}
+        Manual override
+      {% elif rule %}
+        Rule <a href="/rules/{{ rule.id }}">#{{ rule.id }} — {{ rule.category }}</a> (priority {{ rule.priority }})
+      {% elif t.categorization_source %}
+        Rule #{{ t.categorization_source }}
+      {% else %}
+        Uncategorized
+      {% endif %}
+    </dd>
+    <dt>Rule category / tags</dt><dd>{{ t.category or '—' }} / {{ t.tags or '—' }}</dd>
+    <dt>Manual category / tags</dt><dd>{{ t.manual_category or '—' }} / {{ t.manual_tags or '—' }}</dd>
+    <dt>Transaction id</dt><dd><code>{{ t.id }}</code></dd>
+  </dl>
+
+  {% if structured %}
+  <details open>
+    <summary>Structured description fields</summary>
+    <dl class="structured">
+      {% for key, value in structured.items() %}
+      <dt>{{ key }}</dt><dd>{{ value }}</dd>
+      {% endfor %}
+    </dl>
+  </details>
+  {% endif %}
+
+  <a role="button" class="secondary" href="/rules/new?from_transaction={{ t.id }}">Create rule from this transaction</a>
+</div>

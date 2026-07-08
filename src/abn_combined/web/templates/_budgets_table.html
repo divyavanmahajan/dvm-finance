@@ -1,0 +1,40 @@
+{% if rows %}
+<table class="data-table">
+  <thead>
+    <tr>
+      <th>Category</th>
+      <th>Period</th>
+      <th>Window</th>
+      <th class="num">Budget €</th>
+      <th class="num">Actual €</th>
+      <th class="num">Remaining €</th>
+      <th class="num">Used</th>
+      <th>Status</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    <tr class="budget-{{ row.status }}">
+      <td><a href="{{ row.txn_url }}">{{ row.category }}</a></td>
+      <td>{{ row.period }}</td>
+      <td>{{ row.period_start.isoformat() }} → {{ row.period_end.isoformat() }}</td>
+      <td class="num">{{ "%.2f" | format(row.budget) }}</td>
+      <td class="num actual"><a href="{{ row.txn_url }}">{{ "%.2f" | format(row.actual) }}</a></td>
+      <td class="num">{{ "%.2f" | format(row.remaining) }}</td>
+      <td class="num">{{ row.percentage }}%</td>
+      <td><span class="status-pill {{ row.status }}">{{ row.status }}</span></td>
+      <td class="tag-actions">
+        <a href="/budgets/{{ row.id }}/edit" role="button" class="secondary outline">Edit</a>
+        <form class="inline-form" method="post" action="/budgets/{{ row.id }}/delete"
+              onsubmit="return confirm('Delete the {{ row.period }} budget for “{{ row.category }}”?');">
+          <button type="submit" class="secondary outline">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p><em>No budgets{% if period %} with period “{{ period }}”{% endif %} valid for this date. Add one below.</em></p>
+{% endif %}
