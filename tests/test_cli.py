@@ -29,6 +29,22 @@ def test_migrate_legacy_subcommand():
     assert args.legacy_db == "/path/to/abn_analyst.db"
 
 
+def test_migrate_legacy_data_dir_after_subcommand(tmp_path):
+    """--data-dir placed AFTER the subcommand name resolves correctly."""
+    args = build_parser().parse_args(
+        ["migrate-legacy", "/path/to/db", "--data-dir", str(tmp_path)]
+    )
+    assert args.data_dir == str(tmp_path)
+
+
+def test_migrate_legacy_data_dir_before_subcommand(tmp_path):
+    """--data-dir placed BEFORE the subcommand name also resolves correctly."""
+    args = build_parser().parse_args(
+        ["--data-dir", str(tmp_path), "migrate-legacy", "/path/to/db"]
+    )
+    assert args.data_dir == str(tmp_path)
+
+
 def test_migrate_legacy_missing_file_fails(capsys, tmp_path):
     rc = main(["--data-dir", str(tmp_path / "data"), "migrate-legacy", "/nope/abn_analyst.db"])
     assert rc == 1
