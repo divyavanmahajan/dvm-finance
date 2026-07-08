@@ -28,6 +28,9 @@
   display: inline-flex;
   align-items: center;
   padding-inline: 0.8rem;
+  /* Pico gives <button> a bottom margin but not <a role="button">; zero both
+     so Apply/Reset share a baseline under align-items:end. */
+  margin-bottom: 0;
 }
 .multi { position: relative; }
 .multi-menu {
