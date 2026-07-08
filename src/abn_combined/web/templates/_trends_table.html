@@ -14,6 +14,7 @@
   <td class="num total {% if value < 0 %}neg{% else %}pos{% endif %}">{{ '%.2f'|format(value) }}</td>
 {%- endmacro %}
 
+{% if table.rows %}
 <div class="trends-scroll">
   <table class="trends-table">
     <thead>
@@ -66,6 +67,9 @@
     </tfoot>
   </table>
 </div>
-{% if not table.rows %}
-<p class="trends-empty">No transactions in this window.</p>
+{% else %}
+<article class="trends-empty">
+  <p>No transactions in this window. Adjust the date range, or import statements via
+     the <a href="/upload">Upload</a> or <a href="/download">Download</a> tabs.</p>
+</article>
 {% endif %}

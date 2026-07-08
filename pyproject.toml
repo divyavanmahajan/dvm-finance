@@ -43,6 +43,13 @@ abn-combined = "abn_combined.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/abn_combined"]
 
+# Bundle the Alembic migration tree inside the wheel so packaged/uvx installs run
+# real migrations on startup (not the create_all fallback). Maps repo-root paths
+# into the installed package (site-packages/abn_combined/alembic{,.ini}).
+[tool.hatch.build.targets.wheel.force-include]
+"alembic" = "abn_combined/alembic"
+"alembic.ini" = "abn_combined/alembic.ini"
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
@@ -66,4 +73,4 @@ source = ["abn_combined"]
 omit = ["*/downloaders/*", "*/tests/*"]
 
 [tool.coverage.report]
-fail_under = 0
+fail_under = 80
