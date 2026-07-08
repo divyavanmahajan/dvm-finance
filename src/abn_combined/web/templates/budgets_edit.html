@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Edit budget — abn-combined{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="/static/tables.css">
+<hgroup>
+  <h1>Edit budget</h1>
+  <p>{{ budget.category }} ({{ budget.period }})</p>
+</hgroup>
+
+<form method="post" action="/budgets/{{ budget.id }}/update" class="form-grid">
+  <label>Category
+    <input type="text" name="category" value="{{ budget.category }}" list="known-categories" required>
+  </label>
+  <label>Amount €
+    <input type="number" name="amount" step="0.01" min="0" value="{{ budget.amount }}" required>
+  </label>
+  <label>Period
+    <select name="period">
+      {% for p in periods %}
+      <option value="{{ p }}" {% if budget.period == p %}selected{% endif %}>{{ p.title() }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Valid from <input type="date" name="start_date" value="{{ budget.start_date.isoformat() if budget.start_date else '' }}"></label>
+  <label>Valid to <input type="date" name="end_date" value="{{ budget.end_date.isoformat() if budget.end_date else '' }}"></label>
+  <label>Notes <input type="text" name="notes" value="{{ budget.notes or '' }}"></label>
+  <button type="submit">Save</button>
+  <a href="/budgets" role="button" class="secondary">Cancel</a>
+</form>
+
+<datalist id="known-categories">
+  {% for c in categories %}<option value="{{ c }}"></option>{% endfor %}
+</datalist>
+{% endblock %}
