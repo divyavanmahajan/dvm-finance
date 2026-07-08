@@ -36,5 +36,8 @@ Status values: `pending` | `in-progress` | `done` | `blocked`
 - (resolved 2026-07-08) PyPI name `abn-combined` is unclaimed; not published yet — README documents `uvx --from git+…` until publication.
 - Real bank/PayPal download flows (step 10) require manual verification with live credentials — schedule with the user.
 
+## Merged
+2026-07-08 (merge commit e687f73, --no-ff into main)
+
 ## Last Updated
 2026-07-07 (step 05 done)
