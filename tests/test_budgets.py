@@ -89,7 +89,7 @@ class TestComputeActual:
         db = factory()
         # January 2024: food spending = 25 + 50 = 75, income = +1500
         db.add(_txn("a1", -25.0, category="food", txdate=date(2024, 1, 5)))
-        db.add(_txn("a2", -50.0, category="food:restaurants", txdate=date(2024, 1, 10)))
+        db.add(_txn("a2", -50.0, category="food-restaurants", txdate=date(2024, 1, 10)))
         db.add(_txn("a3", 1500.0, category="income", txdate=date(2024, 1, 20)))
         # Manual override: this one has food as manual, not rule-assigned
         db.add(
