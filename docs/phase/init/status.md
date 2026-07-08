@@ -24,7 +24,7 @@ Integrated local finance app merging abn-download + abn-analyst: UI-triggered do
 | 06 - Transactions View + Filtering | 06-transactions-view | done |
 | 07 - Rules UI | 07-rules-ui | done |
 | 08 - Category Trends | 08-category-trends | done |
-| 09 - Tags, Budgets, Cash Flow | 09-tags-budgets-cashflow | in-progress |
+| 09 - Tags, Budgets, Cash Flow | 09-tags-budgets-cashflow | done |
 | 10 - Downloads from UI | 10-downloads-from-ui | done |
 | 11 - Snapshot Sharing | 11-snapshot-sharing | in-progress |
 | 12 - Legacy Migration | 12-legacy-migration | in-progress |
