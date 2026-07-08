@@ -26,11 +26,28 @@ def build_parser() -> argparse.ArgumentParser:
 
     migrate = subparsers.add_parser(
         "migrate-legacy",
-        help="Import data from a legacy abn_analyst.db (stub — implemented in a later phase).",
+        help="One-time import of transactions, rules, conditions and budgets "
+        "from a legacy abn_analyst.db (idempotent; re-runs skip existing rows).",
     )
     migrate.add_argument("legacy_db", help="Path to the legacy abn_analyst.db file.")
 
     return parser
+
+
+def _run_migrate_legacy(legacy_db: str, settings: Settings) -> int:
+    from .core.legacy_migration import LegacyMigrationError, migrate_legacy
+
+    try:
+        summary = migrate_legacy(legacy_db, settings)
+    except LegacyMigrationError as exc:
+        print(f"migrate-legacy failed: {exc}", file=sys.stderr)
+        return 1
+    except RuntimeError as exc:  # e.g. unwritable data dir
+        print(str(exc), file=sys.stderr)
+        return 1
+    print(summary.format())
+    print(f"Destination database: {settings.db_path}")
+    return 0
 
 
 def _run_server(settings: Settings) -> None:
@@ -61,11 +78,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     settings = Settings.create(data_dir=args.data_dir, host=args.host, port=args.port)
 
     if args.command == "migrate-legacy":
-        print(
-            f"migrate-legacy is not yet implemented. Requested source: {args.legacy_db}",
-            file=sys.stderr,
-        )
-        return 2
+        return _run_migrate_legacy(args.legacy_db, settings)
 
     try:
         settings.ensure_data_dir()
