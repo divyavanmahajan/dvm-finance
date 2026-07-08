@@ -7,7 +7,7 @@
       <button class="link expand" title="Show detail"
               @click="open = !open"
               hx-get="/transactions/{{ t.id }}/detail"
-              hx-target="#txn-detail-body-{{ t.id }}"
+              hx-target="#txn-detail-body-{{ t.id | css_id }}"
               hx-swap="innerHTML"
               hx-trigger="click once"
               x-text="open ? '▾' : '▸'">▸</button>
@@ -64,7 +64,7 @@
 
     <td class="src">
       {% if t.categorization_source == 'manual' %}manual
-      {% elif t.categorization_source %}rule #{{ t.categorization_source }}
+      {% elif t.categorization_source %}<a href="/rules/{{ t.categorization_source }}">rule #{{ t.categorization_source }}</a>
       {% else %}—{% endif %}
     </td>
     <td>
@@ -75,7 +75,7 @@
 
   <tr class="detail-row" x-show="open" x-cloak>
     <td colspan="9">
-      <div id="txn-detail-body-{{ t.id }}"><small>Loading…</small></div>
+      <div id="txn-detail-body-{{ t.id | css_id }}"><small>Loading…</small></div>
     </td>
   </tr>
 </tbody>
