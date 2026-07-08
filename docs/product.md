@@ -6,7 +6,7 @@
 
 - Download (ABN AMRO, PayPal) and upload (MT940/XLS/CSV/PayPal/Wise/SEB) statements from the web UI; auto-import with dedup and rule application.
 - Rule-based categorization with conditions, priorities, tags; fast "create rule from transaction"; preview before saving; stored change reports after every rule change.
-- Two main tabs: **Transactions** (redesigned simple filter bar, URL-encoded filters) and **Category Trends** (table with cell/row click-through to filtered transactions). Plus Rules, Tags, Budgets, Cash Flow, Download/Upload, Snapshots.
+- Two main tabs: **Transactions** (redesigned simple filter bar, URL-encoded filters; include and **exclude** category filters with subtree semantics) and **Category Trends** (table with cell/row click-through to filtered transactions). Plus Rules, Tags, Budgets, Cash Flow, Download/Upload, Snapshots.
 - Share data with one other person via export/import snapshots (incoming wins).
 - One-time migration from the legacy `abn_analyst.db`.
 
