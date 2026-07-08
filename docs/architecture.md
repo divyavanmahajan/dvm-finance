@@ -50,11 +50,11 @@ Dropped: users/auth tables, LLM/vector artifacts.
 `fixed-insurance-life`, `education-tuition-violin`. This is the convention the
 legacy `abn_analyst.db` data uses (627 of 701 rule categories contain a hyphen;
 none use `:`, `/` or `>` — verified read-only during the migration step, resolving
-the spec Open Question). Trends rolls categories up by the first hyphen segment;
-parent cell/row links enumerate the exact child categories as repeated `category=`
-params so linked transaction lists sum exactly to the displayed cell. The filter
-layer's prefix match also accepts `:`-separated names for forward compatibility,
-but new categories should follow the hyphen convention.
+the spec Open Question). The canonical separator is exported as `CATEGORY_SEPARATOR`
+from `core/utils.py` and used consistently across filters, trends, and budgets.
+Trends rolls categories up by the first hyphen segment; parent cell/row links
+enumerate the exact child categories as repeated `category=` params so linked
+transaction lists sum exactly to the displayed cell.
 
 ## Snapshot format
 
