@@ -1,5 +1,3 @@
-> **Initial draft** — scaffolded from spec interview. Updated by spec-execute as each phase completes.
-
 # Developer Guide
 
 ## Tech stack
@@ -7,7 +5,11 @@
 - Python 3.12+, FastAPI, SQLAlchemy 2.x, Alembic, Jinja2
 - htmx + Alpine.js (vendored, no build step), Pico.css
 - Playwright (downloads + e2e tests), platformdirs
-- Packaging: `src/abn_combined/` layout, hatchling, console script `abn-combined`
+- Packaging: `src/abn_combined/` layout, hatchling, console script `abn-combined`.
+  The Alembic tree (`alembic.ini` + `alembic/`) is force-included in the wheel as
+  `abn_combined/alembic{,.ini}` so packaged/uvx installs migrate on startup
+  (`migrations.py` prefers the bundled tree, falls back to the repo root for
+  editable installs).
 
 ## Environment
 
@@ -29,13 +31,25 @@ ruff check .
 ruff format .
 
 # Tests
-pytest                          # unit + integration
-pytest --cov=abn_combined       # with coverage (gate: >= 80%)
-pytest tests/e2e -m e2e         # Playwright e2e (starts app on a temp DB)
+pytest                          # unit + integration (e2e/slow deselected by default)
+pytest --cov=abn_combined       # with coverage (fail_under = 80, wired in pyproject.toml)
+pytest -m e2e                   # Playwright e2e: boots real app instances on random
+                                # ports against seeded temp data dirs (tests/e2e/ +
+                                # tests/test_snapshots_e2e.py); headless Chromium
 
 # Run the app (dev)
 abn-combined --data-dir ./devdata
 ```
+
+## E2E harness
+
+`tests/e2e/conftest.py` provides `live_app` — a uvicorn subprocess on a free port
+with a fresh temp data dir (Alembic migrates on startup) — plus `seed_transaction`
+/ `seed_rule` helpers; tests drive it with the pytest-playwright `page` fixture.
+The five spec user flows are covered by `tests/e2e/test_flows_e2e.py` (upload,
+create-rule-from-uncategorized, trends click-through, edit-rule diff) and
+`tests/test_snapshots_e2e.py` (two-machine snapshot sharing). Real bank/PayPal
+download flows are covered by mocked tests only and re-verified manually.
 
 ## Env vars / flags
 

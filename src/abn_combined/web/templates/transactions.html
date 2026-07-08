@@ -14,19 +14,22 @@
       hx-target="#txn-table"
       hx-swap="innerHTML"
       hx-push-url="true"
+      hx-indicator="#txn-loading"
       hx-trigger="submit, change from:select, change from:input[type=date], change from:input[name=account]"
       x-data="txnFilterBar()">
 
   <div class="filter-row">
     <label class="grow">
       <input type="search" name="q" placeholder="Search description or counterparty…"
+             aria-label="Search description or counterparty"
              value="{{ filter.q or '' }}"
              hx-get="/transactions/table" hx-target="#txn-table" hx-swap="innerHTML"
-             hx-push-url="true" hx-trigger="keyup changed delay:400ms, search">
+             hx-push-url="true" hx-indicator="#txn-loading"
+             hx-trigger="keyup changed delay:400ms, search">
     </label>
 
     <label>
-      <select name="preset">
+      <select name="preset" aria-label="Date preset">
         <option value="">Any date</option>
         {% for p in presets %}
         <option value="{{ p }}" {% if filter.preset == p %}selected{% endif %}>{{ p.replace('-', ' ').title() }}</option>
@@ -99,6 +102,8 @@
 <datalist id="known-categories">
   {% for c in categories %}<option value="{{ c }}"></option>{% endfor %}
 </datalist>
+
+<p id="txn-loading" class="htmx-indicator" role="status" aria-live="polite">Loading…</p>
 
 <div id="txn-table">
   {% include "_transactions_table.html" %}
