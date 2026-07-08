@@ -15,10 +15,20 @@
 </div>
 {% endif %}
 
+{% if not page.total and not chips %}
+{# First-run hint: an empty database with no filters applied (spec FR10.1). #}
+<article class="first-run-hint">
+  <p><strong>No transactions yet.</strong> Import your history from a legacy
+  abn-analyst database with:</p>
+  <p><code>abn-combined migrate-legacy /path/to/abn_analyst.db</code></p>
+  <p>…or use the <a href="/upload">Upload</a> or <a href="/download">Download</a> tabs.</p>
+</article>
+{% endif %}
+
 <p class="txn-count">
   {% if page.total %}
   Showing <strong>{{ page.start_index }}–{{ page.end_index }}</strong> of <strong>{{ page.total }}</strong>
-  {% else %}
+  {% elif chips %}
   No transactions match these filters.
   {% endif %}
 </p>

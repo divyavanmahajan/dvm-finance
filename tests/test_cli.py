@@ -29,10 +29,10 @@ def test_migrate_legacy_subcommand():
     assert args.legacy_db == "/path/to/abn_analyst.db"
 
 
-def test_migrate_legacy_is_stub(capsys):
-    rc = main(["migrate-legacy", "/nope/abn_analyst.db"])
-    assert rc == 2
-    assert "not yet implemented" in capsys.readouterr().err
+def test_migrate_legacy_missing_file_fails(capsys, tmp_path):
+    rc = main(["--data-dir", str(tmp_path / "data"), "migrate-legacy", "/nope/abn_analyst.db"])
+    assert rc == 1
+    assert "not found" in capsys.readouterr().err
 
 
 def test_resolve_data_dir_explicit(tmp_path):
