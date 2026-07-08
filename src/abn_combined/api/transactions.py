@@ -22,7 +22,7 @@ from ..core.filters import (
     paginate,
 )
 from ..core.models import CategorizationRule, Transaction
-from ..core.utils import normalize_category
+from ..core.utils import CATEGORY_SEPARATOR, normalize_category
 from ..db import get_db
 from ..logging_config import get_logger
 
@@ -56,6 +56,12 @@ def _known_categories(db: Session) -> list[str]:
     for (value,) in db.query(CategorizationRule.category).distinct():
         if value:
             cats.add(value.lower())
+    # Ancestor prefixes so whole subtrees can be included/excluded
+    # (selecting "fixed-insurance" also covers "fixed-insurance-life").
+    for cat in list(cats):
+        parts = cat.split(CATEGORY_SEPARATOR)
+        for i in range(1, len(parts)):
+            cats.add(CATEGORY_SEPARATOR.join(parts[:i]))
     return sorted(cats)
 
 
