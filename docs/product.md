@@ -1,5 +1,3 @@
-> **Initial draft** — scaffolded from spec interview. Updated by spec-execute as each phase completes.
-
 # Product
 
 `abn-combined` merges abn-download (statement downloaders) and abn-analyst (categorizer/viewer) into one local web app run via `uvx abn-combined`.
