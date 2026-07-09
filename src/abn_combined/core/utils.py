@@ -6,6 +6,10 @@ import hashlib
 import re
 from typing import Any
 
+# Hierarchical category separator, e.g. "fixed-insurance-life" (confirmed from
+# real data; see docs/architecture.md). Shared by filters, trends, and budgets.
+CATEGORY_SEPARATOR = "-"
+
 
 def normalize_category(category: Any) -> str | None:
     """Normalize category to lowercase for storage.

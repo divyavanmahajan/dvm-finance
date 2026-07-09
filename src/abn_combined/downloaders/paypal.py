@@ -53,6 +53,38 @@ CHROME_LAUNCH_COMMAND = (
 _csrf_token: str | None = None
 
 
+def identify_cdp_endpoint(cdp_url: str, timeout: float = 3.0) -> str | None:
+    """Return the ``Browser`` string from ``<cdp_url>/json/version``, or None."""
+    import json as _json
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(f"{cdp_url.rstrip('/')}/json/version", timeout=timeout) as resp:
+            return _json.loads(resp.read().decode("utf-8")).get("Browser")
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _connect_failure_message(cdp_url: str, exc: Exception) -> str:
+    """A targeted, actionable message for CDP connect failures."""
+    browser = identify_cdp_endpoint(cdp_url)
+    if "Browser context management is not supported" in str(exc):
+        who = f"reports itself as {browser!r}" if browser else "did not identify itself"
+        return (
+            f"Something is listening on {cdp_url} but it is not a full Chrome browser "
+            f"(it {who}). Most likely another application is already using that port, "
+            "so the Chrome you launched could not bind it. Either quit that application, "
+            "or launch Chrome on a different port and put the matching URL in the "
+            "'CDP URL' field, e.g.:\n"
+            + CHROME_LAUNCH_COMMAND.replace("9222", "9223")
+            + "\nthen use http://127.0.0.1:9223"
+        )
+    return (
+        f"Could not connect to Chrome at {cdp_url}. Please start Chrome with:\n"
+        f"{CHROME_LAUNCH_COMMAND}\n\nError: {exc}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Ported pure / near-pure functions
 # ---------------------------------------------------------------------------
@@ -407,10 +439,7 @@ def run_paypal_job(
             try:
                 browser = pw.chromium.connect_over_cdp(cdp_url)
             except Exception as exc:  # noqa: BLE001
-                _fail(
-                    f"Could not connect to Chrome at {cdp_url}. "
-                    f"Please start Chrome with:\n{CHROME_LAUNCH_COMMAND}\n\nError: {exc}"
-                )
+                _fail(_connect_failure_message(cdp_url, exc))
                 return
 
             if not browser.contexts:
