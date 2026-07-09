@@ -40,12 +40,12 @@ def seed(app):
             amount=-100.0, description="Rent payment", category="housing",
             categorization_source="7"),
         _mk(id="t3", accountNumber="NL01", transactiondate=date(2024, 3, 20),
-            amount=1500.0, description="Salary", category="income:salary"),
+            amount=1500.0, description="Salary", category="income-salary"),
         _mk(id="t4", accountNumber="NL01", transactiondate=date(2024, 3, 25),
             amount=-8.0, description="Coffee shop", category=None,
             source_file="march.STA"),
         _mk(id="t5", accountNumber="NL02", transactiondate=date(2024, 4, 1),
-            amount=-50.0, description="Restaurant dinner", category="food:restaurants",
+            amount=-50.0, description="Restaurant dinner", category="food-restaurants",
             tags="dining, work"),
     ]
     for t in txns:
@@ -99,7 +99,7 @@ def test_filter_account(client, seed):
 
 
 def test_filter_category_hierarchical(client, seed):
-    # "food" matches both "food" and "food:restaurants"
+    # "food" matches both "food" and "food-restaurants" (hyphen separator)
     r = client.get("/transactions/table?category=food")
     assert "Albert Heijn" in r.text
     assert "Restaurant dinner" in r.text
@@ -147,6 +147,42 @@ def test_filter_combined(client, seed):
     r = client.get("/transactions/table?account=NL01&category=food")
     assert "Albert Heijn" in r.text
     assert "Restaurant dinner" not in r.text  # NL02
+
+
+def test_filter_exclude_category_subtree(client, seed):
+    """exclude_category=food hides food and food-* children."""
+    r = client.get("/transactions/table?exclude_category=food")
+    assert "Albert Heijn" not in r.text       # category="food" → excluded
+    assert "Restaurant dinner" not in r.text  # category="food-restaurants" → excluded
+    assert "Rent payment" in r.text
+    assert "Salary" in r.text
+
+
+def test_filter_exclude_keeps_uncategorized(client, seed):
+    """Excluding a named category must NOT drop uncategorized rows (NULL-safe)."""
+    r = client.get("/transactions/table?exclude_category=food")
+    assert "Coffee shop" in r.text            # category=None → must survive
+
+
+def test_filter_include_exclude_combined(client, seed):
+    """include=food, exclude=food-restaurants → only exact 'food' rows show."""
+    r = client.get("/transactions/table?category=food&exclude_category=food-restaurants")
+    assert "Albert Heijn" in r.text           # category="food" (included, not excluded)
+    assert "Restaurant dinner" not in r.text  # excluded by exclude_category
+
+
+def test_ancestor_prefixes_in_known_categories(client, seed):
+    """_known_categories must include ancestor prefixes (food appears because
+    food-restaurants is in the DB, even if no transaction has exactly 'food')."""
+    from abn_combined.api.transactions import _known_categories
+    from abn_combined.db import get_session_factory
+
+    db = get_session_factory()()
+    cats = _known_categories(db)
+    db.close()
+    # "food" should appear as an ancestor prefix of "food-restaurants"
+    assert "food" in cats
+    assert "food-restaurants" in cats
 
 
 # ---------------------------------------------------------------------------
