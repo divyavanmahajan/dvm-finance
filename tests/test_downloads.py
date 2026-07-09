@@ -576,3 +576,45 @@ def test_run_paypal_job_cdp_unreachable_fails_with_launch_command(settings) -> N
     assert job.state == JobState.FAILED
     assert "--remote-debugging-port=9222" in job.message
     assert "Could not connect to Chrome" in job.message
+
+
+# ===========================================================================
+# _connect_failure_message — PayPal CDP diagnostic helper
+# ===========================================================================
+
+
+class TestConnectFailureMessage:
+    """Unit tests for the actionable CDP connect-failure message builder."""
+
+    def test_browser_context_not_supported_with_browser_id(self, monkeypatch) -> None:
+        """When something is on the port and identifies itself, name it."""
+        monkeypatch.setattr(
+            paypal, "identify_cdp_endpoint", lambda url, timeout=3.0: "SomeElectronApp/1.0"
+        )
+        exc = Exception("Browser context management is not supported")
+        msg = paypal._connect_failure_message("http://127.0.0.1:9222", exc)
+        assert "Browser context management is not supported" not in msg or "SomeElectronApp" in msg
+        assert "SomeElectronApp/1.0" in msg
+        assert "9223" in msg          # suggests alternate port
+        assert "9222" in msg          # names the conflicted port
+
+    def test_browser_context_not_supported_no_browser_id(self, monkeypatch) -> None:
+        """When nothing responds on the port, say 'did not identify itself'."""
+        monkeypatch.setattr(
+            paypal, "identify_cdp_endpoint", lambda url, timeout=3.0: None
+        )
+        exc = Exception("Browser context management is not supported")
+        msg = paypal._connect_failure_message("http://127.0.0.1:9222", exc)
+        assert "did not identify itself" in msg
+        assert "9223" in msg
+
+    def test_generic_failure_message(self, monkeypatch) -> None:
+        """Any other exception returns the generic 'Could not connect' message."""
+        monkeypatch.setattr(
+            paypal, "identify_cdp_endpoint", lambda url, timeout=3.0: None
+        )
+        exc = ConnectionRefusedError("Connection refused")
+        msg = paypal._connect_failure_message("http://127.0.0.1:9222", exc)
+        assert "Could not connect to Chrome" in msg
+        assert "--remote-debugging-port=9222" in msg
+        assert str(exc) in msg

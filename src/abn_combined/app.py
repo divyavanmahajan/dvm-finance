@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -34,8 +35,22 @@ NAV_TABS = [
     ("/snapshots", "Snapshots"),
 ]
 
+def _css_id(s: str) -> str:
+    """Make an arbitrary string safe for use as a CSS ID selector component.
+
+    HTML ids may contain any character; CSS selectors cannot — ``:`` triggers
+    pseudo-class parsing, ``.`` triggers class parsing, etc.  Replace every
+    character that is not alphanumeric, hyphen, or underscore with ``_``.
+    Used in templates via the ``css_id`` filter so ``hx-target`` selectors
+    always resolve correctly even when transaction IDs come from PayPal
+    (``pp:paypaleu_…``) or ABN (``…_2000.0_…``).
+    """
+    return re.sub(r"[^a-zA-Z0-9_-]", "_", str(s))
+
+
 templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 templates.env.globals["nav_tabs"] = NAV_TABS
+templates.env.filters["css_id"] = _css_id
 
 
 def create_app(settings: Settings) -> FastAPI:

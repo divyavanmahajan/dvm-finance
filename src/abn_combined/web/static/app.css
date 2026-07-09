@@ -20,6 +20,18 @@
 .filter-row label { margin: 0; }
 .filter-row .grow { flex: 1 1 16rem; }
 .filter-bar input, .filter-bar select { margin-bottom: 0; }
+/* Pico v2 makes all buttons 100%-width block elements; override to natural
+   inline width so Apply/Reset sit side-by-side at the end of the filter row. */
+.filter-row button,
+.filter-row a[role="button"] {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  padding-inline: 0.8rem;
+  /* Pico gives <button> a bottom margin but not <a role="button">; zero both
+     so Apply/Reset share a baseline under align-items:end. */
+  margin-bottom: 0;
+}
 .multi { position: relative; }
 .multi-menu {
   position: absolute;
@@ -43,13 +55,19 @@
   gap: 0.3rem;
   padding: 0.15rem 0.6rem;
   border-radius: 1rem;
-  background: var(--pico-primary-background, #e3edff);
-  color: var(--pico-primary, #1a56db);
+  /* Light-tinted background that reads well in both light and dark themes.
+     Pico v2 --pico-primary-background is the solid button blue (not a tint),
+     so we use a fixed light-blue that contrasts with near-black text. */
+  background: #ddeeff;
+  color: #1a3a6b;
   font-size: 0.82rem;
   text-decoration: none;
   cursor: pointer;
 }
-.chip:hover { filter: brightness(0.95); }
+@media (prefers-color-scheme: dark) {
+  .chip { background: #1e3a5f; color: #b8d4f5; }
+}
+.chip:hover { filter: brightness(0.92); }
 .chip-clear { background: transparent; text-decoration: underline; }
 
 /* --- Table --- */

@@ -33,8 +33,24 @@ class TestRoundTrip:
         assert _roundtrip(f) == f
 
     def test_multi_categories_including_uncategorized(self):
-        f = TransactionFilter(categories=["food", "food:groceries", "uncategorized"])
+        # Real data uses hyphen separators; roundtrip must preserve them
+        f = TransactionFilter(categories=["food", "food-groceries", "uncategorized"])
         assert _roundtrip(f) == f
+
+    def test_exclude_categories_roundtrip(self):
+        f = TransactionFilter(exclude_categories=["housing", "food-restaurants"])
+        assert _roundtrip(f) == f
+
+    def test_exclude_categories_in_query_string(self):
+        f = TransactionFilter(exclude_categories=["housing"])
+        qs = f.to_query_string()
+        assert "exclude_category=housing" in qs
+
+    def test_exclude_category_from_params(self):
+        from starlette.datastructures import QueryParams
+        qp = QueryParams("exclude_category=food&exclude_category=housing")
+        f = TransactionFilter.from_params(qp)
+        assert f.exclude_categories == ["food", "housing"]
 
     def test_multi_tags(self):
         f = TransactionFilter(tags=["holiday", "work"])
@@ -169,6 +185,26 @@ class TestChips:
 
     def test_no_chips_when_empty(self):
         assert TransactionFilter().active_chips() == []
+
+    def test_exclude_category_chip_label(self):
+        f = TransactionFilter(exclude_categories=["housing"])
+        chips = f.active_chips()
+        exclude_chips = [c for c in chips if c["kind"] == "exclude_category"]
+        assert len(exclude_chips) == 1
+        assert exclude_chips[0]["label"] == "Exclude: housing"
+
+    def test_exclude_category_chip_remove(self):
+        f = TransactionFilter(exclude_categories=["food", "housing"], q="test")
+        qs = f.without("exclude_category", "food")
+        f2 = TransactionFilter.from_query_string(qs)
+        assert f2.exclude_categories == ["housing"]
+        assert f2.q == "test"
+
+    def test_exclude_uncategorized_chip_label(self):
+        f = TransactionFilter(exclude_categories=["uncategorized"])
+        chips = f.active_chips()
+        exclude_chips = [c for c in chips if c["kind"] == "exclude_category"]
+        assert exclude_chips[0]["label"] == "Exclude: Uncategorized"
 
 
 @pytest.mark.parametrize(

@@ -15,6 +15,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from .models import Budget, Transaction
+from .utils import CATEGORY_SEPARATOR
 
 PERIODS = ("year", "month", "week")
 
@@ -53,8 +54,7 @@ def compute_actual(db: Session, category: str, period_start: date,
             Transaction.transactiondate <= period_end,
             or_(
                 func.lower(eff) == c,
-                func.lower(eff).like(f"{c}:%"),
-                func.lower(eff).like(f"{c}-%"),
+                func.lower(eff).like(f"{c}{CATEGORY_SEPARATOR}%"),
             ),
         )
         .scalar()

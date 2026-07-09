@@ -30,6 +30,10 @@ def build_parser() -> argparse.ArgumentParser:
         "from a legacy abn_analyst.db (idempotent; re-runs skip existing rows).",
     )
     migrate.add_argument("legacy_db", help="Path to the legacy abn_analyst.db file.")
+    # Also accepted after the subcommand (argparse only sees top-level options
+    # before it); SUPPRESS keeps this from clobbering a value given up front.
+    migrate.add_argument("--data-dir", default=argparse.SUPPRESS, dest="data_dir",
+                         help="Data directory (same as the global --data-dir).")
 
     return parser
 
