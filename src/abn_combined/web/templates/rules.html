@@ -2,49 +2,73 @@
 {% block title %}Rules — abn-combined{% endblock %}
 {% block content %}
 <link rel="stylesheet" href="/static/rules.css">
-<hgroup>
-  <h1>Categorization Rules</h1>
-  <p>Rules run in priority order (lower first); the first matching rule assigns
-     category and tags. Every change is recorded in
-     <a href="/rules/history">History</a>.</p>
-</hgroup>
 
-<div class="rules-actions">
-  <a role="button" href="/rules/new">New rule</a>
-  <a role="button" class="secondary" href="/rules/history">History</a>
-  <form method="post" action="/rules/recategorize" class="inline-form"
-        onsubmit="return confirm('Reapply all active rules to every non-manual transaction?')">
-    <button type="submit" class="secondary outline">Recategorize all</button>
-  </form>
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-2">Categorization Rules</h1>
+    <p class="text-muted small mb-0">
+      Rules are evaluated in priority order (lower number = runs first).
+    </p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="/rules/create" class="btn btn-primary">
+      <i class="bi bi-plus-lg"></i> New rule
+    </a>
+    <a href="/rules/history" class="btn btn-outline-secondary">
+      <i class="bi bi-clock-history"></i> History
+    </a>
+    <button type="button" class="btn btn-outline-warning"
+            hx-post="/rules/recategorize"
+            hx-confirm="Recategorize all non-manual transactions? This may take a minute."
+            hx-indicator="#recategorize-spinner"
+            hx-disabled-elt="this">
+      <i class="bi bi-arrow-repeat"></i> Recategorize
+      <span id="recategorize-spinner" class="htmx-indicator ms-1">
+        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+      </span>
+    </button>
+  </div>
 </div>
 
-{% if rules %}
-<table class="rules-table">
-  <thead>
-    <tr>
-      <th>Priority</th>
-      <th>Type</th>
-      <th>Pattern</th>
-      <th>Match value</th>
-      <th>Category</th>
-      <th>Tags</th>
-      <th>Active</th>
-      <th>Matched</th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for rule in rules %}
-    {% with count = counts.get(rule.id, 0) %}
-    {% include "_rules_row.html" %}
-    {% endwith %}
-    {% endfor %}
-  </tbody>
-</table>
-{% else %}
-<article>
-  <p>No rules yet. <a href="/rules/new">Create your first rule</a>, or use
-     “+ rule” next to any transaction to start from a real example.</p>
-</article>
-{% endif %}
+<div class="card shadow-sm" id="rules-card"
+     hx-get="/rules"
+     hx-trigger="rulesChanged from:body"
+     hx-select="#rules-card"
+     hx-target="#rules-card"
+     hx-swap="outerHTML">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th style="width: 5%;">Pri</th>
+          <th style="width: 25%;">Type / Field</th>
+          <th style="width: 30%;">Match</th>
+          <th style="width: 15%;">Category</th>
+          <th class="d-none d-lg-table-cell" style="width: 10%;">Tags</th>
+          <th style="width: 8%;">Active</th>
+          <th style="width: 8%;">Matches</th>
+          <th class="text-end" style="width: 12%;">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="rules-table-body">
+        {% for rule in rules %}
+          {% with count = counts.get(rule.id, 0) %}
+            {% include "_rules_row.html" %}
+          {% endwith %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if not rules %}
+  <div class="card-body text-center py-5">
+    <i class="bi bi-sliders display-4 text-muted d-block mb-3"></i>
+    <p class="lead text-muted mb-3">No rules yet</p>
+    <p class="text-muted small mb-3">Create your first rule to automatically categorize transactions.</p>
+    <a href="/rules/create" class="btn btn-primary">
+      <i class="bi bi-plus-lg"></i> Create your first rule
+    </a>
+  </div>
+  {% endif %}
+</div>
 {% endblock %}

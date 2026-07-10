@@ -7,6 +7,8 @@
   <p>Budget vs actual per category. Actuals use effective categories (manual precedence) within each budget's current period window.</p>
 </hgroup>
 
+<p><small><strong>Note:</strong> Budget actuals exclude transfers. Transfer transactions are not counted toward budget spend.</small></p>
+
 {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
 
 <form class="table-controls" method="get" action="/budgets">

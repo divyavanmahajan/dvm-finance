@@ -1,83 +1,156 @@
 {# Preview panel partial: dry-run result of the (unsaved) draft rule. #}
 {% macro txn_table(txns) %}
-<table class="preview-table">
-  <thead><tr><th>Date</th><th>Account</th><th>Description</th><th>Amount</th><th>Current category</th></tr></thead>
-  <tbody>
-    {% for t in txns %}
-    <tr>
-      <td>{{ t.transactiondate.isoformat() }}</td>
-      <td class="acct">{{ t.accountNumber }}</td>
-      <td class="desc">{{ (t.description or '')[:90] }}</td>
-      <td class="num {% if t.amount < 0 %}neg{% else %}pos{% endif %}">{{ '%.2f'|format(t.amount) }}</td>
-      <td>{{ t.manual_category or t.category or '—' }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="table-responsive">
+  <table class="table table-sm table-hover">
+    <thead class="table-light">
+      <tr>
+        <th>Date</th>
+        <th>Account</th>
+        <th>Description</th>
+        <th class="text-end">Amount</th>
+        <th>Current category</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in txns %}
+      <tr>
+        <td class="text-nowrap">{{ t.transactiondate.isoformat() }}</td>
+        <td><code class="text-muted small">{{ t.accountNumber }}</code></td>
+        <td style="max-width: 28rem; word-wrap: break-word;">{{ (t.description or '')[:90] }}</td>
+        <td class="text-end text-nowrap num {% if t.amount < 0 %}neg{% else %}pos{% endif %}">{{ '%.2f'|format(t.amount) }}</td>
+        <td>{{ t.manual_category or t.category or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 {% endmacro %}
 
-<article class="rule-preview">
+<div class="card shadow-sm mt-4">
   {% if error %}
-  <p class="preview-error"><strong>Preview failed:</strong> {{ error }}</p>
-  {% else %}
-  <header>
-    <strong>Preview</strong> — dry run against non-manual transactions; nothing has been saved.
-  </header>
-
-  <div class="preview-counts">
-    <span class="pill">Matched: {{ preview.counts.matched }}</span>
-    {% if is_edit %}
-    <span class="pill pos">Gained: {{ preview.counts.gains }}</span>
-    <span class="pill neg">Lost: {{ preview.counts.losses }}</span>
-    {% endif %}
-    <span class="pill">Would change: {{ preview.counts.changes }}</span>
+  <div class="card-body">
+    <div class="alert alert-warning mb-0">
+      <strong>Preview failed:</strong> {{ error }}
+    </div>
   </div>
+  {% else %}
+  <div class="card-header bg-light">
+    <strong>Preview</strong>
+    <small class="text-muted">— dry run against non-manual transactions{% if not include_transfers %} (transfers excluded){% endif %}; nothing has been saved.</small>
+  </div>
+  <div class="card-body">
+    <div class="d-flex gap-2 flex-wrap mb-3">
+      <span class="badge text-bg-primary">Matched: {{ preview.counts.matched }}</span>
+      {% if is_edit %}
+      <span class="badge text-bg-success">Gained: {{ preview.counts.gains }}</span>
+      <span class="badge text-bg-danger">Lost: {{ preview.counts.losses }}</span>
+      {% endif %}
+      <span class="badge text-bg-warning">Would change: {{ preview.counts.changes }}</span>
+    </div>
 
-  <details {% if preview.counts.matched %}open{% endif %}>
-    <summary>Matched transactions ({{ preview.counts.matched }})</summary>
-    {% if matched_txns %}{{ txn_table(matched_txns) }}
-    {% if preview.counts.matched > matched_txns|length %}
-    <small>Showing first {{ matched_txns|length }} of {{ preview.counts.matched }}.</small>
-    {% endif %}
-    {% else %}<p><small>No transactions match this draft.</small></p>{% endif %}
-  </details>
+    <div class="accordion" id="preview-accordion">
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button {% if not preview.counts.matched %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#matched-section">
+            Matched transactions ({{ preview.counts.matched }})
+          </button>
+        </h2>
+        <div id="matched-section" class="accordion-collapse collapse {% if preview.counts.matched %}show{% endif %}" data-bs-parent="#preview-accordion">
+          <div class="accordion-body p-0">
+            {% if matched_txns %}
+            {{ txn_table(matched_txns) }}
+            {% if preview.counts.matched > matched_txns|length %}
+            <div class="ps-3 pb-3"><small class="text-muted">Showing first {{ matched_txns|length }} of {{ preview.counts.matched }}.</small></div>
+            {% endif %}
+            {% else %}
+            <div class="p-3"><small class="text-muted">No transactions match this draft.</small></div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
 
-  {% if is_edit %}
-  <details {% if gained_txns %}open{% endif %}>
-    <summary>Gained — newly attributed to this rule ({{ preview.counts.gains }})</summary>
-    {% if gained_txns %}{{ txn_table(gained_txns) }}{% else %}<p><small>None.</small></p>{% endif %}
-  </details>
-  <details {% if lost_txns %}open{% endif %}>
-    <summary>Lost — matched the old version but not this draft ({{ preview.counts.losses }})</summary>
-    {% if lost_txns %}
-    {{ txn_table(lost_txns) }}
-    <ul class="txn-ids">{% for t in lost_txns %}<li><code>{{ t.id }}</code></li>{% endfor %}</ul>
-    {% else %}<p><small>None.</small></p>{% endif %}
-  </details>
+      {% if is_edit %}
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button {% if not gained_txns %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#gained-section">
+            Gained — newly attributed to this rule ({{ preview.counts.gains }})
+          </button>
+        </h2>
+        <div id="gained-section" class="accordion-collapse collapse {% if gained_txns %}show{% endif %}" data-bs-parent="#preview-accordion">
+          <div class="accordion-body p-0">
+            {% if gained_txns %}
+            {{ txn_table(gained_txns) }}
+            {% else %}
+            <div class="p-3"><small class="text-muted">None.</small></div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button {% if not lost_txns %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#lost-section">
+            Lost — matched the old version but not this draft ({{ preview.counts.losses }})
+          </button>
+        </h2>
+        <div id="lost-section" class="accordion-collapse collapse {% if lost_txns %}show{% endif %}" data-bs-parent="#preview-accordion">
+          <div class="accordion-body p-0">
+            {% if lost_txns %}
+            {{ txn_table(lost_txns) }}
+            <div class="ps-3 pb-3">
+              <small class="text-muted">IDs:</small>
+              <ul class="mb-0">{% for t in lost_txns %}<li><code class="small">{{ t.id }}</code></li>{% endfor %}</ul>
+            </div>
+            {% else %}
+            <div class="p-3"><small class="text-muted">None.</small></div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button {% if not changes %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#changes-section">
+            Category/tag changes this save would cause ({{ preview.counts.changes }})
+          </button>
+        </h2>
+        <div id="changes-section" class="accordion-collapse collapse {% if changes %}show{% endif %}" data-bs-parent="#preview-accordion">
+          <div class="accordion-body p-0">
+            {% if changes %}
+            <div class="table-responsive">
+              <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Transaction</th>
+                    <th>Category</th>
+                    <th>Tags</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in changes %}
+                  <tr>
+                    <td style="max-width: 18rem; word-wrap: break-word;">
+                      {% if row.txn %}{{ (row.txn.description or '')[:70] }}{% endif %}
+                      <br><code class="small text-muted">{{ row.change.transaction_id }}</code>
+                    </td>
+                    <td>{{ row.change.old_category or '—' }} <i class="bi bi-arrow-right text-muted"></i> <strong>{{ row.change.new_category or '—' }}</strong></td>
+                    <td>{{ row.change.old_tags or '—' }} <i class="bi bi-arrow-right text-muted"></i> {{ row.change.new_tags or '—' }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% if preview.counts.changes > changes|length %}
+            <div class="ps-3 pb-3"><small class="text-muted">Showing first {{ changes|length }} of {{ preview.counts.changes }}.</small></div>
+            {% endif %}
+            {% else %}
+            <div class="p-3"><small class="text-muted">No effective category or tag changes.</small></div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
   {% endif %}
-
-  <details {% if changes %}open{% endif %}>
-    <summary>Category/tag changes this save would cause ({{ preview.counts.changes }})</summary>
-    {% if changes %}
-    <table class="preview-table">
-      <thead><tr><th>Transaction</th><th>Category</th><th>Tags</th></tr></thead>
-      <tbody>
-        {% for row in changes %}
-        <tr>
-          <td class="desc">
-            {% if row.txn %}{{ (row.txn.description or '')[:70] }}{% endif %}
-            <br><code class="txn-id">{{ row.change.transaction_id }}</code>
-          </td>
-          <td>{{ row.change.old_category or '—' }} → <strong>{{ row.change.new_category or '—' }}</strong></td>
-          <td>{{ row.change.old_tags or '—' }} → {{ row.change.new_tags or '—' }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% if preview.counts.changes > changes|length %}
-    <small>Showing first {{ changes|length }} of {{ preview.counts.changes }}.</small>
-    {% endif %}
-    {% else %}<p><small>No effective category or tag changes.</small></p>{% endif %}
-  </details>
-  {% endif %}
-</article>
+</div>

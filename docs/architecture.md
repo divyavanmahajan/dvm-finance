@@ -44,6 +44,25 @@ Dropped: users/auth tables, LLM/vector artifacts.
 - All schema changes via Alembic.
 - Snapshot merge: insert-or-overwrite (incoming wins), never deletes local rows; whole import is one transaction with a pre-import DB backup.
 
+## Transfer exclusion (default behavior)
+
+**Default: All views exclude transfer categories by default** to reduce visual clutter
+and focus financial reporting on actual spending rather than inter-account movements.
+
+Transfer categories are identified by the `is_transfer_category()` helper in
+`core/utils.py`, which checks if the effective category matches the pattern
+`transfer*` (e.g., `transfer`, `transfer-wise`, `transfer-angelina`, etc.).
+
+- **TransactionFilter** accepts `include_transfers: bool = False` parameter; URL query
+  param `?include_transfers=1` restores them.
+- **All aggregations** (trends, budgets, tags, rules match counts) respect this setting.
+- **Manual category precedence** still applies: if a user manually categorizes a row
+  as `transfer`, it will be excluded unless `include_transfers=1` is set.
+
+UI toggles on Transactions, Trends, and Cash Flow pages allow users to toggle the setting
+per-session (state lives in URL query params per Golden Principle 8). Rules preview also
+has a toggle to test rule matches with/without transfers included.
+
 ## Category hierarchy convention
 
 **Separator: hyphen (`-`), up to three segments** — e.g. `groceries-ah`,

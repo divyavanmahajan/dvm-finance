@@ -1,4 +1,16 @@
 /* Custom styles for abn-combined. Intentionally minimal. */
+:root {
+  --money-positive: #198754;
+  --money-negative: #dc3545;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --money-positive: #75b798;
+    --money-negative: #f8938c;
+  }
+}
+
 .nav-tabs {
   flex-wrap: wrap;
 }

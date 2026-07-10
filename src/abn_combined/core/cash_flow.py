@@ -107,8 +107,18 @@ class CashFlowResult:
 
 def compute_cash_flow(db: Session, date_from: date, date_to: date,
                       breakdown: str = "month",
-                      accounts: list[str] | None = None) -> CashFlowResult:
-    """Aggregate income vs expense per period via a single SQL GROUP BY."""
+                      accounts: list[str] | None = None,
+                      include_transfers: bool = False) -> CashFlowResult:
+    """Aggregate income vs expense per period via a single SQL GROUP BY.
+
+    Args:
+        db: Database session
+        date_from: Inclusive start date
+        date_to: Inclusive end date
+        breakdown: Period breakdown ('month', 'week', 'year')
+        accounts: Optional list of account numbers to include
+        include_transfers: If False (default), exclude transfer transactions
+    """
     if breakdown not in BREAKDOWNS:
         raise ValueError(f"Invalid breakdown: {breakdown}")
 
@@ -133,10 +143,13 @@ def compute_cash_flow(db: Session, date_from: date, date_to: date,
         .filter(
             Transaction.transactiondate >= date_from,
             Transaction.transactiondate <= date_to,
-            # Exclude transfers by effective category (legacy semantics).
-            or_(eff.is_(None), not_(eff.like("%transfer%"))),
         )
     )
+    # Exclude transfers by effective category (legacy semantics) unless include_transfers is True
+    if not include_transfers:
+        query = query.filter(
+            or_(eff.is_(None), not_(eff.like("%transfer%")))
+        )
     if accounts:
         query = query.filter(Transaction.accountNumber.in_(accounts))
     rows = {r.bucket: r for r in query.group_by("bucket").all()}
