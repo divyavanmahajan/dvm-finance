@@ -73,17 +73,22 @@ class TrendsParams:
     date_from: date | None = None
     date_to: date | None = None
     accounts: list[str] = field(default_factory=list)
+    include_transfers: bool = False
 
     @classmethod
     def _build(cls, one, many) -> TrendsParams:
         granularity = one("granularity") or DEFAULT_GRANULARITY
         if granularity not in GRANULARITIES:
             granularity = DEFAULT_GRANULARITY
+        # Parse include_transfers: True if param is "1", "true", or "True"; False otherwise
+        include_transfers_str = one("include_transfers") or ""
+        include_transfers = include_transfers_str in ("1", "true", "True")
         return cls(
             granularity=granularity,
             date_from=_parse_date(one("date_from")),
             date_to=_parse_date(one("date_to")),
             accounts=[a for a in many("account") if a],
+            include_transfers=include_transfers,
         )
 
     @classmethod
@@ -113,6 +118,8 @@ class TrendsParams:
             pairs.append(("date_to", self.date_to.isoformat()))
         for a in self.accounts:
             pairs.append(("account", a))
+        if self.include_transfers:
+            pairs.append(("include_transfers", "1"))
         return pairs
 
     def to_query_string(self) -> str:
@@ -219,6 +226,12 @@ def aggregate(db: Session, params: TrendsParams, today: date | None = None) -> T
     )
     if params.accounts:
         query = query.filter(Transaction.accountNumber.in_(params.accounts))
+    # Exclude transfers by default (unless include_transfers is True)
+    if not params.include_transfers:
+        from sqlalchemy import or_
+        query = query.filter(
+            or_(eff_cat.is_(None), eff_cat == "", ~eff_cat.ilike('%transfer%'))
+        )
     grouped = query.group_by(period_expr, eff_cat).all()
 
     # cat -> {period_key: amount}; None/"" categories fold into the uncategorized
