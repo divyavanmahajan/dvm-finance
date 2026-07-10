@@ -1,4 +1,4 @@
-/* Rules UI (step 07). Separate stylesheet — app.css is owned by other steps. */
+/* Rules UI — Bootstrap redesign. Step 07, Phase R1. */
 
 .rules-actions {
   display: flex;
@@ -20,84 +20,80 @@
 }
 .rules-table .field-target { display: block; opacity: 0.7; }
 
-button.link {
-  background: none;
-  border: none;
-  padding: 0;
-  color: var(--pico-primary, #1095c1);
+.cond-op { width: 5.5rem; }
+
+@media (max-width: 576px) {
+  .cond-row {
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    padding: 0.5rem;
+  }
+}
+
+.rule-form-actions {
+  position: sticky;
+  bottom: 0;
+  background: var(--bs-body-bg);
+  border-top: 1px solid var(--bs-border-color);
+  padding: 1rem;
+  display: flex;
+  gap: 0.5rem;
+  z-index: 10;
+}
+
+.num.pos { color: var(--money-positive, #198754); }
+.num.neg { color: var(--money-negative, #dc3545); }
+
+/* Details/summary styling for report transaction changes */
+.card-body details summary {
+  padding: 0.5rem 0.75rem;
+  background: var(--bs-tertiary-bg);
+  border-radius: var(--bs-border-radius);
+  font-weight: 500;
   cursor: pointer;
-  width: auto;
-  display: inline;
+  list-style: none;
+  user-select: none;
 }
-button.link.danger { color: #b71c1c; }
-
-/* --- Editor --- */
-.rule-form fieldset { margin-bottom: 1rem; }
-.rule-form .grow { flex: 1 1 20rem; }
-.rule-errors {
-  border-left: 4px solid #b71c1c;
-  background: #fdecea;
-  padding: 0.75rem 1rem;
+.card-body details summary:hover {
+  background: var(--bs-secondary-bg);
 }
-.rule-errors ul { margin-bottom: 0; }
-
-.cond-row {
-  display: flex;
-  gap: 0.4rem;
-  align-items: center;
-  margin-bottom: 0.4rem;
+.card-body details summary::-webkit-details-marker {
+  display: none;
 }
-.cond-row select, .cond-row input { margin-bottom: 0; }
-.cond-row select[name="cond_operator"] { max-width: 6rem; }
-.cond-row select[name="cond_match_pattern"] { max-width: 9rem; }
-.rule-form-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
-
-/* --- Preview + reports --- */
-.rule-preview header { margin-bottom: 0.5rem; }
-.preview-error { color: #b71c1c; }
-.preview-counts { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.5rem 0; }
-.pill {
+.card-body details summary i {
+  transition: transform 0.2s ease-in-out;
   display: inline-block;
-  padding: 0.1rem 0.6rem;
-  border-radius: 1rem;
-  background: var(--pico-muted-border-color, #e0e0e0);
-  font-size: 0.85rem;
+  margin-right: 0.5rem;
 }
-.pill.pos { background: #dcedc8; }
-.pill.neg { background: #ffcdd2; }
-
-.preview-table { font-size: 0.85rem; }
-.preview-table .desc { max-width: 28rem; overflow-wrap: anywhere; }
-.preview-table .num { text-align: right; white-space: nowrap; }
-.preview-table .num.neg { color: #b71c1c; }
-.preview-table .num.pos { color: #1b5e20; }
-.txn-id { font-size: 0.75rem; opacity: 0.7; }
-.txn-ids { font-size: 0.8rem; }
-
-.rule-report { padding: 1rem 1.25rem; margin-bottom: 1rem; }
-.rule-report header {
-  display: flex;
-  gap: 0.6rem;
-  align-items: baseline;
-  margin-bottom: 0.5rem;
+.card-body details[open] summary i {
+  transform: rotate(90deg);
 }
-.rule-report .ts { margin-left: auto; opacity: 0.7; }
-.action {
-  display: inline-block;
-  padding: 0.05rem 0.5rem;
+
+/* Bootstrap migration removes .rule-report, .action-* old styles (now use .card, .badge) */
+
+[data-bs-theme="dark"] .rule-form-actions {
+  background: var(--bs-body-bg);
+}
+/* Phase R2: Rules List Page */
+tr.inactive { opacity: 0.55; }
+
+/* Scoped code styling for card bodies (report transaction IDs, etc.) */
+.card-body code {
+  background: var(--bs-tertiary-bg);
+  padding: 0.25rem 0.4rem;
   border-radius: 0.25rem;
-  font-size: 0.8rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  background: #e0e0e0;
+  word-break: break-all;
 }
-.action-create { background: #dcedc8; }
-.action-update { background: #bbdefb; }
-.action-delete { background: #ffcdd2; }
-.action-toggle { background: #fff9c4; }
-.action-recategorize { background: #d1c4e9; }
-.action-import { background: #b2dfdb; }
 
-.report-diff { font-size: 0.85rem; }
-.report-diff .before { color: #b71c1c; overflow-wrap: anywhere; }
-.report-diff .after { color: #1b5e20; overflow-wrap: anywhere; }
+[data-bs-theme="dark"] .card-body code {
+  background: var(--bs-secondary-bg);
+}
+
+/* L3: Chevron rotation on collapse expand/collapse */
+.card-header[data-bs-toggle="collapse"] .bi-chevron-down {
+  transition: transform 0.2s ease-in-out;
+}
+
+.card-header[data-bs-toggle="collapse"][aria-expanded="true"] .bi-chevron-down {
+  transform: rotate(180deg);
+}

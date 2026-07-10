@@ -1,64 +1,136 @@
-{# One change report card.
+{# One change report card (Bootstrap styled).
 
-   Generic contract (also usable for step-11 snapshot-import reports): `report` is a
+   Generic contract (also usable for snapshot-import reports): `report` is a
    dict with keys id, created_at, action, rule_id (optional), rule_label (optional),
    diff (list of {field, before, after}), summary (dict of counts), txn_changes (list of
    {transaction_id, description, link, old_category, new_category, old_tags, new_tags}). #}
-<article class="rule-report" id="report-{{ report.id }}">
-  <header>
-    <span class="action action-{{ report.action }}">{{ report.action }}</span>
-    {% if report.rule_id %}
-    <a href="/rules/{{ report.rule_id }}/history">rule #{{ report.rule_id }}</a>
-    {% endif %}
-    {% if report.rule_label %}<strong>{{ report.rule_label }}</strong>{% endif %}
-    <small class="ts">{{ report.created_at.strftime('%Y-%m-%d %H:%M:%S') if report.created_at else '' }}</small>
-  </header>
 
-  {% if report.diff %}
-  <table class="report-diff">
-    <thead><tr><th>Field</th><th>Before</th><th>After</th></tr></thead>
-    <tbody>
-      {% for d in report.diff %}
-      <tr>
-        <td>{{ d.field }}</td>
-        <td class="before">{{ d.before if d.before is not none else '—' }}</td>
-        <td class="after">{{ d.after if d.after is not none else '—' }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
+<!-- Report card wrapper -->
+<div id="rule-report-{{ report.id }}" class="card shadow-sm mb-3">
+  <!-- Card header with action badge, rule link, timestamp -->
+  <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
+    <div class="d-flex align-items-center gap-2">
+      <!-- Action badge: create/update/delete/toggle/recategorize/import -->
+      {% if report.action == 'create' %}
+        <span class="badge text-bg-success"><i class="bi bi-plus-lg"></i> Created</span>
+      {% elif report.action == 'update' %}
+        <span class="badge text-bg-primary"><i class="bi bi-pencil"></i> Updated</span>
+      {% elif report.action == 'delete' %}
+        <span class="badge text-bg-danger"><i class="bi bi-trash"></i> Deleted</span>
+      {% elif report.action == 'toggle' %}
+        <span class="badge text-bg-warning text-dark"><i class="bi bi-toggle-on"></i> Toggled</span>
+      {% elif report.action in ['recategorize', 'recategorize-all'] %}
+        <span class="badge text-bg-info"><i class="bi bi-arrow-repeat"></i> Recategorized</span>
+      {% elif report.action == 'import' %}
+        <span class="badge text-bg-secondary"><i class="bi bi-download"></i> Imported</span>
+      {% else %}
+        <span class="badge text-bg-secondary">{{ report.action }}</span>
+      {% endif %}
 
-  <div class="preview-counts">
-    {% for key, value in report.summary.items() %}
-    <span class="pill">{{ key }}: {{ value }}</span>
-    {% endfor %}
+      <!-- Rule link (if rule still exists) -->
+      {% if report.rule_id %}
+        <a href="/rules/{{ report.rule_id }}/history" class="link-secondary fw-semibold text-decoration-none">
+          Rule #{{ report.rule_id }}
+        </a>
+      {% elif report.rule_label %}
+        <span class="text-muted fw-semibold">(Rule deleted)</span>
+      {% endif %}
+
+      <!-- Rule label (category / match_value) -->
+      {% if report.rule_label %}
+        <span class="text-muted small">{{ report.rule_label }}</span>
+      {% endif %}
+    </div>
+
+    <!-- Timestamp (right-aligned, muted) -->
+    <span class="text-muted small" title="{{ report.created_at.strftime('%Y-%m-%d %H:%M:%S') if report.created_at else '' }}">
+      {{ report.created_at.strftime('%Y-%m-%d %H:%M') if report.created_at else '' }}
+    </span>
   </div>
 
-  {% if report.txn_changes %}
-  <details>
-    <summary>Changed transactions ({{ report.txn_changes|length }})</summary>
-    <table class="preview-table">
-      <thead><tr><th>Transaction</th><th>Category</th><th>Tags</th></tr></thead>
-      <tbody>
-        {% for item in report.txn_changes %}
-        <tr>
-          <td class="desc">
-            {% if item.link %}
-            <a href="{{ item.link }}">{{ (item.description or item.transaction_id)[:70] }}</a>
-            {% else %}
-            {{ (item.description or '')[:70] }}
-            {% endif %}
-            <br><code class="txn-id">{{ item.transaction_id }}</code>
-          </td>
-          <td>{{ item.old_category or '—' }} → <strong>{{ item.new_category or '—' }}</strong></td>
-          <td>{{ item.old_tags or '—' }} → {{ item.new_tags or '—' }}</td>
-        </tr>
+  <!-- Card body: diff, summary, or transaction changes -->
+  <div class="card-body">
+    {% if report.diff %}
+      <!-- Diff table for updates -->
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-3">
+          <thead class="table-light">
+            <tr>
+              <th>Field</th>
+              <th>Before</th>
+              <th>After</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in report.diff %}
+            <tr>
+              <td class="fw-semibold text-muted small">{{ d.field }}</td>
+              <td>
+                <span class="text-danger">{{ d.before if d.before is not none else '—' }}</span>
+              </td>
+              <td>
+                <span class="text-success">{{ d.after if d.after is not none else '—' }}</span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+
+    <!-- Summary counts (badges) -->
+    {% if report.summary %}
+      <div class="mb-3">
+        {% for key, value in report.summary.items() %}
+          <span class="badge text-bg-light text-dark me-1 mb-1">{{ key }}: {{ value }}</span>
         {% endfor %}
-      </tbody>
-    </table>
-  </details>
-  {% else %}
-  <p><small>No transactions changed.</small></p>
-  {% endif %}
-</article>
+      </div>
+    {% endif %}
+
+    <!-- Transaction changes (collapsible details) -->
+    {% if report.txn_changes %}
+    <details class="mb-0">
+      <summary class="cursor-pointer mb-2">
+        <i class="bi bi-chevron-right"></i> Changed transactions ({{ report.txn_changes|length }})
+      </summary>
+      <div class="table-responsive mt-2">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Transaction</th>
+              <th>Category</th>
+              <th>Tags</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in report.txn_changes %}
+            <tr>
+              <td class="small">
+                {% if item.link %}
+                  <a href="{{ item.link }}" class="link-primary">{{ (item.description or item.transaction_id)[:60] }}</a>
+                {% else %}
+                  {{ (item.description or '')[:60] }}
+                {% endif %}
+                <br><code class="text-muted small">{{ item.transaction_id }}</code>
+              </td>
+              <td class="small">
+                <span class="text-danger">{{ item.old_category or '—' }}</span>
+                <i class="bi bi-arrow-right text-muted"></i>
+                <span class="text-success fw-semibold">{{ item.new_category or '—' }}</span>
+              </td>
+              <td class="small">
+                <span class="text-muted">{{ item.old_tags or '—' }}</span>
+                <i class="bi bi-arrow-right text-muted"></i>
+                <span class="text-success fw-semibold">{{ item.new_tags or '—' }}</span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+    {% else %}
+      <p class="text-muted small mb-0">No transactions changed.</p>
+    {% endif %}
+  </div>
+</div>

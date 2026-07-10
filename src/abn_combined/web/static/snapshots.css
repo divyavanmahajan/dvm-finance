@@ -1,4 +1,4 @@
-/* Snapshots page (step 11) — app.css untouched. */
+/* Snapshots page — Bootstrap migration. */
 
 .snapshot-error {
   border-left: 4px solid #c62828;
@@ -6,48 +6,11 @@
   padding: 0.75rem 1rem;
 }
 
+/* Table vertical alignment for counts/exports/overwrites */
 .snapshot-exports td,
 .snapshot-counts td,
 .snapshot-overwrites td {
   vertical-align: middle;
-}
-
-.snapshot-report {
-  margin-top: 1rem;
-}
-
-.snapshot-report.just-imported {
-  border: 2px solid #26a69a;
-}
-
-.snapshot-report header {
-  display: flex;
-  align-items: baseline;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-}
-
-.snapshot-report .ts {
-  color: var(--muted-color, #666);
-}
-
-.snapshot-report .action {
-  padding: 0.1rem 0.5rem;
-  border-radius: 0.5rem;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-}
-
-.snapshot-report .action-import {
-  background: #b2dfdb;
-}
-
-.snapshot-overwrites .before {
-  color: #b71c1c;
-}
-
-.snapshot-overwrites .after {
-  color: #1b5e20;
 }
 
 .snapshot-import-form {
