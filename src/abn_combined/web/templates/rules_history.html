@@ -2,25 +2,48 @@
 {% block title %}{{ title }} — abn-combined{% endblock %}
 {% block content %}
 <link rel="stylesheet" href="/static/rules.css">
-<hgroup>
-  <h1>{{ title }}</h1>
-  <p>Audit trail of rule mutations and recategorization runs, newest first.
-     Each report records the rule snapshot diff and every transaction it touched.</p>
-</hgroup>
 
-<div class="rules-actions">
-  <a role="button" class="secondary" href="/rules">Back to rules</a>
-  {% if scope_rule_id %}
-  <a role="button" class="secondary outline" href="/rules/history">All history</a>
-  <a role="button" class="secondary outline" href="/rules/{{ scope_rule_id }}/edit">Edit rule #{{ scope_rule_id }}</a>
-  {% endif %}
+<!-- Header -->
+<div class="mb-4">
+  <a href="/rules" class="btn btn-outline-secondary btn-sm mb-3">
+    <i class="bi bi-arrow-left"></i> Back to rules
+  </a>
+  <h1 class="h3 mb-2">{{ title }}</h1>
+  <p class="text-muted small">Audit trail of rule mutations and recategorization runs, newest first.
+     Each report records the rule snapshot diff and every transaction it touched.</p>
 </div>
 
-{% if reports %}
-{% for report in reports %}
-{% include "_rule_report.html" %}
-{% endfor %}
-{% else %}
-<article><p>Nothing here yet — reports appear when rules change.</p></article>
+<!-- Scoped actions (if viewing single rule history) -->
+{% if scope_rule_id %}
+<div class="mb-3 d-flex gap-2">
+  <a href="/rules/history" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-list-ul"></i> All history
+  </a>
+  <a href="/rules/{{ scope_rule_id }}/edit" class="btn btn-primary btn-sm">
+    <i class="bi bi-pencil"></i> Edit rule #{{ scope_rule_id }}
+  </a>
+</div>
 {% endif %}
+
+<!-- Empty state (if no history) -->
+{% if not reports %}
+<div class="card shadow-sm">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-inbox display-4 text-muted d-block mb-3"></i>
+    <p class="lead text-muted mb-3">No change history yet</p>
+    <p class="text-muted small mb-3">Rules history will appear here as you create and modify rules.</p>
+    <a href="/rules/new" class="btn btn-primary">
+      <i class="bi bi-plus-lg"></i> Create your first rule
+    </a>
+  </div>
+</div>
+{% else %}
+<!-- Reports list -->
+<div>
+  {% for report in reports %}
+    {% include "_rule_report.html" %}
+  {% endfor %}
+</div>
+{% endif %}
+
 {% endblock %}
