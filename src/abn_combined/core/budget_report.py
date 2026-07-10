@@ -14,6 +14,7 @@ from decimal import Decimal
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from ..constants import is_transfer_category
 from .models import Budget, Transaction
 from .utils import CATEGORY_SEPARATOR
 
@@ -43,22 +44,32 @@ def _effective_category_expr():
 
 
 def compute_actual(db: Session, category: str, period_start: date,
-                   period_end: date) -> float:
-    """Total ``abs(amount)`` for the effective category (incl. children) in a window."""
+                   period_end: date, exclude_transfers: bool = True) -> float:
+    """Total ``abs(amount)`` for the effective category (incl. children) in a window.
+
+    Args:
+        db: Database session
+        category: Budget category to sum
+        period_start: Inclusive start date
+        period_end: Inclusive end date
+        exclude_transfers: If True (default), exclude transfer transactions
+    """
     eff = _effective_category_expr()
     c = category.strip().lower()
-    result = (
-        db.query(func.sum(func.abs(Transaction.amount)))
-        .filter(
-            Transaction.transactiondate >= period_start,
-            Transaction.transactiondate <= period_end,
-            or_(
-                func.lower(eff) == c,
-                func.lower(eff).like(f"{c}{CATEGORY_SEPARATOR}%"),
-            ),
-        )
-        .scalar()
+    query = db.query(func.sum(func.abs(Transaction.amount))).filter(
+        Transaction.transactiondate >= period_start,
+        Transaction.transactiondate <= period_end,
+        or_(
+            func.lower(eff) == c,
+            func.lower(eff).like(f"{c}{CATEGORY_SEPARATOR}%"),
+        ),
     )
+    # Exclude transfers by default (unless exclude_transfers is False)
+    if exclude_transfers:
+        query = query.filter(
+            or_(eff.is_(None), eff == "", ~eff.ilike('%transfer%'))
+        )
+    result = query.scalar()
     return float(result) if result is not None else 0.0
 
 
@@ -74,8 +85,15 @@ def budget_status(actual: float, budget_amount: float) -> str:
 
 
 def budget_vs_actual_table(db: Session, reference_date: date | None = None,
-                           period: str | None = None) -> list[dict]:
+                           period: str | None = None,
+                           exclude_transfers: bool = True) -> list[dict]:
     """One row per valid budget with actuals for its current period window.
+
+    Args:
+        db: Database session
+        reference_date: Reference date for period calculation (defaults to today)
+        period: Restrict to budgets of one period type (year/month/week)
+        exclude_transfers: If True (default), exclude transfer transactions from actuals
 
     ``period`` restricts to budgets of one period type; validity dates exclude
     budgets whose window does not overlap [start_date, end_date].
@@ -91,7 +109,8 @@ def budget_vs_actual_table(db: Session, reference_date: date | None = None,
             continue  # not yet active
         if budget.end_date and period_start > budget.end_date:
             continue  # expired
-        actual = compute_actual(db, budget.category, period_start, period_end)
+        actual = compute_actual(db, budget.category, period_start, period_end,
+                               exclude_transfers=exclude_transfers)
         amount = float(budget.amount)
         rows.append(
             {

@@ -17,6 +17,7 @@ from urllib.parse import parse_qsl, urlencode
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Query, Session
 
+from ..constants import is_transfer_category
 from .models import Transaction
 from .utils import CATEGORY_SEPARATOR
 
@@ -124,6 +125,7 @@ class TransactionFilter:
     amount_max: float | None = None
     rule_id: int | None = None
     source_file: str | None = None
+    include_transfers: bool = False
     sort: str = DEFAULT_SORT
     page: int = 1
 
@@ -140,6 +142,9 @@ class TransactionFilter:
         preset = one("preset")
         if preset not in PRESETS:
             preset = None
+        # Parse include_transfers: True if param is "1", "true", or "True"; False otherwise
+        include_transfers_str = one("include_transfers") or ""
+        include_transfers = include_transfers_str in ("1", "true", "True")
         return cls(
             q=(one("q") or None),
             date_from=_parse_date(one("date_from")),
@@ -153,6 +158,7 @@ class TransactionFilter:
             amount_max=_parse_float(one("amount_max")),
             rule_id=_parse_int(one("rule_id")),
             source_file=(one("source_file") or None),
+            include_transfers=include_transfers,
             sort=sort,
             page=page,
         )
@@ -205,6 +211,8 @@ class TransactionFilter:
             pairs.append(("rule_id", str(self.rule_id)))
         if self.source_file:
             pairs.append(("source_file", self.source_file))
+        if self.include_transfers:
+            pairs.append(("include_transfers", "1"))
         if self.sort != DEFAULT_SORT:
             pairs.append(("sort", self.sort))
         if self.page != 1:
@@ -334,6 +342,13 @@ def build_query(db: Session, f: TransactionFilter, today: date | None = None) ->
         query = query.filter(Transaction.transactiondate >= lo)
     if hi:
         query = query.filter(Transaction.transactiondate <= hi)
+
+    # Exclude transfers by default (unless include_transfers is True)
+    if not f.include_transfers:
+        # Exclude transactions whose effective category contains 'transfer' (case-insensitive)
+        query = query.filter(
+            or_(eff_cat.is_(None), eff_cat == "", ~eff_cat.ilike('%transfer%'))
+        )
 
     def _category_cond(cat: str):
         """Match a category exactly or any hierarchical child (hyphen-separated)."""

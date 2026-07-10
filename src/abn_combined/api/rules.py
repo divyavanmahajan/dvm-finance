@@ -13,7 +13,7 @@ from typing import Any
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -170,8 +170,10 @@ def _validate_vm(vm: dict[str, Any], require_category: bool = True) -> list[str]
 
 
 def _vm_to_draft(vm: dict[str, Any], rule_id: int | None = None) -> DraftRule:
+    # Derive rule_type from field_target for semantic consistency
+    derived_rule_type = _derive_rule_type(vm.get("field_target"))
     return DraftRule(
-        rule_type=vm["rule_type"],
+        rule_type=derived_rule_type,
         match_pattern=vm["match_pattern"],
         field_target=vm["field_target"] or None,
         match_value=vm["match_value"],
@@ -198,9 +200,25 @@ def _vm_to_draft(vm: dict[str, Any], rule_id: int | None = None) -> DraftRule:
     )
 
 
+def _derive_rule_type(field_target: str | None) -> str:
+    """Derive rule_type from field_target for semantic consistency.
+
+    If field_target is 'amount', rule is amount-matching.
+    If field_target is 'category' or 'category_name', rule is category-matching.
+    Otherwise, default to 'keyword' (description, counterparty, etc.).
+    """
+    field = (field_target or "").lower().strip()
+    if field == "amount":
+        return "amount"
+    if field in ("category", "category_name"):
+        return "category"
+    return "keyword"
+
+
 def _apply_vm_to_rule(rule: CategorizationRule, vm: dict[str, Any]) -> None:
     rule.priority = vm["priority"]
-    rule.rule_type = vm["rule_type"]
+    # Derive rule_type from field_target for semantic consistency
+    rule.rule_type = _derive_rule_type(vm.get("field_target"))
     rule.match_pattern = vm["match_pattern"]
     rule.field_target = vm["field_target"] or None
     rule.match_value = vm["match_value"]
@@ -268,14 +286,27 @@ def _get_rule_or_404(db: Session, rule_id: int) -> CategorizationRule:
     return rule
 
 
-def _matched_counts(db: Session) -> dict[int, int]:
-    """Transactions currently attributed per rule (categorization_source = str(id))."""
-    rows = (
+def _matched_counts(db: Session, exclude_transfers: bool = True) -> dict[int, int]:
+    """Transactions currently attributed per rule (categorization_source = str(id)).
+
+    Args:
+        db: Database session
+        exclude_transfers: If True (default), exclude transfer transactions from counts
+    """
+    query = (
         db.query(Transaction.categorization_source, func.count(Transaction.id))
         .filter(Transaction.categorization_source.isnot(None))
-        .group_by(Transaction.categorization_source)
-        .all()
     )
+    # Exclude transfers by default
+    if exclude_transfers:
+        from sqlalchemy import or_
+        eff = func.coalesce(
+            func.nullif(Transaction.manual_category, ""), Transaction.category
+        )
+        query = query.filter(
+            or_(eff.is_(None), eff == "", ~eff.ilike('%transfer%'))
+        )
+    rows = query.group_by(Transaction.categorization_source).all()
     counts: dict[int, int] = {}
     for source, n in rows:
         try:
@@ -589,11 +620,15 @@ async def rule_create(request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/rules/recategorize", include_in_schema=False)
-def recategorize_all(db: Session = Depends(get_db)) -> RedirectResponse:
+def recategorize_all(db: Session = Depends(get_db)) -> JSONResponse:
     report = record_rule_change(db, "recategorize")
     logger.info("recategorize_all", report_id=report.id,
                 changed=report.summary.get("changed"))
-    return RedirectResponse(url=f"/rules/history#report-{report.id}", status_code=303)
+    # Return success response with HX-Trigger to refresh counts and empty state.
+    # HTMX will NOT swap the response (default no-swap on POST), keeping user on page.
+    response = JSONResponse({"success": True, "report_id": report.id})
+    response.headers["HX-Trigger"] = "rulesChanged"
+    return response
 
 
 @router.post("/rules/{rule_id}", include_in_schema=False)
@@ -637,5 +672,7 @@ def rule_delete(request: Request, rule_id: int, db: Session = Depends(get_db)) -
                                 rule_id=rule_id, rule_uuid=before.get("uuid"))
     logger.info("rule_deleted", rule_id=rule_id, report_id=report.id,
                 changed=report.summary.get("changed"))
-    # htmx removes the row (hx-swap="outerHTML" with empty body).
-    return HTMLResponse("")
+    # Trigger table refresh to handle empty state and stale counts (H5).
+    response = JSONResponse({"success": True})
+    response.headers["HX-Trigger"] = "rulesChanged"
+    return response
