@@ -59,6 +59,9 @@ def _cash_flow_context(request: Request, db: Session) -> dict:
     if preset not in PRESETS:
         preset = None
     accounts = [a for a in params.getlist("account") if a]
+    # Parse include_transfers: True if param is "1", "true", or "True"; False otherwise
+    include_transfers_str = params.get("include_transfers") or ""
+    include_transfers = include_transfers_str in ("1", "true", "True")
 
     today = date.today()
     if preset:
@@ -68,7 +71,8 @@ def _cash_flow_context(request: Request, db: Session) -> dict:
         date_to = _parse_date(params.get("date_to")) or date(today.year, 12, 31)
 
     result = compute_cash_flow(db, date_from=date_from, date_to=date_to,
-                               breakdown=breakdown, accounts=accounts or None)
+                               breakdown=breakdown, accounts=accounts or None,
+                               include_transfers=include_transfers)
     columns = [
         {
             "label": label,
@@ -94,6 +98,7 @@ def _cash_flow_context(request: Request, db: Session) -> dict:
         "accounts": accounts,
         "known_accounts": _known_accounts(db),
         "total_txn_url": _txn_link(date_from, date_to, accounts),
+        "include_transfers": include_transfers,
     }
 
 

@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="/static/tables.css">
 <hgroup>
   <h1>Cash Flow</h1>
-  <p>Income vs expense per period (transfers excluded). Amounts link to the matching transactions; filter state lives in the URL.</p>
+  <p>Income vs expense per period. Transfers excluded by default. Amounts link to the matching transactions; filter state lives in the URL.</p>
 </hgroup>
 
 <form class="table-controls" method="get" action="/cash-flow"
@@ -34,6 +34,11 @@
       <option value="{{ a }}" {% if a in accounts %}selected{% endif %}>{{ a }}</option>
       {% endfor %}
     </select>
+  </label>
+  <label style="display: flex; align-items: center; gap: 0.5rem;">
+    <input type="checkbox" name="include_transfers" value="1"
+           {% if include_transfers %}checked{% endif %}>
+    <span>Include Transfers</span>
   </label>
   <noscript><button type="submit">Apply</button></noscript>
 </form>

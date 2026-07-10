@@ -1,12 +1,12 @@
 {# Active-filter chips — each removes itself by swapping to a narrower URL. #}
 {% if chips %}
-<div class="chips">
+<div class="chips mb-3">
   {% for chip in chips %}
   <a class="chip" href="/transactions/table?{{ chip.remove }}"
      hx-get="/transactions/table?{{ chip.remove }}"
      hx-target="#txn-table" hx-swap="innerHTML"
      hx-push-url="/{% if chip.remove %}?{{ chip.remove }}{% endif %}">
-    {{ chip.label }} <span aria-hidden="true">✕</span>
+    {{ chip.label }} <i class="bi bi-x" aria-hidden="true"></i>
   </a>
   {% endfor %}
   <a class="chip chip-clear" href="/"
@@ -17,26 +17,25 @@
 
 {% if not page.total and not chips %}
 {# First-run hint: an empty database with no filters applied (spec FR10.1). #}
-<article class="first-run-hint">
-  <p><strong>No transactions yet.</strong> Import your history from a legacy
-  abn-analyst database with:</p>
+<div class="first-run-hint">
+  <p><strong>No transactions yet.</strong> Import your history from a legacy abn-analyst database with:</p>
   <p><code>abn-combined migrate-legacy /path/to/abn_analyst.db</code></p>
   <p>…or use the <a href="/upload">Upload</a> or <a href="/download">Download</a> tabs.</p>
-</article>
+</div>
 {% endif %}
 
 <p class="txn-count">
   {% if page.total %}
-  Showing <strong>{{ page.start_index }}–{{ page.end_index }}</strong> of <strong>{{ page.total }}</strong>
+  Showing <strong>{{ page.start_index }}–{{ page.end_index }}</strong> of <strong>{{ page.total }}</strong> transactions
   {% elif chips %}
   No transactions match these filters.
   {% endif %}
 </p>
 
-<table class="txn-table">
+<table class="table table-hover align-middle txn-table">
   <thead>
     <tr>
-      <th></th>
+      <th style="width: 40px;"></th>
       <th>Date</th>
       <th>Account</th>
       <th>Description</th>
@@ -44,32 +43,47 @@
       <th>Category</th>
       <th>Tags</th>
       <th>Source</th>
-      <th></th>
+      <th style="width: 60px;"></th>
     </tr>
   </thead>
   {% for row in rows %}
     {% include "_transactions_row.html" %}
   {% else %}
-  <tbody><tr><td colspan="9"><em>Nothing here.</em></td></tr></tbody>
+  <tbody><tr><td colspan="9" class="text-center text-muted py-4"><em>Nothing here.</em></td></tr></tbody>
   {% endfor %}
 </table>
 
+<!-- Table footer: transaction count and net total -->
+{% if page.total %}
+<div class="px-3 py-2 bg-light border-top" style="font-size: 0.9rem;">
+  <div class="d-flex justify-content-between">
+    <span><strong>{{ page.total }} transaction{{ 's' if page.total != 1 else '' }}</strong></span>
+    <span class="text-muted">{{ page.start_index }}–{{ page.end_index }} shown</span>
+  </div>
+</div>
+{% endif %}
+
+<!-- Pagination -->
 {% if page.pages > 1 %}
 <nav class="pagination" aria-label="Pagination">
-  <a role="button" class="secondary {% if not page.has_prev %}disabled{% endif %}"
+  <a role="button" class="btn btn-sm btn-outline-secondary {% if not page.has_prev %}disabled{% endif %}"
      {% if page.has_prev %}
      hx-get="/transactions/table?{{ filter.with_page(page.page - 1).to_query_string() }}"
      hx-target="#txn-table" hx-swap="innerHTML"
      hx-push-url="/?{{ filter.with_page(page.page - 1).to_query_string() }}"
      href="/?{{ filter.with_page(page.page - 1).to_query_string() }}"
-     {% endif %}>Prev</a>
+     {% endif %}>
+    <i class="bi bi-chevron-left"></i> Prev
+  </a>
   <span class="page-indicator">Page {{ page.page }} / {{ page.pages }}</span>
-  <a role="button" class="secondary {% if not page.has_next %}disabled{% endif %}"
+  <a role="button" class="btn btn-sm btn-outline-secondary {% if not page.has_next %}disabled{% endif %}"
      {% if page.has_next %}
      hx-get="/transactions/table?{{ filter.with_page(page.page + 1).to_query_string() }}"
      hx-target="#txn-table" hx-swap="innerHTML"
      hx-push-url="/?{{ filter.with_page(page.page + 1).to_query_string() }}"
      href="/?{{ filter.with_page(page.page + 1).to_query_string() }}"
-     {% endif %}>Next</a>
+     {% endif %}>
+    Next <i class="bi bi-chevron-right"></i>
+  </a>
 </nav>
 {% endif %}

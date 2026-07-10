@@ -2,80 +2,114 @@
    Alpine state (valid HTML: a table may contain multiple tbody elements). #}
 {% set t = row.txn %}
 <tbody x-data="{ open: false, editcat: false, edittags: false }">
-  <tr id="txn-row-{{ t.id }}" class="{% if row.is_manual %}manual{% endif %}">
-    <td>
-      <button class="link expand" title="Show detail"
+  <tr id="txn-row-{{ t.id }}" class="{% if row.is_manual %}manual-txn{% endif %}">
+    <!-- Expand button -->
+    <td class="text-center">
+      <button class="link" title="Show detail"
               @click="open = !open"
               hx-get="/transactions/{{ t.id }}/detail"
               hx-target="#txn-detail-body-{{ t.id | css_id }}"
               hx-swap="innerHTML"
               hx-trigger="click once"
-              x-text="open ? '▾' : '▸'">▸</button>
+              style="font-size: 1rem; line-height: 1;">
+        <i class="bi" :class="open ? 'bi-chevron-down' : 'bi-chevron-right'" aria-hidden="true"></i>
+        <span class="visually-hidden" x-text="open ? 'Hide details' : 'Show details'"></span>
+      </button>
     </td>
-    <td>{{ t.transactiondate.isoformat() }}</td>
-    <td class="acct">{{ t.accountNumber }}</td>
-    <td class="desc">{{ (t.description or '')[:80] }}</td>
+
+    <!-- Date -->
+    <td class="text-nowrap" style="font-variant-numeric: tabular-nums;">{{ t.transactiondate.isoformat() }}</td>
+
+    <!-- Account -->
+    <td class="text-nowrap small">{{ t.accountNumber }}</td>
+
+    <!-- Description (with counterparty on second line) -->
+    <td class="desc">
+      <span class="desc-name">{{ (t.description or '')[:80] }}</span>
+    </td>
+
+    <!-- Amount (tabular-nums, color-coded) -->
     <td class="num {% if t.amount < 0 %}neg{% else %}pos{% endif %}">
       {{ '%.2f'|format(t.amount) }} {{ t.currency }}
     </td>
 
-    {# ---- effective category (inline edit) ---- #}
-    <td class="cat">
+    <!-- Category (inline edit) -->
+    <td>
       <span x-show="!editcat">
-        {% if row.effective_category %}{{ row.effective_category }}{% else %}<em>uncategorized</em>{% endif %}
-        {% if row.is_manual %}<span class="badge" title="Manually set">M</span>{% endif %}
-        <button class="link" title="Edit category" @click="editcat = true">✎</button>
+        {% if row.effective_category %}
+          <span class="badge bg-primary">{{ row.effective_category }}</span>
+        {% else %}
+          <span class="badge bg-secondary">uncategorized</span>
+        {% endif %}
+        {% if row.is_manual %}<span class="badge bg-warning text-dark ms-1" title="Manually set"><i class="bi bi-hand-thumbs-up"></i></span>{% endif %}
+        <button class="link ms-2" title="Edit category" @click="editcat = true"><i class="bi bi-pencil"></i></button>
       </span>
       <form x-show="editcat" x-cloak class="inline-edit"
             hx-post="/transactions/{{ t.id }}/category"
             hx-target="#txn-row-{{ t.id }}" hx-swap="outerHTML">
-        <input name="manual_category" list="known-categories"
+        <input name="manual_category" list="known-categories" class="form-control form-control-sm"
                value="{{ row.effective_category or '' }}" autocomplete="off">
-        <button type="submit" class="link" title="Save">✓</button>
-        <button type="button" class="link" title="Cancel" @click="editcat = false">✕</button>
+        <button type="submit" class="link" title="Save"><i class="bi bi-check-lg text-success"></i></button>
+        <button type="button" class="link" title="Cancel" @click="editcat = false"><i class="bi bi-x-lg text-danger"></i></button>
         {% if row.txn.manual_category %}
         <button type="button" class="link" title="Clear manual (restore rule)"
                 hx-delete="/transactions/{{ t.id }}/category"
-                hx-target="#txn-row-{{ t.id }}" hx-swap="outerHTML">↺</button>
+                hx-target="#txn-row-{{ t.id }}" hx-swap="outerHTML"><i class="bi bi-arrow-counterclockwise text-info"></i></button>
         {% endif %}
       </form>
     </td>
 
-    {# ---- effective tags (inline edit) ---- #}
-    <td class="tags">
+    <!-- Tags (inline edit) -->
+    <td>
       <span x-show="!edittags">
-        {% if row.effective_tags %}{{ row.effective_tags }}{% else %}<em>—</em>{% endif %}
-        <button class="link" title="Edit tags" @click="edittags = true">✎</button>
+        {% if row.effective_tags %}
+          {% for tag in row.effective_tags.split(', ') %}
+            <span class="badge bg-info">{{ tag }}</span>
+          {% endfor %}
+        {% else %}
+          <span class="text-muted small">—</span>
+        {% endif %}
+        <button class="link ms-2" title="Edit tags" @click="edittags = true"><i class="bi bi-pencil"></i></button>
       </span>
       <form x-show="edittags" x-cloak class="inline-edit"
             hx-post="/transactions/{{ t.id }}/tags"
             hx-target="#txn-row-{{ t.id }}" hx-swap="outerHTML">
-        <input name="manual_tags" value="{{ row.effective_tags or '' }}"
+        <input name="manual_tags" class="form-control form-control-sm" value="{{ row.effective_tags or '' }}"
                placeholder="comma,separated" autocomplete="off">
-        <button type="submit" class="link" title="Save">✓</button>
-        <button type="button" class="link" title="Cancel" @click="edittags = false">✕</button>
+        <button type="submit" class="link" title="Save"><i class="bi bi-check-lg text-success"></i></button>
+        <button type="button" class="link" title="Cancel" @click="edittags = false"><i class="bi bi-x-lg text-danger"></i></button>
         {% if row.txn.manual_tags %}
         <button type="button" class="link" title="Clear manual (restore rule)"
                 hx-delete="/transactions/{{ t.id }}/tags"
-                hx-target="#txn-row-{{ t.id }}" hx-swap="outerHTML">↺</button>
+                hx-target="#txn-row-{{ t.id }}" hx-swap="outerHTML"><i class="bi bi-arrow-counterclockwise text-info"></i></button>
         {% endif %}
       </form>
     </td>
 
-    <td class="src">
-      {% if t.categorization_source == 'manual' %}manual
-      {% elif t.categorization_source %}<a href="/rules/{{ t.categorization_source }}">rule #{{ t.categorization_source }}</a>
-      {% else %}—{% endif %}
+    <!-- Source (rule or manual) -->
+    <td class="small text-muted">
+      {% if t.categorization_source == 'manual' %}
+        <span title="Manually categorized"><i class="bi bi-hand-thumbs-up"></i> manual</span>
+      {% elif t.categorization_source %}
+        <a href="/rules/{{ t.categorization_source }}" title="View rule">rule #{{ t.categorization_source }}</a>
+      {% else %}
+        <span class="text-muted">—</span>
+      {% endif %}
     </td>
-    <td>
-      <a class="link create-rule" href="/rules/new?from_transaction={{ t.id }}"
-         title="Create rule from this transaction">+ rule</a>
+
+    <!-- Create rule -->
+    <td class="text-end">
+      <a class="link" href="/rules/new?from_transaction={{ t.id }}"
+         title="Create rule from this transaction"><i class="bi bi-plus-circle"></i></a>
     </td>
   </tr>
 
+  <!-- Detail row (expandable) -->
   <tr class="detail-row" x-show="open" x-cloak>
-    <td colspan="9">
-      <div id="txn-detail-body-{{ t.id | css_id }}"><small>Loading…</small></div>
+    <td colspan="9" class="p-3">
+      <div id="txn-detail-body-{{ t.id | css_id }}">
+        <small class="text-muted"><i class="bi bi-hourglass-split"></i> Loading…</small>
+      </div>
     </td>
   </tr>
 </tbody>
