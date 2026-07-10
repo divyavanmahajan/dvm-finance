@@ -10,8 +10,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from ..constants import is_transfer_category
 from ..core.models import Transaction
 from ..core.renames import delete_tag, rename_tag
 from ..db import get_db
@@ -27,13 +29,27 @@ def _templates(request: Request):
     return templates
 
 
-def collect_tags(db: Session) -> list[dict]:
-    """All tags with usage counts and credit/debit totals, sorted by count desc."""
-    txns = (
-        db.query(Transaction)
-        .filter((Transaction.tags.isnot(None)) | (Transaction.manual_tags.isnot(None)))
-        .all()
+def collect_tags(db: Session, exclude_transfers: bool = True) -> list[dict]:
+    """All tags with usage counts and credit/debit totals, sorted by count desc.
+
+    Args:
+        db: Database session
+        exclude_transfers: If True (default), exclude transfer transactions
+    """
+    query = db.query(Transaction).filter(
+        (Transaction.tags.isnot(None)) | (Transaction.manual_tags.isnot(None))
     )
+    # Exclude transfers by default
+    if exclude_transfers:
+        eff_cat = Transaction.manual_category
+        eff_cat_fallback = Transaction.category
+        # Use the effective category expression (manual takes precedence)
+        from sqlalchemy import func
+        eff = func.coalesce(func.nullif(eff_cat, ""), eff_cat_fallback)
+        query = query.filter(
+            or_(eff.is_(None), eff == "", ~eff.ilike('%transfer%'))
+        )
+    txns = query.all()
     data: dict[str, dict] = {}
     for txn in txns:
         names: set[str] = set()
