@@ -2,122 +2,180 @@
 {% block title %}Transactions — abn-combined{% endblock %}
 {% block content %}
 <script src="/static/js/transactions.js"></script>
-<hgroup>
-  <h1>Transactions</h1>
-  <p>Filter, sort and categorize. The full filter state lives in the URL — bookmark or share any view.</p>
-</hgroup>
 
-{# Filter bar. Every control targets the table partial and pushes the URL so state
-   is always in the query string (Golden Principle 8). #}
-<form id="filter-bar" class="filter-bar"
-      hx-get="/transactions/table"
-      hx-target="#txn-table"
-      hx-swap="innerHTML"
-      hx-push-url="true"
-      hx-indicator="#txn-loading"
-      hx-trigger="submit, change from:select, change from:input[type=date], change from:input[name=account]"
-      x-data="txnFilterBar()">
+<!-- Page header -->
+<div class="mb-4">
+  <h1 class="display-6 mb-2">Transactions</h1>
+  <p class="text-muted">Filter, sort and categorize. The full filter state lives in the URL — bookmark or share any view.</p>
+</div>
 
-  <div class="filter-row">
-    <label class="grow">
-      <input type="search" name="q" placeholder="Search description or counterparty…"
-             aria-label="Search description or counterparty"
-             value="{{ filter.q or '' }}"
-             hx-get="/transactions/table" hx-target="#txn-table" hx-swap="innerHTML"
-             hx-push-url="true" hx-indicator="#txn-loading"
-             hx-trigger="keyup changed delay:400ms, search">
-    </label>
+<!-- Filter bar (card with form inside) -->
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    {# Filter bar. Every control targets the table partial and pushes the URL so state
+       is always in the query string (Golden Principle 8). #}
+    <form id="filter-bar" class="filter-bar"
+          hx-get="/transactions/table"
+          hx-target="#txn-table"
+          hx-swap="innerHTML"
+          hx-push-url="true"
+          hx-indicator="#txn-loading"
+          hx-trigger="submit, change from:select, change from:input[type=date], change from:input[type=checkbox], change from:input[name=account]"
+          x-data="txnFilterBar()">
 
-    <label>
-      <select name="preset" aria-label="Date preset">
-        <option value="">Any date</option>
-        {% for p in presets %}
-        <option value="{{ p }}" {% if filter.preset == p %}selected{% endif %}>{{ p.replace('-', ' ').title() }}</option>
-        {% endfor %}
-      </select>
-    </label>
+      <!-- Primary filter row: search | preset | sort | toggle -->
+      <div class="filter-row">
+        <!-- Search input with icon -->
+        <div class="grow input-group">
+          <span class="input-group-text" aria-hidden="true">
+            <i class="bi bi-search"></i>
+          </span>
+          <input type="search"
+                 name="q"
+                 class="form-control"
+                 placeholder="Search description or counterparty…"
+                 aria-label="Search description or counterparty"
+                 value="{{ filter.q or '' }}"
+                 hx-get="/transactions/table"
+                 hx-target="#txn-table"
+                 hx-swap="innerHTML"
+                 hx-push-url="true"
+                 hx-indicator="#txn-loading"
+                 hx-trigger="keyup changed delay:400ms, search">
+        </div>
 
-    <label>Sort
-      <select name="sort">
-        <option value="date_desc" {% if filter.sort == 'date_desc' %}selected{% endif %}>Newest</option>
-        <option value="date_asc" {% if filter.sort == 'date_asc' %}selected{% endif %}>Oldest</option>
-        <option value="amount_desc" {% if filter.sort == 'amount_desc' %}selected{% endif %}>Amount ↓</option>
-        <option value="amount_asc" {% if filter.sort == 'amount_asc' %}selected{% endif %}>Amount ↑</option>
-        <option value="category_asc" {% if filter.sort == 'category_asc' %}selected{% endif %}>Category A→Z</option>
-        <option value="category_desc" {% if filter.sort == 'category_desc' %}selected{% endif %}>Category Z→A</option>
-      </select>
-    </label>
+        <!-- Date preset -->
+        <select name="preset" class="form-select" aria-label="Date preset" style="max-width: 160px;">
+          <option value="">Any date</option>
+          {% for p in presets %}
+          <option value="{{ p }}" {% if filter.preset == p %}selected{% endif %}>{{ p.replace('-', ' ').title() }}</option>
+          {% endfor %}
+        </select>
 
-    <button type="button" class="secondary outline" @click="advanced = !advanced"
-            x-text="advanced ? 'Fewer filters' : 'More filters'">More filters</button>
-  </div>
+        <!-- Sort -->
+        <select name="sort" class="form-select" aria-label="Sort" style="max-width: 150px;">
+          <option value="date_desc" {% if filter.sort == 'date_desc' %}selected{% endif %}>Newest</option>
+          <option value="date_asc" {% if filter.sort == 'date_asc' %}selected{% endif %}>Oldest</option>
+          <option value="amount_desc" {% if filter.sort == 'amount_desc' %}selected{% endif %}>Amount ↓</option>
+          <option value="amount_asc" {% if filter.sort == 'amount_asc' %}selected{% endif %}>Amount ↑</option>
+          <option value="category_asc" {% if filter.sort == 'category_asc' %}selected{% endif %}>Category A→Z</option>
+          <option value="category_desc" {% if filter.sort == 'category_desc' %}selected{% endif %}>Category Z→A</option>
+        </select>
 
-  <div class="filter-row" x-show="advanced" x-cloak>
-    <label>From <input type="date" name="date_from" value="{{ filter.date_from.isoformat() if filter.date_from else '' }}"></label>
-    <label>To <input type="date" name="date_to" value="{{ filter.date_to.isoformat() if filter.date_to else '' }}"></label>
-    <label>Min € <input type="number" step="0.01" name="amount_min" value="{{ filter.amount_min if filter.amount_min is not none else '' }}"></label>
-    <label>Max € <input type="number" step="0.01" name="amount_max" value="{{ filter.amount_max if filter.amount_max is not none else '' }}"></label>
-
-    <label>Account
-      <select name="account">
-        <option value="">All accounts</option>
-        {% for a in accounts %}
-        <option value="{{ a }}" {% if a in filter.accounts %}selected{% endif %}>{{ a }}</option>
-        {% endfor %}
-      </select>
-    </label>
-  </div>
-
-  <div class="filter-row" x-show="advanced" x-cloak>
-    {# Category multi-select via checkboxes in an Alpine dropdown #}
-    <div class="multi" x-data="{ open: false }">
-      <button type="button" class="secondary outline" @click="open = !open">Categories ▾</button>
-      <div class="multi-menu" x-show="open" @click.outside="open = false" x-cloak>
-        <label><input type="checkbox" name="category" value="uncategorized"
-               {% if 'uncategorized' in filter.categories %}checked{% endif %}> Uncategorized</label>
-        {% for c in categories %}
-        <label><input type="checkbox" name="category" value="{{ c }}"
-               {% if c in filter.categories %}checked{% endif %}> {{ c }}</label>
-        {% endfor %}
+        <!-- Toggle advanced filters -->
+        <button type="button"
+                class="btn btn-secondary"
+                @click="advanced = !advanced"
+                x-text="advanced ? 'Fewer filters' : 'More filters'">More filters</button>
       </div>
-    </div>
 
-    <div class="multi" x-data="{ open: false }">
-      <button type="button" class="secondary outline" @click="open = !open">Exclude ▾</button>
-      <div class="multi-menu" x-show="open" @click.outside="open = false" x-cloak>
-        <label><input type="checkbox" name="exclude_category" value="uncategorized"
-               {% if 'uncategorized' in filter.exclude_categories %}checked{% endif %}> Uncategorized</label>
-        {% for c in categories %}
-        <label><input type="checkbox" name="exclude_category" value="{{ c }}"
-               {% if c in filter.exclude_categories %}checked{% endif %}> {{ c }}</label>
-        {% endfor %}
+      <!-- Advanced filters row 1 (date range + amounts) -->
+      <div class="filter-row" x-show="advanced" x-cloak>
+        <label class="form-label d-flex align-items-center" style="margin-bottom: 0;">
+          <span>From</span>
+          <input type="date" name="date_from" class="form-control" style="margin-left: 0.5rem;" value="{{ filter.date_from.isoformat() if filter.date_from else '' }}">
+        </label>
+
+        <label class="form-label d-flex align-items-center" style="margin-bottom: 0;">
+          <span>To</span>
+          <input type="date" name="date_to" class="form-control" style="margin-left: 0.5rem;" value="{{ filter.date_to.isoformat() if filter.date_to else '' }}">
+        </label>
+
+        <label class="form-label d-flex align-items-center" style="margin-bottom: 0;">
+          <span>Min €</span>
+          <input type="number" step="0.01" name="amount_min" class="form-control" style="margin-left: 0.5rem;" value="{{ filter.amount_min if filter.amount_min is not none else '' }}">
+        </label>
+
+        <label class="form-label d-flex align-items-center" style="margin-bottom: 0;">
+          <span>Max €</span>
+          <input type="number" step="0.01" name="amount_max" class="form-control" style="margin-left: 0.5rem;" value="{{ filter.amount_max if filter.amount_max is not none else '' }}">
+        </label>
+
+        <!-- Account select -->
+        <select name="account" class="form-select" style="max-width: 180px;">
+          <option value="">All accounts</option>
+          {% for a in accounts %}
+          <option value="{{ a }}" {% if a in filter.accounts %}selected{% endif %}>{{ a }}</option>
+          {% endfor %}
+        </select>
       </div>
-    </div>
 
-    <div class="multi" x-data="{ open: false }">
-      <button type="button" class="secondary outline" @click="open = !open">Tags ▾</button>
-      <div class="multi-menu" x-show="open" @click.outside="open = false" x-cloak>
-        {% for t in tags %}
-        <label><input type="checkbox" name="tag" value="{{ t }}"
-               {% if t in filter.tags %}checked{% endif %}> {{ t }}</label>
-        {% else %}
-        <small>No tags yet.</small>
-        {% endfor %}
+      <!-- Advanced filters row 2 (multi-selects) -->
+      <div class="filter-row" x-show="advanced" x-cloak>
+        {# Category multi-select via checkboxes in an Alpine dropdown #}
+        <div class="multi" x-data="{ open: false }">
+          <button type="button" class="btn btn-secondary" @click="open = !open">
+            <i class="bi bi-funnel"></i> Categories
+          </button>
+          <div class="multi-menu" x-show="open" @click.outside="open = false" x-cloak>
+            <label><input type="checkbox" name="category" value="uncategorized"
+                   {% if 'uncategorized' in filter.categories %}checked{% endif %}> Uncategorized</label>
+            {% for c in categories %}
+            <label><input type="checkbox" name="category" value="{{ c }}"
+                   {% if c in filter.categories %}checked{% endif %}> {{ c }}</label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="multi" x-data="{ open: false }">
+          <button type="button" class="btn btn-secondary" @click="open = !open">
+            <i class="bi bi-x-circle"></i> Exclude
+          </button>
+          <div class="multi-menu" x-show="open" @click.outside="open = false" x-cloak>
+            <label><input type="checkbox" name="exclude_category" value="uncategorized"
+                   {% if 'uncategorized' in filter.exclude_categories %}checked{% endif %}> Uncategorized</label>
+            {% for c in categories %}
+            <label><input type="checkbox" name="exclude_category" value="{{ c }}"
+                   {% if c in filter.exclude_categories %}checked{% endif %}> {{ c }}</label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="multi" x-data="{ open: false }">
+          <button type="button" class="btn btn-secondary" @click="open = !open">
+            <i class="bi bi-tags"></i> Tags
+          </button>
+          <div class="multi-menu" x-show="open" @click.outside="open = false" x-cloak>
+            {% for t in tags %}
+            <label><input type="checkbox" name="tag" value="{{ t }}"
+                   {% if t in filter.tags %}checked{% endif %}> {{ t }}</label>
+            {% else %}
+            <small>No tags yet.</small>
+            {% endfor %}
+          </div>
+        </div>
+
+        {# Include transfers toggle #}
+        <label class="form-check form-check-inline" style="margin: 0; padding: 0.5rem 1rem; border-radius: 0.375rem; background-color: var(--bs-secondary-bg);">
+          <input type="checkbox" name="include_transfers" value="1" class="form-check-input"
+                 {% if filter.include_transfers %}checked{% endif %}>
+          <span class="form-check-label">Include Transfers</span>
+        </label>
+
+        <button type="submit" class="btn btn-primary">Apply</button>
+        <a href="/" role="button" class="btn btn-outline-secondary" hx-boost="false">Reset</a>
       </div>
-    </div>
-
-    <button type="submit">Apply</button>
-    <a href="/" role="button" class="secondary" hx-boost="false">Reset</a>
+    </form>
   </div>
-</form>
+</div>
 
+<!-- Known categories datalist for autocomplete -->
 <datalist id="known-categories">
   {% for c in categories %}<option value="{{ c }}"></option>{% endfor %}
 </datalist>
 
-<p id="txn-loading" class="htmx-indicator" role="status" aria-live="polite">Loading…</p>
+<!-- Loading indicator (HTMX) -->
+<div id="txn-loading" class="htmx-indicator" role="status" aria-live="polite"></div>
 
-<div id="txn-table">
-  {% include "_transactions_table.html" %}
+<!-- Transaction table card -->
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <div id="txn-table">
+        {% include "_transactions_table.html" %}
+      </div>
+    </div>
+  </div>
 </div>
+
 {% endblock %}

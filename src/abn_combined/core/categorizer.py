@@ -254,6 +254,12 @@ def _is_manual(txn: Transaction) -> bool:
     return txn.categorization_source == MANUAL_SOURCE
 
 
+def _is_transfer(txn: Transaction) -> bool:
+    """Check if transaction is categorized as a transfer (case-insensitive)."""
+    eff_category = txn.manual_category if txn.manual_category else txn.category
+    return eff_category and "transfer" in eff_category.lower()
+
+
 # ---------------------------------------------------------------------------
 # apply_rules
 # ---------------------------------------------------------------------------
@@ -349,15 +355,24 @@ def preview_rule(
     db: Session,
     draft_rule: Any,
     existing_rule_id: int | None = None,
+    include_transfers: bool = False,
 ) -> PreviewResult:
     """Dry-run a draft rule and report matches + the diff vs current state.
 
-    - ``matched``: non-manual transactions the draft rule matches.
-    - ``gains``: transactions newly attributed to this rule (not previously so).
-    - ``losses``: transactions the *old* version of this rule categorized that the
-      draft no longer matches.
-    - ``changes``: per-transaction category/tag changes the draft would cause,
-      simulated against the full active rule set with the draft substituted in.
+    Args:
+        db: Database session
+        draft_rule: The draft rule to preview
+        existing_rule_id: ID of rule being edited (if any)
+        include_transfers: If False (default), exclude transfer transactions
+
+    Returns:
+        PreviewResult with:
+        - ``matched``: non-manual transactions the draft rule matches.
+        - ``gains``: transactions newly attributed to this rule (not previously so).
+        - ``losses``: transactions the *old* version of this rule categorized that the
+          draft no longer matches.
+        - ``changes``: per-transaction category/tag changes the draft would cause,
+          simulated against the full active rule set with the draft substituted in.
     """
     validate_rule_regex(draft_rule)
 
@@ -381,6 +396,9 @@ def preview_rule(
 
     for txn in db.query(Transaction).all():
         if _is_manual(txn):
+            continue
+        # Skip transfers unless include_transfers is True
+        if not include_transfers and _is_transfer(txn):
             continue
         trans = _txn_to_dict(txn)
 

@@ -87,6 +87,15 @@
       </div>
     {% endif %}
 
+    {# Show transfer rule badge if the rule's category contains "transfer" #}
+    {% if report.rule_label and 'transfer' in report.rule_label.lower() %}
+      <div class="mb-3">
+        <span class="badge text-bg-warning text-dark" title="This rule affects transfer transactions">
+          <i class="bi bi-exclamation-triangle"></i> Affects: transfers
+        </span>
+      </div>
+    {% endif %}
+
     <!-- Transaction changes (collapsible details) -->
     {% if report.txn_changes %}
     <details class="mb-0">

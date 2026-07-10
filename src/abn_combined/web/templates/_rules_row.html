@@ -1,32 +1,86 @@
-{# One rule row. Swapped via htmx on toggle (outerHTML) and removed on delete. #}
-<tr id="rule-row-{{ rule.id }}" class="{% if not rule.is_active %}inactive{% endif %}">
-  <td class="num">{{ rule.priority }}</td>
-  <td><span class="rule-type">{{ rule.rule_type }}</span>
-      {% if rule.field_target and rule.field_target != 'description' %}
-      <small class="field-target">{{ rule.field_target }}</small>{% endif %}</td>
-  <td>{{ rule.match_pattern }}</td>
-  <td class="match-value"><code>{{ rule.match_value }}</code>
-      {% if rule.conditions %}<small title="{{ rule.conditions|length }} extra condition(s)">
-        +{{ rule.conditions|length }} cond</small>{% endif %}</td>
-  <td>{{ rule.category }}</td>
-  <td>{{ rule.tags or '—' }}</td>
+<tr id="rule-row-{{ rule.id }}" {% if not rule.is_active %}class="inactive"{% endif %}>
+  <td class="text-end fw-semibold">{{ rule.priority }}</td>
+
   <td>
-    <input type="checkbox" role="switch" {% if rule.is_active %}checked{% endif %}
-           title="Toggle active (recorded in history)"
-           hx-post="/rules/{{ rule.id }}/toggle"
-           hx-target="#rule-row-{{ rule.id }}" hx-swap="outerHTML">
+    <div>
+      {% if rule.rule_type == 'keyword' %}
+        <span class="badge text-bg-info">keyword</span>
+      {% elif rule.rule_type == 'amount' %}
+        <span class="badge text-bg-warning text-dark">amount</span>
+      {% elif rule.rule_type == 'category' %}
+        <span class="badge text-bg-secondary">category</span>
+      {% else %}
+        <span class="badge text-bg-secondary">{{ rule.rule_type }}</span>
+      {% endif %}
+      {% if not rule.is_active %}
+        <span class="badge text-bg-secondary">inactive</span>
+      {% endif %}
+    </div>
+    {% if rule.field_target and rule.field_target != 'description' %}
+      <small class="text-muted d-block">{{ rule.field_target }}</small>
+    {% endif %}
   </td>
-  <td class="num">
-    {% if count %}
-    <a href="/transactions?rule_id={{ rule.id }}" title="Show matched transactions">{{ count }}</a>
-    {% else %}0{% endif %}
+
+  <td>
+    <span class="text-muted small">{{ rule.match_pattern }}</span>
+    <code class="d-block small text-break">{{ rule.match_value }}</code>
+    {% if rule.conditions %}
+      <span class="badge rounded-pill text-bg-secondary">+{{ rule.conditions|length }} cond</span>
+    {% endif %}
   </td>
-  <td class="row-actions">
-    <a href="/rules/{{ rule.id }}/edit" title="Edit">✎</a>
-    <a href="/rules/{{ rule.id }}/history" title="History">🕘</a>
-    <button class="link danger" title="Delete rule"
-            hx-delete="/rules/{{ rule.id }}"
-            hx-confirm="Delete rule #{{ rule.id }} ({{ rule.category }})? Its transactions will be recategorized by the remaining rules."
-            hx-target="#rule-row-{{ rule.id }}" hx-swap="outerHTML">🗑</button>
+
+  <td>{{ rule.category }}</td>
+
+  <td class="d-none d-lg-table-cell">
+    {% if rule.tags %}
+      {% for tag in rule.tags %}
+        <span class="badge rounded-pill text-bg-light border me-1">{{ tag }}</span>
+      {% endfor %}
+    {% else %}
+      <small class="text-muted">—</small>
+    {% endif %}
+  </td>
+
+  <td>
+    <div class="form-check form-switch d-inline-block">
+      <input class="form-check-input" type="checkbox" id="active-{{ rule.id }}"
+             name="is_active" value="1" {% if rule.is_active %}checked{% endif %}
+             hx-post="/rules/{{ rule.id }}/toggle"
+             hx-target="#rule-row-{{ rule.id }}"
+             hx-swap="outerHTML">
+      <label class="form-check-label visually-hidden" for="active-{{ rule.id }}">Toggle active</label>
+    </div>
+  </td>
+
+  <td>
+    {% if count > 0 %}
+      <a href="/transactions?rule_id={{ rule.id }}" class="badge text-bg-primary text-decoration-none"
+         title="Excludes transfers by default" data-bs-toggle="tooltip" data-bs-placement="top">
+        {{ count }}
+      </a>
+    {% else %}
+      <span class="text-muted" title="Excludes transfers by default" data-bs-toggle="tooltip" data-bs-placement="top">0</span>
+    {% endif %}
+  </td>
+
+  <td class="text-end">
+    <div class="btn-group btn-group-sm">
+      <a href="/rules/{{ rule.id }}/edit" class="btn btn-outline-secondary"
+         title="Edit rule" aria-label="Edit rule #{{ rule.id }}">
+        <i class="bi bi-pencil"></i>
+      </a>
+      <a href="/rules/{{ rule.id }}/history" class="btn btn-outline-secondary"
+         title="View history" aria-label="View history for rule #{{ rule.id }}">
+        <i class="bi bi-clock-history"></i>
+      </a>
+      <button type="button" class="btn btn-outline-danger"
+              hx-delete="/rules/{{ rule.id }}"
+              hx-target="#rule-row-{{ rule.id }}"
+              hx-swap="outerHTML swap:0.5s"
+              hx-confirm="Delete this rule? Existing categorizations won't be affected."
+              title="Delete rule" aria-label="Delete rule #{{ rule.id }}">
+        <i class="bi bi-trash"></i>
+      </button>
+    </div>
   </td>
 </tr>
