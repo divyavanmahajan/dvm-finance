@@ -15,7 +15,7 @@
       hx-swap="innerHTML"
       hx-push-url="true"
       hx-indicator="#trends-loading"
-      hx-trigger="change from:select, change from:input[type=date]">
+      hx-trigger="change from:select, change from:input[type=date], change from:input[type=checkbox]">
   <label>
     <span>From</span>
     <input type="date" name="date_from" value="{{ params.date_from.isoformat() if params.date_from else '' }}"
@@ -41,6 +41,11 @@
       <option value="{{ account }}" {% if account in params.accounts %}selected{% endif %}>{{ account }}</option>
       {% endfor %}
     </select>
+  </label>
+  <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+    <input type="checkbox" name="include_transfers" value="1"
+           {% if params.include_transfers %}checked{% endif %}>
+    <span>Include Transfers</span>
   </label>
 </form>
 

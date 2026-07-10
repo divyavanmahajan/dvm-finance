@@ -551,19 +551,23 @@ async def rule_preview(request: Request, db: Session = Depends(get_db)) -> HTMLR
     rule_id_raw = form.get("rule_id")
     rule_id = int(rule_id_raw) if rule_id_raw not in (None, "") else None
 
+    # Parse include_transfers: True if param is "1", "true", or "True"; False otherwise
+    include_transfers_str = form.get("include_transfers") or ""
+    include_transfers = include_transfers_str in ("1", "true", "True")
+
     tpl = _templates(request)
     if not vm["match_value"]:
         return tpl.TemplateResponse(
             request, "_rule_preview.html",
-            {"request": request, "error": "Enter a match value to preview.", "preview": None},
+            {"request": request, "error": "Enter a match value to preview.", "preview": None, "include_transfers": include_transfers},
         )
     try:
         draft = _vm_to_draft(vm, rule_id=rule_id)
-        result = preview_rule(db, draft, existing_rule_id=rule_id)
+        result = preview_rule(db, draft, existing_rule_id=rule_id, include_transfers=include_transfers)
     except RuleValidationError as exc:
         return tpl.TemplateResponse(
             request, "_rule_preview.html",
-            {"request": request, "error": str(exc), "preview": None},
+            {"request": request, "error": str(exc), "preview": None, "include_transfers": include_transfers},
         )
 
     def _txns(ids: list[str], limit: int = 100) -> list[Transaction]:
@@ -583,6 +587,7 @@ async def rule_preview(request: Request, db: Session = Depends(get_db)) -> HTMLR
         "error": None,
         "preview": result.as_dict(),
         "is_edit": rule_id is not None,
+        "include_transfers": include_transfers,
         "matched_txns": _txns(result.matched),
         "gained_txns": _txns(result.gains),
         "lost_txns": _txns(result.losses),

@@ -10,6 +10,8 @@
 {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
 {% if message %}<p role="status">{{ message }}</p>{% endif %}
 
+<p><small><strong>Note:</strong> Transfer tags are excluded by default. Transfer transactions are not counted in tag usage.</small></p>
+
 {% if tags %}
 <table class="data-table">
   <thead>
