@@ -15,7 +15,7 @@ def test_root_serves_shell(client):
     resp = client.get("/")
     assert resp.status_code == 200
     body = resp.text
-    assert "abn-combined" in body
+    assert "Your Finance" in body
     # All nav tabs are present in the rendered shell.
     for _path, label in NAV_TABS:
         assert label in body
