@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ title }} - abn-combined{% endblock %}
+{% block title %}{{ title }} - Your Finance{% endblock %}
 {% block content %}
 <link rel="stylesheet" href="/static/rules.css">
 <script src="/static/js/rules.js"></script>
@@ -64,6 +64,16 @@
                 <select id="pattern" name="match_pattern" class="form-select" required>
                   {% for p in patterns %}
                   <option value="{{ p }}" {% if vm.match_pattern == p %}selected{% endif %}>{{ p }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label for="rule_type" class="form-label">Type</label>
+                <select class="form-select" id="rule_type" name="rule_type" required>
+                  {% for rt in rule_types %}
+                  <option value="{{ rt }}" {% if vm.rule_type == rt %}selected{% endif %}>
+                    {{ rt | replace('_', ' ') | title }}
+                  </option>
                   {% endfor %}
                 </select>
               </div>
