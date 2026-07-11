@@ -11,7 +11,7 @@ from .settings import DATA_DIR_ENV, Settings
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="abn-combined",
+        prog="dvm-finance",
         description="Integrated personal-finance app (download, parse, categorize, review).",
     )
     parser.add_argument("--host", default="127.0.0.1", help="Bind host (default: 127.0.0.1)")
@@ -62,7 +62,7 @@ def _run_server(settings: Settings) -> None:
     settings.ensure_data_dir()
     app = create_app(settings)
     url = f"http://{settings.host}:{settings.port}"
-    print(f"abn-combined serving at {url}  (data dir: {settings.data_dir})")
+    print(f"dvm-finance serving at {url}  (data dir: {settings.data_dir})")
     try:
         uvicorn.run(app, host=settings.host, port=settings.port, log_level="info")
     except OSError as exc:

@@ -67,7 +67,7 @@ def create_app(settings: Settings) -> FastAPI:
         logger.info("app_started", data_dir=str(settings.data_dir))
         yield
 
-    app = FastAPI(title="abn-combined", lifespan=lifespan)
+    app = FastAPI(title="dvm-finance", lifespan=lifespan)
     app.state.settings = settings
 
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
