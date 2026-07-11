@@ -1,47 +1,69 @@
 {% extends "base.html" %}
-{% block title %}Cash Flow — abn-combined{% endblock %}
+{% block title %}Cash Flow — Your Finance{% endblock %}
 {% block content %}
 <link rel="stylesheet" href="/static/tables.css">
-<hgroup>
-  <h1>Cash Flow</h1>
-  <p>Income vs expense per period. Transfers excluded by default. Amounts link to the matching transactions; filter state lives in the URL.</p>
-</hgroup>
 
-<form class="table-controls" method="get" action="/cash-flow"
-      hx-get="/cash-flow/table" hx-target="#cash-flow-table" hx-swap="innerHTML"
-      hx-push-url="/cash-flow" hx-trigger="change">
-  <label>Preset
-    <select name="preset">
-      <option value="">Custom range</option>
-      {% for p in presets %}
-      <option value="{{ p }}" {% if preset == p %}selected{% endif %}>{{ p.replace('-', ' ') | title }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label>From <input type="date" name="date_from" value="{{ date_from.isoformat() }}"></label>
-  <label>To <input type="date" name="date_to" value="{{ date_to.isoformat() }}"></label>
-  <label>Breakdown
-    <select name="breakdown">
-      {% for b in breakdowns %}
-      <option value="{{ b }}" {% if breakdown == b %}selected{% endif %}>{{ b.title() }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label>Account
-    <select name="account">
-      <option value="">All accounts</option>
-      {% for a in known_accounts %}
-      <option value="{{ a }}" {% if a in accounts %}selected{% endif %}>{{ a }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label style="display: flex; align-items: center; gap: 0.5rem;">
-    <input type="checkbox" name="include_transfers" value="1"
-           {% if include_transfers %}checked{% endif %}>
-    <span>Include Transfers</span>
-  </label>
-  <noscript><button type="submit">Apply</button></noscript>
-</form>
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-2">Cash Flow</h1>
+    <p class="text-muted small mb-0">Income vs expense per period. Transfers excluded by default. Amounts link to the matching transactions; filter state lives in the URL.</p>
+  </div>
+</div>
+
+<div class="card card-body mb-3">
+  <form method="get" action="/cash-flow"
+        hx-get="/cash-flow/table" hx-target="#cash-flow-table" hx-swap="innerHTML"
+        hx-push-url="/cash-flow" hx-trigger="change">
+    <div class="row g-3 align-items-end">
+      <div class="col-auto">
+        <label for="preset" class="form-label">Preset</label>
+        <select id="preset" name="preset" class="form-select form-select-sm">
+          <option value="">Custom range</option>
+          {% for p in presets %}
+          <option value="{{ p }}" {% if preset == p %}selected{% endif %}>{{ p.replace('-', ' ') | title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <label for="date_from" class="form-label">From</label>
+        <input id="date_from" type="date" name="date_from" value="{{ date_from.isoformat() }}" class="form-control form-control-sm">
+      </div>
+      <div class="col-auto">
+        <label for="date_to" class="form-label">To</label>
+        <input id="date_to" type="date" name="date_to" value="{{ date_to.isoformat() }}" class="form-control form-control-sm">
+      </div>
+      <div class="col-auto">
+        <label for="breakdown" class="form-label">Breakdown</label>
+        <select id="breakdown" name="breakdown" class="form-select form-select-sm">
+          {% for b in breakdowns %}
+          <option value="{{ b }}" {% if breakdown == b %}selected{% endif %}>{{ b.title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <label for="account" class="form-label">Account</label>
+        <select id="account" name="account" class="form-select form-select-sm">
+          <option value="">All accounts</option>
+          {% for a in known_accounts %}
+          <option value="{{ a }}" {% if a in accounts %}selected{% endif %}>{{ a }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <div class="form-check">
+          <input type="checkbox" id="include_transfers" class="form-check-input" name="include_transfers" value="1"
+                 {% if include_transfers %}checked{% endif %}>
+          <label class="form-check-label" for="include_transfers">Include Transfers</label>
+        </div>
+      </div>
+      <noscript>
+        <div class="col-auto">
+          <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+        </div>
+      </noscript>
+    </div>
+  </form>
+</div>
 
 <div id="cash-flow-table">
   {% include "_cash_flow_table.html" %}
