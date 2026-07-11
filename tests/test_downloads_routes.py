@@ -65,7 +65,7 @@ def test_download_page_renders_with_playwright(client, playwright_on) -> None:
     # Dates prefilled (DD-MM-YYYY for ABN, YYYY-MM-DD for PayPal patterns present)
     assert 'name="from_date"' in html
     # PayPal Chrome launch command shown
-    assert "--remote-debugging-port=9222" in html
+    assert "--remote-debugging-port=9226" in html
 
 
 def test_download_page_without_playwright_shows_install_instructions(
