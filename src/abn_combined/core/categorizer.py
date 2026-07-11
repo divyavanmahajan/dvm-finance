@@ -250,6 +250,28 @@ def _load_active_rules(db: Session) -> list[CategorizationRule]:
     )
 
 
+def _split_rules(
+    rules: list[Any],
+) -> tuple[list[Any], list[Any]]:
+    """Split rules into (category_rules, tag_only_rules), each in priority order."""
+    category_rules = [r for r in rules if not getattr(r, "is_tag_only", False)]
+    tag_only_rules = [r for r in rules if getattr(r, "is_tag_only", False)]
+    return category_rules, tag_only_rules
+
+
+def _merge_tags(existing_tags: str | None, new_tags: str | None) -> str | None:
+    """Merge tag strings, de-duplicating while preserving first-seen order."""
+    if not new_tags:
+        return existing_tags
+    existing_list = [t.strip() for t in (existing_tags or "").split(",") if t.strip()]
+    new_list = [t.strip() for t in new_tags.split(",") if t.strip()]
+    merged: list[str] = list(existing_list)
+    for t in new_list:
+        if t not in merged:
+            merged.append(t)
+    return ",".join(merged) if merged else None
+
+
 def _is_manual(txn: Transaction) -> bool:
     return txn.categorization_source == MANUAL_SOURCE
 
@@ -279,30 +301,44 @@ def apply_rules(
     rules: list[CategorizationRule] | None = None,
     commit: bool = True,
 ) -> list[TxnChange]:
-    """Reapply active rules to non-manual transactions.
+    """Reapply active rules to transactions.
 
-    Writes ``category``, ``tags`` and ``categorization_source`` (str(rule.id)); a
-    transaction with no matching rule gets ``category=None`` (effective
-    "Uncategorized"). Never touches ``manual_category``/``manual_tags`` and skips
-    transactions whose ``categorization_source == "manual"``. Returns the list of
-    transactions whose rule-assigned category or tags changed.
+    Two-pass application:
+
+    1. Category rules (``is_tag_only=False``) are applied in priority order, first
+       match wins, to non-manual transactions only. Writes ``category``, ``tags``
+       and ``categorization_source`` (str(rule.id)); a transaction with no matching
+       category rule gets ``category=None`` (effective "Uncategorized"). Never
+       touches ``manual_category``/``manual_tags`` and skips transactions whose
+       ``categorization_source == "manual"``.
+    2. Tag-only rules (``is_tag_only=True``) are then applied *regardless of
+       priority* — every matching tag-only rule contributes its tags, merged
+       (de-duplicated) onto whatever tags are already present. Tag-only rules run
+       against **all** transactions, including manually categorized ones, and never
+       change ``category``/``manual_category``.
+
+    Returns the list of transactions whose rule-assigned category or tags changed.
     """
     if rules is None:
         rules = _load_active_rules(db)
+    category_rules, tag_only_rules = _split_rules(rules)
 
     query = db.query(Transaction)
     if transaction_ids is not None:
         query = query.filter(Transaction.id.in_(transaction_ids))
+    txns = query.all()
 
-    changes: list[TxnChange] = []
-    for txn in query.all():
+    changes: dict[str, TxnChange] = {}
+
+    # Pass 1: category rules, non-manual transactions only, first match wins.
+    for txn in txns:
         if _is_manual(txn):
             continue
 
         old_category = txn.category
         old_tags = txn.tags
 
-        rule = _first_match(rules, _txn_to_dict(txn))
+        rule = _first_match(category_rules, _txn_to_dict(txn))
         if rule is None:
             new_category, new_tags, new_source = None, None, None
         else:
@@ -313,16 +349,36 @@ def apply_rules(
             txn.category = new_category
             txn.tags = new_tags
             txn.categorization_source = new_source
-            changes.append(
-                TxnChange(txn.id, old_category, new_category, old_tags, new_tags)
+            changes[txn.id] = TxnChange(
+                txn.id, old_category, new_category, old_tags, new_tags
             )
         else:
             # Keep categorization_source in sync even when category is unchanged.
             txn.categorization_source = new_source
 
+    # Pass 2: tag-only rules, all matching transactions (including manual ones),
+    # every match applies (not just the first). Category is never touched.
+    for txn in txns:
+        trans = _txn_to_dict(txn)
+        pre_tags = txn.tags
+        merged_tags = txn.tags
+        for rule in tag_only_rules:
+            if _apply_rule_to_transaction(rule, trans):
+                merged_tags = _merge_tags(merged_tags, rule.tags)
+
+        if merged_tags != pre_tags:
+            existing = changes.get(txn.id)
+            if existing is not None:
+                existing.new_tags = merged_tags
+            else:
+                changes[txn.id] = TxnChange(
+                    txn.id, txn.category, txn.category, pre_tags, merged_tags
+                )
+            txn.tags = merged_tags
+
     if commit:
         db.commit()
-    return changes
+    return list(changes.values())
 
 
 # ---------------------------------------------------------------------------
@@ -446,6 +502,7 @@ def rule_snapshot(rule: CategorizationRule | None) -> dict[str, Any] | None:
         "category": rule.category,
         "tags": rule.tags,
         "is_active": rule.is_active,
+        "is_tag_only": rule.is_tag_only,
         "notes": rule.notes,
         "filter_account": rule.filter_account,
         "filter_currency": rule.filter_currency,

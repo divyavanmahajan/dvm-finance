@@ -15,6 +15,11 @@
       {% if not rule.is_active %}
         <span class="badge text-bg-secondary">inactive</span>
       {% endif %}
+      {% if rule.is_tag_only %}
+        <span class="badge text-bg-info" title="Only applies tags, category is left unchanged">
+          <i class="bi bi-tags"></i> Tag only
+        </span>
+      {% endif %}
     </div>
     {% if rule.field_target and rule.field_target != 'description' %}
       <small class="text-muted d-block">{{ rule.field_target }}</small>
@@ -29,17 +34,29 @@
     {% endif %}
   </td>
 
-  <td>{{ rule.category }}</td>
-
-  <td class="d-none d-lg-table-cell">
+  {% if rule.is_tag_only %}
+  <td>
     {% if rule.tags %}
-      {% for tag in rule.tags %}
-        <span class="badge rounded-pill text-bg-light border me-1">{{ tag }}</span>
+      {% for tag in rule.tags.split(',') %}
+        <span class="badge rounded-pill text-bg-light border me-1">{{ tag.strip() }}</span>
       {% endfor %}
     {% else %}
       <small class="text-muted">—</small>
     {% endif %}
   </td>
+  {% else %}
+  <td>{{ rule.category }}</td>
+
+  <td class="d-none d-lg-table-cell">
+    {% if rule.tags %}
+      {% for tag in rule.tags.split(',') %}
+        <span class="badge rounded-pill text-bg-light border me-1">{{ tag.strip() }}</span>
+      {% endfor %}
+    {% else %}
+      <small class="text-muted">—</small>
+    {% endif %}
+  </td>
+  {% endif %}
 
   <td>
     <div class="form-check form-switch d-inline-block">

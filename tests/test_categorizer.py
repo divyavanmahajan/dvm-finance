@@ -252,6 +252,59 @@ def test_apply_rules_assigns_tags(session):
     assert session.get(Transaction, "t1").tags == "subscription"
 
 
+# --- tag-only rules --------------------------------------------------------
+
+def test_tag_only_rule_applies_after_category_rules(session):
+    add_rule(session, match_value="supermarkt", category="groceries")
+    add_rule(
+        session, match_value="ah ", category=None, tags="ah-brand",
+        is_tag_only=True, priority=1,  # highest priority, but tag-only so it must not win category
+    )
+    add_txn(session, "t1", "AH SUPERMARKT")
+    apply_rules(session)
+    txn = session.get(Transaction, "t1")
+    # Category comes from the category rule, not the (higher-priority) tag-only rule.
+    assert txn.category == "groceries"
+    assert txn.tags == "ah-brand"
+
+
+def test_multiple_tag_only_rules_all_apply(session):
+    add_rule(session, match_value="supermarkt", category="groceries")
+    add_rule(session, match_value="ah ", category=None, tags="brand-ah", is_tag_only=True)
+    add_rule(session, match_value="supermarkt", category=None, tags="essential", is_tag_only=True)
+    add_txn(session, "t1", "AH SUPERMARKT")
+    apply_rules(session)
+    txn = session.get(Transaction, "t1")
+    assert txn.category == "groceries"
+    tags = set(txn.tags.split(","))
+    assert tags == {"brand-ah", "essential"}
+
+
+def test_tag_only_rule_applies_to_manually_categorized_transactions(session):
+    add_rule(session, match_value="ah ", category=None, tags="brand-ah", is_tag_only=True)
+    add_txn(
+        session, "t1", "AH SUPERMARKT",
+        manual_category="dining", category="old",
+        categorization_source="manual",
+    )
+    apply_rules(session)
+    txn = session.get(Transaction, "t1")
+    # Category (manual) is untouched, but the tag-only rule still applies its tag.
+    assert txn.manual_category == "dining"
+    assert txn.category == "old"
+    assert txn.tags == "brand-ah"
+
+
+def test_tag_only_rule_merges_with_existing_tags_without_duplicates(session):
+    add_rule(session, match_value="netflix", category="entertainment", tags="subscription")
+    add_rule(session, match_value="netflix", category=None, tags="subscription,streaming", is_tag_only=True)
+    add_txn(session, "t1", "NETFLIX")
+    apply_rules(session)
+    txn = session.get(Transaction, "t1")
+    assert txn.category == "entertainment"
+    assert set(txn.tags.split(",")) == {"subscription", "streaming"}
+
+
 # --- preview -------------------------------------------------------------
 
 def test_preview_new_rule_gains_and_changes(session):

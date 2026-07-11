@@ -140,6 +140,38 @@ def test_negative_amounts_styled(client, seed):
 
 
 # ---------------------------------------------------------------------------
+# Sortable column headers
+# ---------------------------------------------------------------------------
+
+
+def test_headers_are_sortable_links(client, seed):
+    r = client.get(f"/trends/table?{QS}")
+    assert "sortable-th" in r.text
+    assert "sort=total_asc" in r.text  # default sort is category_asc; total starts asc
+
+
+def test_sort_by_total_asc_orders_rows(client, seed):
+    r = client.get(f"/trends/table?{QS}&sort=total_asc")
+    body = r.text
+    # totals in this window: groceries ~-70, dining -50, uncategorized -8.
+    # total_asc (most negative first) => groceries, dining, uncategorized.
+    assert body.index("groceries") < body.index("dining") < body.index("Uncategorized")
+
+
+def test_sort_category_desc_orders_alphabetically_reversed(client, seed):
+    r = client.get(f"/trends/table?{QS}&sort=category_desc")
+    body = r.text
+    assert body.index("Uncategorized") < body.index("groceries")
+
+
+def test_sort_toggle_asc_desc_on_repeated_click(client, seed):
+    r_asc = client.get(f"/trends/table?{QS}&sort=total_asc")
+    assert "sort=total_desc" in r_asc.text
+    r_desc = client.get(f"/trends/table?{QS}&sort=total_desc")
+    assert "sort=total_asc" in r_desc.text
+
+
+# ---------------------------------------------------------------------------
 # Integration: a cell's linked transactions sum to the cell value
 # ---------------------------------------------------------------------------
 

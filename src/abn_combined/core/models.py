@@ -77,9 +77,10 @@ class CategorizationRule(Base):
     match_pattern: Mapped[str] = mapped_column(String(50), nullable=False)
     field_target: Mapped[str | None] = mapped_column(String(50))
     match_value: Mapped[str] = mapped_column(String(500), nullable=False)
-    category: Mapped[str] = mapped_column(String(100), nullable=False)
+    category: Mapped[str | None] = mapped_column(String(100), nullable=True)
     tags: Mapped[str | None] = mapped_column(String)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_tag_only: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text)
 
     # Context filters — all optional (NULL = no restriction)
