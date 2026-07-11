@@ -1,0 +1,274 @@
+{# Phase 3 Transactions Table — Desktop + Mobile
+   Renders:
+   - Desktop (md+): Full table view with Bootstrap styling
+   - Mobile (<md): Stacked cards per transaction
+   Uses CSS media queries (no HTMX partial needed) for layout switching.
+   Pagination via Bootstrap pagination component wired to HTMX.
+#}
+
+{# Active-filter chips #}
+{% if chips %}
+<div class="chips">
+  {% for chip in chips %}
+  <a class="chip" href="/transactions/table?{{ chip.remove }}"
+     hx-get="/transactions/table?{{ chip.remove }}"
+     hx-target="#txn-table" hx-swap="innerHTML"
+     hx-push-url="/{% if chip.remove %}?{{ chip.remove }}{% endif %}">
+    {{ chip.label }} <span aria-hidden="true">✕</span>
+  </a>
+  {% endfor %}
+  <a class="chip chip-clear" href="/"
+     hx-get="/transactions/table" hx-target="#txn-table" hx-swap="innerHTML"
+     hx-push-url="/">Clear all</a>
+</div>
+{% endif %}
+
+{# First-run hint #}
+{% if not page.total and not chips %}
+<article class="first-run-hint">
+  <p><strong>No transactions yet.</strong> Import your history from a legacy
+  abn-analyst database with:</p>
+  <p><code>abn-combined migrate-legacy /path/to/abn_analyst.db</code></p>
+  <p>…or use the <a href="/upload">Upload</a> or <a href="/download">Download</a> tabs.</p>
+</article>
+{% endif %}
+
+{# Transaction count info #}
+<p class="txn-count">
+  {% if page.total %}
+  Showing <strong>{{ page.start_index }}–{{ page.end_index }}</strong> of <strong>{{ page.total }}</strong>
+  {% elif chips %}
+  No transactions match these filters.
+  {% endif %}
+</p>
+
+{# ===== DESKTOP TABLE (md+ breakpoint) ===== #}
+<div class="d-md-block">
+  <table class="txn-table">
+    <thead>
+      <tr>
+        <th></th>
+        <th>Date</th>
+        <th>Account</th>
+        <th>Description</th>
+        <th class="num">Amount</th>
+        <th>Category</th>
+        <th>Tags</th>
+        <th>Source</th>
+        <th></th>
+      </tr>
+    </thead>
+    {% for row in rows %}
+      {# Desktop table row (from _transactions_row.html) #}
+      {% include "_transactions_row.html" %}
+    {% else %}
+    <tbody><tr><td colspan="9"><em>Nothing here.</em></td></tr></tbody>
+    {% endfor %}
+  </table>
+</div>
+
+{# ===== MOBILE CARD LAYOUT (<md breakpoint) ===== #}
+<div class="d-md-none">
+  <div class="txn-cards-container">
+    {% for row in rows %}
+      {% set t = row.txn %}
+      <div class="txn-card" x-data="{ detailOpen: false }">
+        {# ===== Card Header (Date + Amount) ===== #}
+        <div class="txn-card-header">
+          <div class="txn-card-date">
+            {{ t.transactiondate.isoformat() }}
+          </div>
+          <div class="txn-card-amount {% if t.amount < 0 %}neg{% else %}pos{% endif %}">
+            {{ '−€' if t.amount < 0 else '+€' }} {{ '%.2f'|format(t.amount | abs) }}
+          </div>
+        </div>
+
+        {# ===== Card Body (Description + Category + Account) ===== #}
+        <div class="txn-card-body">
+          {# Description #}
+          <div class="txn-card-row">
+            <div class="txn-card-value" style="width: 100%;">
+              <strong>{{ (t.description or '')[:80] }}</strong>
+            </div>
+          </div>
+
+          {# Category (with inline edit button) #}
+          <div class="txn-card-row">
+            <div class="txn-card-label">Category:</div>
+            <div class="txn-card-value">
+              {% if row.effective_category %}
+                <span class="badge">{{ row.effective_category }}</span>
+              {% else %}
+                <em class="text-muted">uncategorized</em>
+              {% endif %}
+              {% if row.is_manual %}<span class="badge manual" title="Manually set">M</span>{% endif %}
+            </div>
+          </div>
+
+          {# Account #}
+          <div class="txn-card-row">
+            <div class="txn-card-label">Account:</div>
+            <div class="txn-card-value">{{ t.accountNumber }}</div>
+          </div>
+
+          {# Tags #}
+          {% if row.effective_tags %}
+          <div class="txn-card-row">
+            <div class="txn-card-label">Tags:</div>
+            <div class="txn-card-value">{{ row.effective_tags }}</div>
+          </div>
+          {% endif %}
+
+          {# Categorization source #}
+          <div class="txn-card-row">
+            <div class="txn-card-label">Source:</div>
+            <div class="txn-card-value">
+              {% if t.categorization_source == 'manual' %}
+                manual
+              {% elif t.categorization_source %}
+                <a href="/rules/{{ t.categorization_source }}" class="link">rule #{{ t.categorization_source }}</a>
+              {% else %}
+                —
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        {# ===== Card Detail (Expandable) ===== #}
+        <div class="txn-card-detail" x-show="detailOpen" x-cloak>
+          <dl>
+            <dt>Full Description:</dt>
+            <dd>{{ t.description or '—' }}</dd>
+
+            <dt>Amount:</dt>
+            <dd>{{ '%.2f'|format(t.amount) }} {{ t.currency }}</dd>
+
+            <dt>Date:</dt>
+            <dd>{{ t.transactiondate.isoformat() }}</dd>
+
+            <dt>Account:</dt>
+            <dd>{{ t.accountNumber }}</dd>
+
+            <dt>Category:</dt>
+            <dd>
+              {% if row.effective_category %}{{ row.effective_category }}{% else %}<em>uncategorized</em>{% endif %}
+            </dd>
+
+            {% if row.effective_tags %}
+            <dt>Tags:</dt>
+            <dd>{{ row.effective_tags }}</dd>
+            {% endif %}
+          </dl>
+        </div>
+
+        {# ===== Card Footer (Actions) ===== #}
+        <div class="txn-card-footer">
+          <button type="button" class="btn btn-sm btn-outline-secondary flex-grow-1"
+                  @click="detailOpen = !detailOpen"
+                  x-text="detailOpen ? 'Hide detail' : 'Show detail'">
+            Show detail
+          </button>
+          <a href="/rules/new?from_transaction={{ t.id }}"
+             class="btn btn-sm btn-outline-primary"
+             title="Create rule from this transaction">
+            + rule
+          </a>
+        </div>
+      </div>
+    {% else %}
+    <div class="text-center text-muted py-4">
+      <em>Nothing here.</em>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{# ===== BOOTSTRAP PAGINATION (Phase 3) ===== #}
+{% if page.pages > 1 %}
+<nav aria-label="Pagination" class="mt-4">
+  <ul class="pagination pagination-sm justify-content-center">
+    {# Previous button #}
+    <li class="page-item {% if not page.has_prev %}disabled{% endif %}">
+      {% if page.has_prev %}
+      <a class="page-link" href="/?{{ filter.with_page(page.page - 1).to_query_string() }}"
+         hx-get="/transactions/table?{{ filter.with_page(page.page - 1).to_query_string() }}"
+         hx-target="#txn-table" hx-swap="innerHTML"
+         hx-push-url="/?{{ filter.with_page(page.page - 1).to_query_string() }}">
+        Previous
+      </a>
+      {% else %}
+      <span class="page-link disabled">Previous</span>
+      {% endif %}
+    </li>
+
+    {# Page numbers #}
+    {% set start_page = [1, page.page - 2] | max %}
+    {% set end_page = [page.pages, page.page + 2] | min %}
+
+    {# Show "1" if not in visible range #}
+    {% if start_page > 1 %}
+    <li class="page-item">
+      <a class="page-link" href="/?{{ filter.with_page(1).to_query_string() }}"
+         hx-get="/transactions/table?{{ filter.with_page(1).to_query_string() }}"
+         hx-target="#txn-table" hx-swap="innerHTML"
+         hx-push-url="/?{{ filter.with_page(1).to_query_string() }}">
+        1
+      </a>
+    </li>
+    {% if start_page > 2 %}
+    <li class="page-item disabled"><span class="page-link">…</span></li>
+    {% endif %}
+    {% endif %}
+
+    {# Visible page numbers #}
+    {% for p in range(start_page, end_page + 1) %}
+    <li class="page-item {% if p == page.page %}active{% endif %}">
+      {% if p == page.page %}
+      <span class="page-link">{{ p }}</span>
+      {% else %}
+      <a class="page-link" href="/?{{ filter.with_page(p).to_query_string() }}"
+         hx-get="/transactions/table?{{ filter.with_page(p).to_query_string() }}"
+         hx-target="#txn-table" hx-swap="innerHTML"
+         hx-push-url="/?{{ filter.with_page(p).to_query_string() }}">
+        {{ p }}
+      </a>
+      {% endif %}
+    </li>
+    {% endfor %}
+
+    {# Show last page if not in visible range #}
+    {% if end_page < page.pages %}
+    {% if end_page < page.pages - 1 %}
+    <li class="page-item disabled"><span class="page-link">…</span></li>
+    {% endif %}
+    <li class="page-item">
+      <a class="page-link" href="/?{{ filter.with_page(page.pages).to_query_string() }}"
+         hx-get="/transactions/table?{{ filter.with_page(page.pages).to_query_string() }}"
+         hx-target="#txn-table" hx-swap="innerHTML"
+         hx-push-url="/?{{ filter.with_page(page.pages).to_query_string() }}">
+        {{ page.pages }}
+      </a>
+    </li>
+    {% endif %}
+
+    {# Next button #}
+    <li class="page-item {% if not page.has_next %}disabled{% endif %}">
+      {% if page.has_next %}
+      <a class="page-link" href="/?{{ filter.with_page(page.page + 1).to_query_string() }}"
+         hx-get="/transactions/table?{{ filter.with_page(page.page + 1).to_query_string() }}"
+         hx-target="#txn-table" hx-swap="innerHTML"
+         hx-push-url="/?{{ filter.with_page(page.page + 1).to_query_string() }}">
+        Next
+      </a>
+      {% else %}
+      <span class="page-link disabled">Next</span>
+      {% endif %}
+    </li>
+  </ul>
+</nav>
+
+{# Page info text #}
+<div class="text-center mt-2">
+  <small class="text-muted">Page {{ page.page }} of {{ page.pages }}</small>
+</div>
+{% endif %}
