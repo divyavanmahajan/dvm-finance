@@ -425,8 +425,8 @@ def test_per_rule_history(client, seed):
 def test_recategorize_all(client, seed):
     factory, _ = seed
     r = client.post("/rules/recategorize", follow_redirects=False)
-    assert r.status_code == 303
-    assert "/rules/history" in r.headers["location"]
+    assert r.status_code == 200
+    assert "rulesChanged" in r.headers.get("HX-Trigger", "")
     reports = _reports(factory, "recategorize")
     assert len(reports) == 1
     # t1 + t2 newly categorized by the seed rules
