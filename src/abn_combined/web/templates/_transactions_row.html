@@ -37,11 +37,11 @@
     <td>
       <span x-show="!editcat">
         {% if row.effective_category %}
-          <span class="badge bg-primary">{{ row.effective_category }}</span>
+          <span class="badge text-bg-primary">{{ row.effective_category }}</span>
         {% else %}
-          <span class="badge bg-secondary">uncategorized</span>
+          <span class="badge text-bg-secondary">uncategorized</span>
         {% endif %}
-        {% if row.is_manual %}<span class="badge bg-warning text-dark ms-1" title="Manually set"><i class="bi bi-hand-thumbs-up"></i></span>{% endif %}
+        {% if row.is_manual %}<span class="badge text-bg-warning ms-1" title="Manually set"><i class="bi bi-hand-thumbs-up"></i></span>{% endif %}
         <button class="link ms-2" title="Edit category" @click="editcat = true"><i class="bi bi-pencil"></i></button>
       </span>
       <form x-show="editcat" x-cloak class="inline-edit"
@@ -64,7 +64,7 @@
       <span x-show="!edittags">
         {% if row.effective_tags %}
           {% for tag in row.effective_tags.split(', ') %}
-            <span class="badge bg-info">{{ tag }}</span>
+            <span class="badge text-bg-info">{{ tag }}</span>
           {% endfor %}
         {% else %}
           <span class="text-muted small">—</span>
