@@ -1,0 +1,80 @@
+{#
+  Phase 4 Polish: Dark Mode Toggle, Toasts, Skeleton Loaders
+
+  Snippets for:
+  - Dark mode toggle button (include in navbar)
+  - Toast notification templates
+  - Skeleton loader rows for table placeholders
+  - Print-aware layout
+#}
+
+{# === DARK MODE TOGGLE ===
+   Include this in base.html navbar (far right, before utility dropdown)
+   Requires: Alpine.js, phase4.js, phase4.css
+#}
+<div x-data="darkModeToggle()" class="dark-mode-toggle">
+  <button
+    @click="toggle()"
+    title="Toggle dark mode"
+    aria-label="Toggle dark mode"
+    class="icon-button">
+    <span x-show="!dark" aria-hidden="true">🌙</span>
+    <span x-show="dark" aria-hidden="true">☀️</span>
+  </button>
+</div>
+
+{# === TOAST NOTIFICATION CONTAINER ===
+   Include this once at the end of base.html <body>
+   Toasts appear in the top-right and auto-dismiss after 4s
+#}
+<div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true">
+  {# Toasts are injected here dynamically #}
+</div>
+
+{# === TOAST TEMPLATE ===
+   Use this to generate individual toast HTML.
+   Data attributes: message (string), type ('success'|'info'|'warning'|'error')
+#}
+<template id="toast-template">
+  <div class="toast" role="status" data-message="" data-type="info">
+    <span class="toast-icon" aria-hidden="true"></span>
+    <span class="toast-message"></span>
+    <button class="toast-close" aria-label="Close notification" type="button">✕</button>
+  </div>
+</template>
+
+{# === SKELETON LOADER ROW ===
+   For table placeholders during slow loads.
+   Use with hx-swap="innerHTML swap:500ms" so real rows replace after 500ms.
+#}
+<template id="skeleton-row-template">
+  <tbody class="skeleton-tbody">
+    {% for i in range(3) %}
+    <tr class="skeleton-row">
+      <td><span class="skeleton placeholder"></span></td>
+      <td><span class="skeleton placeholder" style="width: 7rem;"></span></td>
+      <td><span class="skeleton placeholder" style="width: 5rem;"></span></td>
+      <td><span class="skeleton placeholder" style="width: 15rem;"></span></td>
+      <td><span class="skeleton placeholder num" style="width: 5rem;"></span></td>
+      <td><span class="skeleton placeholder" style="width: 6rem;"></span></td>
+      <td><span class="skeleton placeholder" style="width: 4rem;"></span></td>
+      <td><span class="skeleton placeholder" style="width: 3rem;"></span></td>
+      <td><span class="skeleton placeholder" style="width: 3rem;"></span></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</template>
+
+{# === PRINT-AWARE FILTER SUMMARY ===
+   Display active filters as plain text for print (hides in screen view).
+   Render after filter chips in transactions.html
+#}
+<div class="print-only filter-summary">
+  <strong>Filters applied:</strong>
+  {% if chips %}
+    {% for chip in chips %}{{ chip.label }}{% if not loop.last %}, {% endif %}{% endfor %}
+  {% else %}
+    None
+  {% endif %}
+  <br><em>Report generated {{ now.strftime('%Y-%m-%d %H:%M') }}</em>
+</div>
