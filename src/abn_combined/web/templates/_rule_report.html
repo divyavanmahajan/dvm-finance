@@ -12,19 +12,19 @@
     <div class="d-flex align-items-center gap-2">
       <!-- Action badge: create/update/delete/toggle/recategorize/import -->
       {% if report.action == 'create' %}
-        <span class="badge text-bg-success"><i class="bi bi-plus-lg"></i> Created</span>
+        <span class="badge text-bg-success action-create"><i class="bi bi-plus-lg"></i> Created</span>
       {% elif report.action == 'update' %}
-        <span class="badge text-bg-primary"><i class="bi bi-pencil"></i> Updated</span>
+        <span class="badge text-bg-primary action-update"><i class="bi bi-pencil"></i> Updated</span>
       {% elif report.action == 'delete' %}
-        <span class="badge text-bg-danger"><i class="bi bi-trash"></i> Deleted</span>
+        <span class="badge text-bg-danger action-delete"><i class="bi bi-trash"></i> Deleted</span>
       {% elif report.action == 'toggle' %}
-        <span class="badge text-bg-warning text-dark"><i class="bi bi-toggle-on"></i> Toggled</span>
+        <span class="badge text-bg-warning text-dark action-toggle"><i class="bi bi-toggle-on"></i> Toggled</span>
       {% elif report.action in ['recategorize', 'recategorize-all'] %}
-        <span class="badge text-bg-info"><i class="bi bi-arrow-repeat"></i> Recategorized</span>
+        <span class="badge text-bg-info action-recategorize"><i class="bi bi-arrow-repeat"></i> Recategorized</span>
       {% elif report.action == 'import' %}
-        <span class="badge text-bg-secondary"><i class="bi bi-download"></i> Imported</span>
+        <span class="badge text-bg-secondary action-import"><i class="bi bi-download"></i> Imported</span>
       {% else %}
-        <span class="badge text-bg-secondary">{{ report.action }}</span>
+        <span class="badge text-bg-secondary action-{{ report.action }}">{{ report.action }}</span>
       {% endif %}
 
       <!-- Rule link (if rule still exists) -->
