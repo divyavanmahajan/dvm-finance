@@ -1,36 +1,50 @@
 {% extends "base.html" %}
 {% block title %}Upload — abn-combined{% endblock %}
 {% block content %}
-<hgroup>
-  <h1>Upload a statement</h1>
-  <p>MT940/STA, ABN XLS, generic CSV, PayPal TXT, Wise CSV, or SEB CSV.</p>
-</hgroup>
+<div class="mb-4">
+  <h1 class="h2">Upload a statement</h1>
+  <p class="text-muted">MT940/STA, ABN XLS, generic CSV, PayPal TXT, Wise CSV, or SEB CSV.</p>
+</div>
 
-<form
-  id="upload-form"
-  hx-post="/api/upload"
-  hx-encoding="multipart/form-data"
-  hx-target="#upload-result"
-  hx-swap="innerHTML"
-  hx-indicator="#upload-spinner">
-  <label>
-    File
-    <input type="file" name="file" required>
-  </label>
-  <label>
-    Format
-    <select name="format">
-      <option value="auto">Auto-detect (MT940 / XLS / CSV)</option>
-      <option value="paypal">PayPal activity report (.TXT)</option>
-      <option value="wise">Wise transaction history (.csv)</option>
-      <option value="seb">SEB kontoutdrag (.csv)</option>
-      <option value="csv">Generic CSV</option>
-    </select>
-    <small>PayPal, Wise and SEB files must select their format explicitly.</small>
-  </label>
-  <button type="submit">Import</button>
-  <span id="upload-spinner" class="htmx-indicator" aria-busy="true">Importing…</span>
-</form>
+<div class="row justify-content-md-center">
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-body">
+        <form
+          id="upload-form"
+          hx-post="/api/upload"
+          hx-encoding="multipart/form-data"
+          hx-target="#upload-result"
+          hx-swap="innerHTML"
+          hx-indicator="#upload-spinner">
 
-<div id="upload-result"></div>
+          <div class="mb-3">
+            <label for="upload-file" class="form-label">File</label>
+            <input type="file" id="upload-file" class="form-control" name="file" required>
+          </div>
+
+          <div class="mb-3">
+            <label for="upload-format" class="form-label">Format</label>
+            <select id="upload-format" class="form-select" name="format">
+              <option value="auto">Auto-detect (MT940 / XLS / CSV)</option>
+              <option value="paypal">PayPal activity report (.TXT)</option>
+              <option value="wise">Wise transaction history (.csv)</option>
+              <option value="seb">SEB kontoutdrag (.csv)</option>
+              <option value="csv">Generic CSV</option>
+            </select>
+            <small class="form-text text-muted d-block mt-2">PayPal, Wise and SEB files must select their format explicitly.</small>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Import</button>
+            <span id="upload-spinner" class="htmx-indicator spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+            <span id="upload-spinner-text" class="htmx-indicator text-muted">Importing…</span>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="upload-result" class="mt-4"></div>
 {% endblock %}
