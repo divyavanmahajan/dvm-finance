@@ -197,6 +197,33 @@ def test_sort_amount_asc(client, seed):
     assert body.index("Rent payment") < body.index("Salary")
 
 
+def test_sort_description_asc(client, seed):
+    r = client.get("/transactions/table?sort=description_asc")
+    body = r.text
+    assert body.index("Albert Heijn groceries") < body.index("Salary")
+
+
+def test_sort_tags_desc(client, seed):
+    r = client.get("/transactions/table?sort=tags_desc")
+    assert r.status_code == 200
+
+
+def test_column_headers_are_sortable_links(client, seed):
+    r = client.get("/transactions/table")
+    body = r.text
+    assert "sortable-th" in body
+    # Clicking Date (already active desc) should link to date_asc
+    assert "sort=date_asc" in body
+
+
+def test_sort_toggle_asc_desc_on_repeated_click(client, seed):
+    """Clicking the active column's header toggles asc <-> desc."""
+    r_desc = client.get("/transactions/table?sort=amount_desc")
+    assert "sort=amount_asc" in r_desc.text
+    r_asc = client.get("/transactions/table?sort=amount_asc")
+    assert "sort=amount_desc" in r_asc.text
+
+
 def test_pagination(app, seed):
     factory = seed
     db = factory()

@@ -44,6 +44,43 @@ Dropped: users/auth tables, LLM/vector artifacts.
 - All schema changes via Alembic.
 - Snapshot merge: insert-or-overwrite (incoming wins), never deletes local rows; whole import is one transaction with a pre-import DB backup.
 
+## Rules categorization (two-pass, v1.1.0+)
+
+`core/categorizer.py:apply_rules` reapplies active rules to transactions in
+**two passes**. Rules are split via `_split_rules` on the `CategorizationRule.is_tag_only`
+column (new `Boolean`, default `False`, non-nullable):
+
+1. **Pass 1 — category rules** (`is_tag_only=False`): applied in `priority`
+   order (ties broken by `id`), **first match wins**, to non-manual
+   transactions only (`categorization_source == "manual"` is skipped
+   entirely). Writes `category`, `tags`, and `categorization_source`
+   (`str(rule.id)`). A transaction with no matching category rule gets
+   `category=None` (effective "Uncategorized").
+2. **Pass 2 — tag-only rules** (`is_tag_only=True`): applied against **all**
+   transactions, including manually categorized ones, and **regardless of
+   priority order** — every tag-only rule that matches contributes its tags,
+   not just the first. Tag-only rules never write `category` or
+   `manual_category`; they only ever merge into `tags`.
+
+Tag merging (`_merge_tags`) is a de-duplicating, order-preserving union: it
+splits both the existing and incoming tag strings on `,`, appends any new tag
+not already present, and rejoins with `,`. This means applying the same
+tag-only rule twice, or having two tag-only rules emit overlapping tags, never
+produces duplicate tags on a transaction.
+
+Both passes route through the same `TxnChange` change list and
+`record_rule_change` audit trail (see Hard rules in `CLAUDE.md`) — a
+tag-only match that only changes `tags` is recorded the same way a category
+change is, with `old_category == new_category` and `old_tags != new_tags`.
+
+The `CategorizationRule` model gained one field for this: `is_tag_only:
+Mapped[bool]`. A tag-only rule's `category` is always `None` (enforced in the
+API layer's validation/draft-building, `api/rules.py`); its `tags` field is
+required. The rules list UI (`web/templates/rules.html`) splits rules into
+two sub-tabs (**Rules** / **Tag-only rules**) using the same `is_tag_only`
+flag, and the snapshot format (below) round-trips `is_tag_only` as an ordinary
+rule field.
+
 ## Transfer exclusion (default behavior)
 
 **Default: All views exclude transfer categories by default** to reduce visual clutter

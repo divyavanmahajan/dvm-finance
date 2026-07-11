@@ -34,5 +34,15 @@ ruff check .                        # lint gate
 - Every rule mutation goes through `record_rule_change` — no silent recategorization.
 - Schema changes via Alembic only. Filter state lives in the URL. No JS build step. No LLM/MCP/auth/charts/Docker.
 
+## Tag-only rules (v1.1.0+)
+
+`CategorizationRule.is_tag_only` marks a rule as tags-only (no `category`).
+`core/categorizer.py:apply_rules` runs two passes: category rules first
+(priority order, first match wins, non-manual transactions only), then
+tag-only rules (all matches apply, even to manually categorized
+transactions, merged/de-duplicated into `tags`, category untouched). See
+`docs/architecture.md` (Rules categorization) and `docs/product.md`
+(Tag-only rules) for details.
+
 ## Phase: init
 See full phase summary: [docs/phase/init/phase-summary.md](docs/phase/init/phase-summary.md)

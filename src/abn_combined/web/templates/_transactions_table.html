@@ -32,16 +32,66 @@
   {% endif %}
 </p>
 
+<!-- Summary statistics for the current filtered view -->
+{% if page.total %}
+<div class="card bg-light border-0 mb-3">
+  <div class="card-body py-2 px-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center" style="gap: 0.5rem 1.5rem;">
+      <span>
+        <span class="text-muted">Transactions:</span>
+        <span class="fw-semibold">{{ page.total }}</span>
+      </span>
+      <span>
+        <span class="text-muted">Total:</span>
+        <span class="fw-semibold text-end {% if summary.total_amount < 0 %}neg{% else %}pos{% endif %}">
+          {{ '%.2f'|format(summary.total_amount) }}
+        </span>
+      </span>
+      {% if summary.date_from and summary.date_to %}
+      <span>
+        <span class="text-muted">Date range:</span>
+        <span class="fw-semibold">
+          {{ summary.date_from.isoformat() }}
+          {% if summary.date_to != summary.date_from %} – {{ summary.date_to.isoformat() }}{% endif %}
+        </span>
+      </span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-light border mb-3 py-2 px-3">
+  No transactions{% if chips %} match these filters{% endif %}.
+</div>
+{% endif %}
+
+{% macro sort_th(column, label, extra_class="") %}
+{% set state = filter.sort_state_for_column(column) %}
+<th class="sortable-th {{ extra_class }} {% if state %}sort-active{% endif %}">
+  <a href="/transactions/table?{{ filter.sort_url_for_column(column) }}"
+     hx-get="/transactions/table?{{ filter.sort_url_for_column(column) }}"
+     hx-target="#txn-table" hx-swap="innerHTML"
+     hx-push-url="/?{{ filter.sort_url_for_column(column) }}"
+     aria-label="Sort by {{ label }}">
+    {{ label }}
+    {% if state == 'asc' %}<i class="bi bi-chevron-up sort-icon"></i>
+    {% elif state == 'desc' %}<i class="bi bi-chevron-down sort-icon"></i>
+    {% else %}<i class="bi bi-chevron-expand sort-icon"></i>
+    {% endif %}
+  </a>
+</th>
+{% endmacro %}
+
 <table class="table table-hover align-middle txn-table">
   <thead>
     <tr>
       <th style="width: 40px;"></th>
-      <th>Date</th>
+      {{ sort_th('date', 'Date') }}
       <th>Account</th>
-      <th>Description</th>
-      <th class="num">Amount</th>
-      <th>Category</th>
-      <th>Tags</th>
+      {{ sort_th('description', 'Description') }}
+      {{ sort_th('amount', 'Amount', 'num') }}
+      {{ sort_th('category', 'Category') }}
+      {{ sort_th('tags', 'Tags') }}
       <th>Source</th>
       <th style="width: 60px;"></th>
     </tr>

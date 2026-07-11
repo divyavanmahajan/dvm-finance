@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from . import __version__
 from .db import configure_engine
 from .logging_config import configure_logging, get_logger
 from .settings import Settings
@@ -50,6 +51,7 @@ def _css_id(s: str) -> str:
 
 templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 templates.env.globals["nav_tabs"] = NAV_TABS
+templates.env.globals["app_version"] = __version__
 templates.env.filters["css_id"] = _css_id
 
 

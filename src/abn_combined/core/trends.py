@@ -65,6 +65,23 @@ def default_window(today: date | None = None) -> tuple[date, date]:
 # ---------------------------------------------------------------------------
 
 
+TRENDS_SORTS = ("category_asc", "category_desc", "total_asc", "total_desc")
+DEFAULT_TRENDS_SORT = "category_asc"
+
+# column key -> (asc sort key, desc sort key), for header click-to-sort toggling.
+TRENDS_SORTABLE_COLUMNS: dict[str, tuple[str, str]] = {
+    "category": ("category_asc", "category_desc"),
+    "total": ("total_asc", "total_desc"),
+}
+
+
+def next_trends_sort(current_sort: str, column: str) -> str:
+    asc_key, desc_key = TRENDS_SORTABLE_COLUMNS[column]
+    if current_sort == asc_key:
+        return desc_key
+    return asc_key
+
+
 @dataclass
 class TrendsParams:
     """Typed representation of the /trends query string."""
@@ -74,6 +91,7 @@ class TrendsParams:
     date_to: date | None = None
     accounts: list[str] = field(default_factory=list)
     include_transfers: bool = False
+    sort: str = DEFAULT_TRENDS_SORT
 
     @classmethod
     def _build(cls, one, many) -> TrendsParams:
@@ -83,12 +101,16 @@ class TrendsParams:
         # Parse include_transfers: True if param is "1", "true", or "True"; False otherwise
         include_transfers_str = one("include_transfers") or ""
         include_transfers = include_transfers_str in ("1", "true", "True")
+        sort = one("sort") or DEFAULT_TRENDS_SORT
+        if sort not in TRENDS_SORTS:
+            sort = DEFAULT_TRENDS_SORT
         return cls(
             granularity=granularity,
             date_from=_parse_date(one("date_from")),
             date_to=_parse_date(one("date_to")),
             accounts=[a for a in many("account") if a],
             include_transfers=include_transfers,
+            sort=sort,
         )
 
     @classmethod
@@ -120,6 +142,8 @@ class TrendsParams:
             pairs.append(("account", a))
         if self.include_transfers:
             pairs.append(("include_transfers", "1"))
+        if self.sort != DEFAULT_TRENDS_SORT:
+            pairs.append(("sort", self.sort))
         return pairs
 
     def to_query_string(self) -> str:
@@ -131,6 +155,22 @@ class TrendsParams:
         """The (from, to) window, defaulting each missing side to the last 12 full months."""
         lo, hi = default_window(today)
         return self.date_from or lo, self.date_to or hi
+
+    def with_sort(self, sort: str) -> TrendsParams:
+        from dataclasses import replace
+
+        return replace(self, sort=sort)
+
+    def sort_url_for_column(self, column: str) -> str:
+        return self.with_sort(next_trends_sort(self.sort, column)).to_query_string()
+
+    def sort_state_for_column(self, column: str) -> str | None:
+        asc_key, desc_key = TRENDS_SORTABLE_COLUMNS[column]
+        if self.sort == asc_key:
+            return "asc"
+        if self.sort == desc_key:
+            return "desc"
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -284,12 +324,32 @@ def aggregate(db: Session, params: TrendsParams, today: date | None = None) -> T
         for key, amount in row.cells.items():
             column_totals[key] = column_totals.get(key, 0.0) + amount
 
+    rows = _sort_rows(rows, params.sort)
+
     return TrendsTable(
         periods=periods,
         rows=rows,
         column_totals=column_totals,
         grand_total=sum(column_totals.values()),
     )
+
+
+def _sort_rows(rows: list[TrendRow], sort: str) -> list[TrendRow]:
+    """Sort top-level rows by category label or total, asc/desc.
+
+    Children within a parent row stay alphabetically ordered — only the
+    top-level row order (which "column" of the pivoted table each row
+    belongs under) changes.
+    """
+    if sort == "total_asc":
+        return sorted(rows, key=lambda r: r.total)
+    if sort == "total_desc":
+        return sorted(rows, key=lambda r: r.total, reverse=True)
+    if sort == "category_desc":
+        return sorted(rows, key=lambda r: r.label.lower(), reverse=True)
+    # category_asc (default) — rows are already alphabetical from `sorted(groups)`,
+    # but the uncategorized row is appended last, so re-sort for consistency.
+    return sorted(rows, key=lambda r: r.label.lower())
 
 
 def _leaf_row(cat: str, cells: dict[str, float]) -> TrendRow:
