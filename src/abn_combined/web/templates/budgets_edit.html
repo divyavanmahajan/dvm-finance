@@ -1,32 +1,51 @@
 {% extends "base.html" %}
 {% block title %}Edit budget — Your Finance{% endblock %}
 {% block content %}
-<link rel="stylesheet" href="/static/tables.css">
-<hgroup>
-  <h1>Edit budget</h1>
-  <p>{{ budget.category }} ({{ budget.period }})</p>
-</hgroup>
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-2">Edit budget</h1>
+    <p class="text-muted small mb-0">{{ budget.category }} ({{ budget.period }})</p>
+  </div>
+</div>
 
-<form method="post" action="/budgets/{{ budget.id }}/update" class="form-grid">
-  <label>Category
-    <input type="text" name="category" value="{{ budget.category }}" list="known-categories" required>
-  </label>
-  <label>Amount €
-    <input type="number" name="amount" step="0.01" min="0" value="{{ budget.amount }}" required>
-  </label>
-  <label>Period
-    <select name="period">
-      {% for p in periods %}
-      <option value="{{ p }}" {% if budget.period == p %}selected{% endif %}>{{ p.title() }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label>Valid from <input type="date" name="start_date" value="{{ budget.start_date.isoformat() if budget.start_date else '' }}"></label>
-  <label>Valid to <input type="date" name="end_date" value="{{ budget.end_date.isoformat() if budget.end_date else '' }}"></label>
-  <label>Notes <input type="text" name="notes" value="{{ budget.notes or '' }}"></label>
-  <button type="submit">Save</button>
-  <a href="/budgets" role="button" class="secondary">Cancel</a>
-</form>
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="post" action="/budgets/{{ budget.id }}/update" class="row g-3 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label" for="edit-category">Category</label>
+        <input type="text" class="form-control" id="edit-category" name="category" value="{{ budget.category }}" list="known-categories" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" for="edit-amount">Amount €</label>
+        <input type="number" class="form-control" id="edit-amount" name="amount" step="0.01" min="0" value="{{ budget.amount }}" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" for="edit-period">Period</label>
+        <select class="form-select" id="edit-period" name="period">
+          {% for p in periods %}
+          <option value="{{ p }}" {% if budget.period == p %}selected{% endif %}>{{ p.title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" for="edit-start-date">Valid from</label>
+        <input type="date" class="form-control" id="edit-start-date" name="start_date" value="{{ budget.start_date.isoformat() if budget.start_date else '' }}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" for="edit-end-date">Valid to</label>
+        <input type="date" class="form-control" id="edit-end-date" name="end_date" value="{{ budget.end_date.isoformat() if budget.end_date else '' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="edit-notes">Notes</label>
+        <input type="text" class="form-control" id="edit-notes" name="notes" value="{{ budget.notes or '' }}">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a href="/budgets" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
 
 <datalist id="known-categories">
   {% for c in categories %}<option value="{{ c }}"></option>{% endfor %}
