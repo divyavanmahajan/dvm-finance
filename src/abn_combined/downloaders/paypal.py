@@ -34,7 +34,7 @@ logger = get_logger(__name__)
 
 PAYPAL_BASE_URL = "https://www.paypal.com"
 PAYPAL_REPORTS_URL = "https://www.paypal.com/reports/dlog"
-DEFAULT_CDP_URL = "http://127.0.0.1:9222"
+DEFAULT_CDP_URL = "http://127.0.0.1:9226"
 PAYPAL_QL_API = "https://www.paypal.com/reports/apis/common/ql"
 RECENT_ACTIVITY_TEXT = "Recent activity"
 INITIAL_STATUS_WAIT_SECONDS = 20
@@ -45,7 +45,7 @@ NAVIGATION_DELAY_SECONDS = 2
 # Exact Chrome launch command shown to the user when CDP connection fails.
 CHROME_LAUNCH_COMMAND = (
     "/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome "
-    "--remote-debugging-port=9222 --user-data-dir=~/.chrome/debugdir "
+    "--remote-debugging-port=9226 --user-data-dir=~/.chrome/debugdir "
     "https://www.paypal.com/reports/dlog"
 )
 
@@ -445,7 +445,7 @@ def run_paypal_job(
             if not browser.contexts:
                 _fail(
                     "Connected Chrome has no open contexts. "
-                    "Ensure Chrome was started with --remote-debugging-port=9222."
+                    "Ensure Chrome was started with --remote-debugging-port=9226."
                 )
                 return
 

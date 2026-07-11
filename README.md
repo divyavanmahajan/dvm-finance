@@ -90,7 +90,7 @@ encrypted**. Exchange them only over a channel you trust.
 
   ```bash
   /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
-    --remote-debugging-port=9222 --user-data-dir=~/.chrome/debugdir \
+    --remote-debugging-port=9226 --user-data-dir=~/.chrome/debugdir \
     https://www.paypal.com/reports/dlog
   ```
 
