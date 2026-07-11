@@ -1,0 +1,35 @@
+{# Empty state card shown when no transactions match the current filters.
+   Include this partial in _transactions_table.html instead of the "No transactions match" message.
+#}
+
+{% if not page.total and chips %}
+<div class="empty-state">
+  {# Icon (using Bootstrap Icons class naming) #}
+  <div class="empty-state-icon">
+    <i class="bi bi-inbox" style="font-size: 4rem; color: var(--bs-secondary-color);"></i>
+  </div>
+
+  {# Heading #}
+  <h2 class="empty-state-heading">No transactions match your filters</h2>
+
+  {# Subtext with active filters list #}
+  <div class="empty-state-subtext">
+    {% if chips %}
+    <p>You're filtering by:</p>
+    <div class="empty-state-filters">
+      <ul>
+        {% for chip in chips %}
+        <li>{{ chip.label }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+    <p style="margin-top: 1rem;">Try adjusting your filters or clearing them entirely.</p>
+  </div>
+
+  {# Action button #}
+  <button type="button" class="btn btn-primary" @click="clearFilters()">
+    Clear all filters
+  </button>
+</div>
+{% endif %}

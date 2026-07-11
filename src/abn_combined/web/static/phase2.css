@@ -1,0 +1,294 @@
+/* Phase 2: Bootstrap 5 Advanced Filters, Pills, and Empty States
+   Styles for offcanvas panel, active filter pills, filter count badge, and empty state card.
+*/
+
+/* ===== OFFCANVAS ADVANCED FILTERS PANEL ===== */
+.offcanvas {
+  width: 100%;
+  max-width: 400px;
+}
+
+.offcanvas-header {
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.offcanvas-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+/* Custom footer styling for offcanvas (not built-in to Bootstrap) */
+.offcanvas-footer {
+  border-top: 1px solid var(--bs-border-color);
+  display: flex;
+  gap: 0.5rem;
+  background-color: var(--bs-secondary-bg);
+}
+
+.offcanvas-footer .btn {
+  flex: 1;
+}
+
+/* Ensure date/number inputs have consistent sizing */
+.offcanvas-body .form-control,
+.offcanvas-body .form-select {
+  font-size: 0.95rem;
+}
+
+.offcanvas-body .input-group .form-control {
+  flex: 1;
+}
+
+/* Input group text styling */
+.input-group-text {
+  background-color: var(--bs-gray-100);
+  border-color: var(--bs-border-color);
+}
+
+@media (prefers-color-scheme: dark) {
+  .input-group-text {
+    background-color: var(--bs-gray-800);
+  }
+}
+
+/* Multi-select helper text */
+.form-text {
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
+
+/* ===== ACTIVE FILTER PILLS STRIP ===== */
+.active-filters-strip {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background-color: var(--bs-info-bg-subtle);
+  border: 1px solid var(--bs-info-border-subtle);
+  border-radius: 0.375rem;
+}
+
+.badge.rounded-pill {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+/* Close button styling within pills */
+.badge .btn-close {
+  width: auto;
+  height: auto;
+  padding: 0 !important;
+  opacity: 0.7;
+  transition: opacity 0.15s ease-in-out;
+}
+
+.badge .btn-close:hover {
+  opacity: 1;
+}
+
+.badge .btn-close::after {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* "Clear all" button styling in pills strip */
+.active-filters-strip .btn-outline-secondary {
+  margin-left: 0.5rem;
+}
+
+/* ===== FILTER COUNT BADGE ===== */
+.position-relative {
+  position: relative;
+}
+
+.badge.position-absolute {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.7rem;
+  min-width: 1.25rem;
+  text-align: center;
+}
+
+/* Ensure badge is visible on hover of button */
+.btn:hover .badge {
+  animation: badgePulse 0.3s ease-in-out;
+}
+
+@keyframes badgePulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+/* ===== EMPTY STATE CARD ===== */
+.empty-state {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.375rem;
+  background-color: var(--bs-secondary-bg);
+}
+
+.empty-state-icon {
+  font-size: 4rem;
+  color: var(--bs-secondary-color);
+  margin-bottom: 1rem;
+}
+
+.empty-state h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--bs-body-color);
+}
+
+.empty-state-subtext {
+  font-size: 0.95rem;
+  color: var(--bs-secondary-color);
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+.empty-state .btn {
+  margin-top: 1rem;
+}
+
+/* Active filters list in empty state */
+.empty-state-filters {
+  display: inline-block;
+  text-align: left;
+  margin: 1rem auto;
+  padding: 0.75rem 1rem;
+  background-color: var(--bs-body-bg);
+  border-radius: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.empty-state-filters ul {
+  margin-bottom: 0;
+  padding-left: 1.5rem;
+}
+
+.empty-state-filters li {
+  margin-bottom: 0.25rem;
+}
+
+/* ===== FILTER BAR ADJUSTMENTS FOR BOOTSTRAP ===== */
+.filter-bar {
+  margin-bottom: 1rem;
+  padding: 0;
+}
+
+/* Ensure form controls in filter bar have consistent spacing */
+.filter-bar .form-label {
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.filter-bar .form-control,
+.filter-bar .form-select {
+  font-size: 0.95rem;
+}
+
+/* Adjust row gutters for tight spacing in filter rows */
+.filter-row {
+  gap: 0.5rem;
+}
+
+.filter-row .col-auto {
+  padding-right: 0;
+  padding-left: 0;
+}
+
+/* ===== RESPONSIVE ADJUSTMENTS ===== */
+@media (max-width: 768px) {
+  .offcanvas {
+    max-width: 100%;
+  }
+
+  .offcanvas-body {
+    padding: 1rem;
+  }
+
+  .active-filters-strip {
+    padding: 0.5rem;
+  }
+
+  .badge.rounded-pill {
+    font-size: 0.85rem;
+    padding: 0.4rem 0.6rem;
+  }
+
+  .empty-state {
+    padding: 2rem 1rem;
+  }
+
+  .empty-state-icon {
+    font-size: 3rem;
+  }
+
+  .empty-state h2 {
+    font-size: 1.25rem;
+  }
+}
+
+/* ===== DARK MODE SUPPORT ===== */
+@media (prefers-color-scheme: dark) {
+  .active-filters-strip {
+    background-color: rgba(13, 110, 253, 0.15);
+    border-color: rgba(13, 110, 253, 0.5);
+  }
+
+  .empty-state {
+    background-color: var(--bs-gray-800);
+  }
+
+  .empty-state-subtext {
+    color: var(--bs-gray-400);
+  }
+
+  .empty-state-filters {
+    background-color: var(--bs-gray-900);
+  }
+}
+
+/* ===== ANIMATIONS ===== */
+.badge {
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Smooth transitions for showing/hiding elements via Alpine */
+[x-cloak] { display: none !important; }
+
+/* ===== ACCESSIBILITY ===== */
+/* Ensure focus states are visible */
+.btn:focus-visible,
+.form-control:focus-visible,
+.form-select:focus-visible {
+  outline: 2px solid var(--bs-primary);
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: more) {
+  .badge.rounded-pill {
+    border: 1px solid currentColor;
+  }
+
+  .active-filters-strip {
+    border-width: 2px;
+  }
+}

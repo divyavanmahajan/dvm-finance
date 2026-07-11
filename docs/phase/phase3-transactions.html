@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+{% block title %}Transactions — abn-combined{% endblock %}
+{% block content %}
+<script src="/static/js/transactions.js"></script>
+<script src="/static/js/phase3.js"></script>
+<link rel="stylesheet" href="/static/phase3.css">
+
+<hgroup>
+  <h1>Transactions</h1>
+  <p>Filter, sort and categorize. The full filter state lives in the URL — bookmark or share any view.</p>
+</hgroup>
+
+{# ===== FILTER BAR (Phase 1 + Phase 2 + Phase 3 enhancements) ===== #}
+{# All filters live in this form; HTMX targets capture the entire state via hx-include #}
+<form id="filter-bar" class="filter-bar mb-3"
+      hx-get="/transactions/table"
+      hx-target="#txn-table"
+      hx-swap="innerHTML"
+      hx-push-url="true"
+      hx-indicator="#txn-loading"
+      hx-trigger="submit, change from:select, change from:input[type=date], change from:input[name=account], change from:input[type=checkbox]"
+      x-data="txnFilterBar()">
+
+  {# ===== Filter Row 1: Search + Quick Presets + Sort (Phase 1) ===== #}
+  <div class="filter-row row g-2 align-items-end mb-2">
+    <div class="col-auto flex-grow-1" style="min-width: 16rem;">
+      <label for="search-input" class="form-label">Search</label>
+      <input id="search-input" type="search" name="q" class="form-control"
+             placeholder="Search description or counterparty…"
+             aria-label="Search description or counterparty"
+             value="{{ filter.q or '' }}"
+             hx-get="/transactions/table" hx-target="#txn-table" hx-swap="innerHTML"
+             hx-push-url="true" hx-indicator="#txn-loading"
+             hx-trigger="keyup changed delay:400ms, search">
+    </div>
+
+    <div class="col-auto">
+      <label for="preset-select" class="form-label">Date</label>
+      <select id="preset-select" name="preset" class="form-select" aria-label="Date preset">
+        <option value="">Any date</option>
+        {% for p in presets %}
+        <option value="{{ p }}" {% if filter.preset == p %}selected{% endif %}>{{ p.replace('-', ' ').title() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-auto">
+      <label for="sort-select" class="form-label">Sort</label>
+      <select id="sort-select" name="sort" class="form-select">
+        <option value="date_desc" {% if filter.sort == 'date_desc' %}selected{% endif %}>Newest</option>
+        <option value="date_asc" {% if filter.sort == 'date_asc' %}selected{% endif %}>Oldest</option>
+        <option value="amount_desc" {% if filter.sort == 'amount_desc' %}selected{% endif %}>Amount ↓</option>
+        <option value="amount_asc" {% if filter.sort == 'amount_asc' %}selected{% endif %}>Amount ↑</option>
+        <option value="category_asc" {% if filter.sort == 'category_asc' %}selected{% endif %}>Category A→Z</option>
+        <option value="category_desc" {% if filter.sort == 'category_desc' %}selected{% endif %}>Category Z→A</option>
+      </select>
+    </div>
+
+    {# ===== Phase 2: Filter Count Badge on "Filters" Button ===== #}
+    <div class="col-auto">
+      <button type="button" class="btn btn-outline-primary position-relative"
+              data-bs-toggle="offcanvas" data-bs-target="#advancedFiltersOffcanvas"
+              aria-controls="advancedFiltersOffcanvas">
+        Filters
+        <span class="badge bg-danger position-absolute top-0 start-100 translate-middle"
+              x-show="activeFilterCount > 0"
+              x-text="activeFilterCount"
+              style="display: none !important;">
+        </span>
+      </button>
+    </div>
+  </div>
+
+  {# ===== HIDDEN ADVANCED FILTER INPUTS (stay in form for HTMX capture) ===== #}
+  {# These are hidden and controlled by the offcanvas panel #}
+  <div style="display: none;">
+    <input type="date" name="date_from" value="{{ filter.date_from.isoformat() if filter.date_from else '' }}">
+    <input type="date" name="date_to" value="{{ filter.date_to.isoformat() if filter.date_to else '' }}">
+    <input type="number" step="0.01" name="amount_min" value="{{ filter.amount_min if filter.amount_min is not none else '' }}">
+    <input type="number" step="0.01" name="amount_max" value="{{ filter.amount_max if filter.amount_max is not none else '' }}">
+    <select name="account">
+      <option value="">All accounts</option>
+      {% for a in accounts %}
+      <option value="{{ a }}" {% if a in filter.accounts %}selected{% endif %}>{{ a }}</option>
+      {% endfor %}
+    </select>
+    {% for c in categories %}
+    <input type="checkbox" name="category" value="{{ c }}" {% if c in filter.categories %}checked{% endif %}>
+    {% endfor %}
+    <input type="checkbox" name="category" value="uncategorized" {% if 'uncategorized' in filter.categories %}checked{% endif %}>
+    {% for c in categories %}
+    <input type="checkbox" name="exclude_category" value="{{ c }}" {% if c in filter.exclude_categories %}checked{% endif %}>
+    {% endfor %}
+    <input type="checkbox" name="exclude_category" value="uncategorized" {% if 'uncategorized' in filter.exclude_categories %}checked{% endif %}>
+    {% for t in tags %}
+    <input type="checkbox" name="tag" value="{{ t }}" {% if t in filter.tags %}checked{% endif %}>
+    {% endfor %}
+  </div>
+</form>
+
+{# ===== OFFCANVAS ADVANCED FILTERS PANEL (Phase 2 + Phase 3) ===== #}
+<div class="offcanvas offcanvas-end" tabindex="-1" id="advancedFiltersOffcanvas" aria-labelledby="advancedFiltersLabel">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="advancedFiltersLabel">Filters</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+
+  <div class="offcanvas-body">
+    {# Date Range #}
+    <div class="mb-3">
+      <label class="form-label">Date Range</label>
+      <div class="input-group">
+        <input type="date" class="form-control" name="date_from"
+               form="filter-bar"
+               value="{{ filter.date_from.isoformat() if filter.date_from else '' }}"
+               aria-label="From date">
+        <span class="input-group-text">–</span>
+        <input type="date" class="form-control" name="date_to"
+               form="filter-bar"
+               value="{{ filter.date_to.isoformat() if filter.date_to else '' }}"
+               aria-label="To date">
+      </div>
+    </div>
+
+    {# Amount Range #}
+    <div class="mb-3">
+      <label class="form-label">Amount Range (€)</label>
+      <div class="input-group">
+        <span class="input-group-text">€</span>
+        <input type="number" step="0.01" class="form-control" name="amount_min"
+               form="filter-bar"
+               placeholder="Min"
+               value="{{ filter.amount_min if filter.amount_min is not none else '' }}"
+               aria-label="Minimum amount">
+        <span class="input-group-text">–</span>
+        <span class="input-group-text">€</span>
+        <input type="number" step="0.01" class="form-control" name="amount_max"
+               form="filter-bar"
+               placeholder="Max"
+               value="{{ filter.amount_max if filter.amount_max is not none else '' }}"
+               aria-label="Maximum amount">
+      </div>
+    </div>
+
+    {# Account Select #}
+    <div class="mb-3">
+      <label for="account-select" class="form-label">Account</label>
+      <select id="account-select" name="account" class="form-select" form="filter-bar">
+        <option value="">All accounts</option>
+        {% for a in accounts %}
+        <option value="{{ a }}" {% if a in filter.accounts %}selected{% endif %}>{{ a }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    {# ===== PHASE 3: Category Checkbox-Dropdown ===== #}
+    <div class="mb-3">
+      <label class="form-label">Categories</label>
+      <div class="dropdown" x-data="categoryPicker({{ categories | tojson }}, {{ filter.categories | tojson }})">
+        <button class="btn btn-outline-secondary btn-sm dropdown-toggle w-100"
+                type="button" id="categoryDropdownBtn"
+                data-bs-toggle="dropdown" data-bs-auto-close="outside"
+                aria-expanded="false"
+                x-text="buttonText()">
+          Categories
+        </button>
+        <div class="dropdown-menu w-100" aria-labelledby="categoryDropdownBtn">
+          {# Search input #}
+          <div class="px-2 py-2">
+            <input type="search" class="form-control form-control-sm"
+                   placeholder="Search categories…"
+                   x-model="searchQuery"
+                   aria-label="Search categories">
+          </div>
+
+          {# Checkbox list (filtered by search) #}
+          <div class="category-list">
+            {# "Uncategorized" option #}
+            <div class="dropdown-item d-flex align-items-center gap-2">
+              <input type="checkbox" class="form-check-input" id="cat-uncategorized"
+                     name="category" value="uncategorized" form="filter-bar"
+                     x-model="selected"
+                     @change="updateHiddenInputs()">
+              <label for="cat-uncategorized" class="form-check-label mb-0 flex-grow-1">
+                Uncategorized
+              </label>
+            </div>
+
+            {# Regular categories #}
+            <template x-for="cat in filtered" :key="cat">
+              <div class="dropdown-item d-flex align-items-center gap-2">
+                <input type="checkbox" class="form-check-input"
+                       :id="'cat-' + slugify(cat)"
+                       name="category" :value="cat" form="filter-bar"
+                       x-model="selected"
+                       @change="updateHiddenInputs()">
+                <label :for="'cat-' + slugify(cat)" class="form-check-label mb-0 flex-grow-1">
+                  <span x-text="cat"></span>
+                </label>
+              </div>
+            </template>
+
+            {# Empty state #}
+            <div x-show="filtered.length === 0 && searchQuery.trim().length > 0"
+                 class="dropdown-item disabled text-muted">
+              No categories match your search.
+            </div>
+          </div>
+        </div>
+      </div>
+      <small class="form-text text-muted">Type to filter categories</small>
+    </div>
+
+    {# Exclude Categories #}
+    <div class="mb-3">
+      <label for="exclude-categories-select" class="form-label">Exclude Categories</label>
+      <select id="exclude-categories-select" name="exclude_category" class="form-select" form="filter-bar" multiple>
+        <option value="uncategorized" {% if 'uncategorized' in filter.exclude_categories %}selected{% endif %}>Uncategorized</option>
+        {% for c in categories %}
+        <option value="{{ c }}" {% if c in filter.exclude_categories %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+      <small class="form-text text-muted">Ctrl+Click to select multiple.</small>
+    </div>
+
+    {# Tags #}
+    <div class="mb-3">
+      <label for="tags-select" class="form-label">Tags</label>
+      <select id="tags-select" name="tag" class="form-select" form="filter-bar" multiple>
+        {% for t in tags %}
+        <option value="{{ t }}" {% if t in filter.tags %}checked{% endif %}>{{ t }}</option>
+        {% else %}
+        <option disabled>No tags yet.</option>
+        {% endfor %}
+      </select>
+      <small class="form-text text-muted">Ctrl+Click to select multiple.</small>
+    </div>
+  </div>
+
+  {# ===== Offcanvas Footer with Reset + Apply (Stack on mobile) ===== #}
+  <div class="offcanvas-footer border-top p-3 d-flex gap-2">
+    <button type="button" class="btn btn-secondary flex-grow-1" @click="clearFilters()">
+      Reset
+    </button>
+    <button type="button" class="btn btn-primary flex-grow-1" data-bs-dismiss="offcanvas" @click="submitForm()">
+      Apply
+    </button>
+  </div>
+</div>
+
+<p id="txn-loading" class="htmx-indicator" role="status" aria-live="polite">Loading…</p>
+
+{# ===== ACTIVE FILTER PILLS STRIP (Phase 2 + Phase 3 extension) ===== #}
+<div class="active-filters-strip mb-3"
+     x-show="activeFilters.length > 0"
+     style="display: none !important;">
+  <div class="d-flex flex-wrap gap-2 align-items-center">
+    <template x-for="filter in activeFilters" :key="filter.key">
+      <span class="badge rounded-pill text-bg-primary d-flex align-items-center gap-2">
+        <span x-text="`${filter.label}: ${filter.value}`"></span>
+        <button type="button" class="btn btn-close btn-close-white" style="padding: 0;"
+                @click="removeFilter(filter.key)"
+                :aria-label="`Remove ${filter.label} filter`">
+        </button>
+      </span>
+    </template>
+    <button type="button" class="btn btn-sm btn-outline-secondary" @click="clearFilters()">
+      Clear all
+    </button>
+  </div>
+</div>
+
+{# ===== TRANSACTIONS TABLE + MOBILE CARDS (Phase 3) ===== #}
+<div id="txn-table">
+  {% include "_transactions_table_phase3.html" %}
+</div>
+
+{# ===== EMPTY STATE ===== #}
+{# This is rendered by the _transactions_table_phase3.html partial when there are no rows.
+   Keep for reference of the structure; actual rendering is server-side.
+#}
+
+{% endblock %}
