@@ -1,53 +1,81 @@
 {% extends "base.html" %}
 {% block title %}Budgets — Your Finance{% endblock %}
 {% block content %}
-<link rel="stylesheet" href="/static/tables.css">
-<hgroup>
-  <h1>Budgets</h1>
-  <p>Budget vs actual per category. Actuals use effective categories (manual precedence) within each budget's current period window.</p>
-</hgroup>
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-2">Budgets</h1>
+    <p class="text-muted small mb-0">
+      Budget vs actual per category. Actuals use effective categories (manual precedence) within each budget's current period window.
+    </p>
+    <p class="text-muted small mb-0">
+      <strong>Note:</strong> Budget actuals exclude transfers. Transfer transactions are not counted toward budget spend.
+    </p>
+  </div>
+</div>
 
-<p><small><strong>Note:</strong> Budget actuals exclude transfers. Transfer transactions are not counted toward budget spend.</small></p>
+{% if error %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endif %}
 
-{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
-
-<form class="table-controls" method="get" action="/budgets">
-  <label>Period type
-    <select name="period" onchange="this.form.submit()">
-      <option value="">All</option>
-      {% for p in periods %}
-      <option value="{{ p }}" {% if period == p %}selected{% endif %}>{{ p.title() }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label>Reference date
-    <input type="date" name="ref" value="{{ ref.isoformat() }}" onchange="this.form.submit()">
-  </label>
-  <noscript><button type="submit">Apply</button></noscript>
-</form>
+<div class="card card-body mb-3">
+  <form class="row g-3 align-items-end" method="get" action="/budgets">
+    <div class="col-auto">
+      <label class="form-label" for="budgets-period">Period type</label>
+      <select class="form-select form-select-sm" id="budgets-period" name="period" onchange="this.form.submit()">
+        <option value="">All</option>
+        {% for p in periods %}
+        <option value="{{ p }}" {% if period == p %}selected{% endif %}>{{ p.title() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <label class="form-label" for="budgets-ref">Reference date</label>
+      <input type="date" class="form-control form-control-sm" id="budgets-ref" name="ref" value="{{ ref.isoformat() }}" onchange="this.form.submit()">
+    </div>
+    <noscript><div class="col-auto"><button type="submit" class="btn btn-primary btn-sm">Apply</button></div></noscript>
+  </form>
+</div>
 
 {% include "_budgets_table.html" %}
 
-<h2>Add budget</h2>
-<form method="post" action="/budgets/create" class="form-grid">
-  <label>Category
-    <input type="text" name="category" list="known-categories" required>
-  </label>
-  <label>Amount €
-    <input type="number" name="amount" step="0.01" min="0" required>
-  </label>
-  <label>Period
-    <select name="period">
-      {% for p in periods %}
-      <option value="{{ p }}" {% if p == 'month' %}selected{% endif %}>{{ p.title() }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label>Valid from <input type="date" name="start_date"></label>
-  <label>Valid to <input type="date" name="end_date"></label>
-  <label>Notes <input type="text" name="notes"></label>
-  <button type="submit">Add budget</button>
-</form>
+<div class="card shadow-sm mt-4">
+  <div class="card-header">Add budget</div>
+  <div class="card-body">
+    <form method="post" action="/budgets/create" class="row g-3 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label" for="add-category">Category</label>
+        <input type="text" class="form-control" id="add-category" name="category" list="known-categories" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" for="add-amount">Amount €</label>
+        <input type="number" class="form-control" id="add-amount" name="amount" step="0.01" min="0" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" for="add-period">Period</label>
+        <select class="form-select" id="add-period" name="period">
+          {% for p in periods %}
+          <option value="{{ p }}" {% if p == 'month' %}selected{% endif %}>{{ p.title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" for="add-start-date">Valid from</label>
+        <input type="date" class="form-control" id="add-start-date" name="start_date">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" for="add-end-date">Valid to</label>
+        <input type="date" class="form-control" id="add-end-date" name="end_date">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="add-notes">Notes</label>
+        <input type="text" class="form-control" id="add-notes" name="notes">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-plus-lg"></i> Add budget
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <datalist id="known-categories">
   {% for c in categories %}<option value="{{ c }}"></option>{% endfor %}
