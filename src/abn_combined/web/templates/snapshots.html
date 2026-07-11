@@ -1,64 +1,104 @@
 {% extends "base.html" %}
 {% block title %}Snapshots — abn-combined{% endblock %}
 {% block content %}
-<link rel="stylesheet" href="/static/snapshots.css">
-<hgroup>
-  <h1>Snapshots</h1>
-  <p>Share the dataset with another machine: export a snapshot file here, import it there.
+<div class="mb-4">
+  <h1 class="h2">Snapshots</h1>
+  <p class="text-muted">Share the dataset with another machine: export a snapshot file here, import it there.
      Import merges with incoming-wins on conflicts, never deletes local data, and backs up
      the database first.</p>
-</hgroup>
+</div>
 
 {% if error %}
-<article class="snapshot-error" role="alert">
+<div class="alert alert-danger" role="alert">
   <strong>Import rejected:</strong> {{ error }}
-</article>
+</div>
 {% endif %}
 
-<section>
-  <h2>Export</h2>
-  <form method="post" action="/snapshots/export">
-    <button type="submit">Export snapshot</button>
-  </form>
+<div class="row g-3 mb-4">
+  {# ── Export card ────────────────────────────────────────────────────── #}
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header bg-body-secondary">
+        <h5 class="mb-0">Export</h5>
+      </div>
+      <div class="card-body">
+        <form method="post" action="/snapshots/export">
+          <button type="submit" class="btn btn-primary">Export snapshot</button>
+        </form>
 
-  {% if exports %}
-  <table class="snapshot-exports">
-    <thead><tr><th>File</th><th>Date</th><th>Size</th><th></th></tr></thead>
-    <tbody>
-      {% for e in exports %}
-      <tr>
-        <td><code>{{ e.name }}</code></td>
-        <td>{{ e.modified.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-        <td>{{ '%.1f'|format(e.size / 1024) }} KB</td>
-        <td><a role="button" class="secondary outline" href="/snapshots/files/{{ e.name }}" download>Download</a></td>
-      </tr>
+        {% if exports %}
+        <div class="table-responsive mt-3">
+          <table class="table table-sm table-hover">
+            <thead class="table-light">
+              <tr>
+                <th>File</th>
+                <th>Date</th>
+                <th>Size</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for e in exports %}
+              <tr>
+                <td><code class="text-muted">{{ e.name }}</code></td>
+                <td>{{ e.modified.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                <td>{{ '%.1f'|format(e.size / 1024) }} KB</td>
+                <td class="text-end">
+                  <a href="/snapshots/files/{{ e.name }}" download class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-download"></i> Download
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted small">No exports yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# ── Import card ────────────────────────────────────────────────────── #}
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header bg-body-secondary">
+        <h5 class="mb-0">Import</h5>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">Upload a snapshot exported by abn-combined. Records that exist on both sides are
+           overwritten with the snapshot's values (including manual categorizations); everything
+           overwritten is listed in the import report. Local-only records are kept.</p>
+
+        <form method="post" action="/snapshots/import" enctype="multipart/form-data">
+          <div class="mb-3">
+            <label for="snapshot-file" class="form-label">Snapshot file</label>
+            <input type="file" id="snapshot-file" class="form-control" name="file"
+                   accept=".gz,.json.gz,application/gzip" required>
+          </div>
+          <button type="submit" class="btn btn-primary">Import snapshot</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Import reports section ─────────────────────────────────────────── #}
+<div class="card">
+  <div class="card-header bg-body-secondary">
+    <h5 class="mb-0">Import reports</h5>
+  </div>
+  <div class="card-body">
+    {% if imports %}
+    <div class="d-flex flex-column gap-3">
+      {% for imp in imports %}
+      {% include "_snapshot_import_report.html" %}
       {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p><small>No exports yet.</small></p>
-  {% endif %}
-</section>
-
-<section>
-  <h2>Import</h2>
-  <p><small>Upload a snapshot exported by abn-combined. Records that exist on both sides are
-     overwritten with the snapshot's values (including manual categorizations); everything
-     overwritten is listed in the import report. Local-only records are kept.</small></p>
-  <form method="post" action="/snapshots/import" enctype="multipart/form-data" class="snapshot-import-form">
-    <input type="file" name="file" accept=".gz,.json.gz,application/gzip" required>
-    <button type="submit">Import snapshot</button>
-  </form>
-</section>
-
-<section>
-  <h2>Import reports</h2>
-  {% if imports %}
-  {% for imp in imports %}
-  {% include "_snapshot_import_report.html" %}
-  {% endfor %}
-  {% else %}
-  <p><small>No imports yet.</small></p>
-  {% endif %}
-</section>
+    </div>
+    {% else %}
+    <p class="text-muted small">No imports yet.</p>
+    {% endif %}
+  </div>
+</div>
 {% endblock %}

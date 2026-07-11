@@ -1,115 +1,130 @@
 {% extends "base.html" %}
 {% block title %}Download — abn-combined{% endblock %}
 {% block content %}
-{# base.html has no head block to extend; import the page stylesheet here instead. #}
-<style>@import url('/static/downloads.css');</style>
-<hgroup>
-  <h1>Download statements</h1>
-  <p>Trigger ABN AMRO or PayPal downloads. Jobs run in the background; status updates every 2 s.</p>
-</hgroup>
+<div class="mb-4">
+  <h1 class="h2">Download statements</h1>
+  <p class="text-muted">Trigger ABN AMRO or PayPal downloads. Jobs run in the background; status updates every 2 s.</p>
+</div>
 
-<div class="download-grid">
+<div class="row g-3">
 
   {# ── ABN AMRO card ─────────────────────────────────────────────────── #}
-  <article class="download-card" id="abn-card">
-    <header><strong>ABN AMRO</strong></header>
-
-    {% if not playwright_available %}
-    <div class="download-notice" role="alert">
-      <p>Playwright / Chromium is not installed.  The ABN AMRO flow requires a headed browser.</p>
-      <p>Run in your terminal:</p>
-      <pre><code>playwright install chromium</code></pre>
-    </div>
-    {% else %}
-    <form
-      hx-post="/api/download/abn"
-      hx-target="#abn-status"
-      hx-swap="innerHTML"
-      hx-disabled-elt="button[type=submit]">
-
-      <div class="download-dates">
-        <label>
-          From (DD-MM-YYYY)
-          <input type="text" name="from_date" value="{{ abn_from }}" pattern="\d{2}-\d{2}-\d{4}"
-                 placeholder="DD-MM-YYYY">
-        </label>
-        <label>
-          To (DD-MM-YYYY)
-          <input type="text" name="to_date" value="{{ abn_to }}" pattern="\d{2}-\d{2}-\d{4}"
-                 placeholder="DD-MM-YYYY">
-        </label>
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header bg-body-secondary">
+        <h5 class="mb-0">ABN AMRO</h5>
       </div>
+      <div class="card-body">
 
-      <p class="download-hint">
-        A headed Chromium window will open. Authenticate with the ABN AMRO app when prompted.
-      </p>
+        {% if not playwright_available %}
+        <div class="alert alert-warning" role="alert">
+          <p class="mb-2"><strong>Playwright / Chromium is not installed.</strong> The ABN AMRO flow requires a headed browser.</p>
+          <p class="mb-0">Run in your terminal:</p>
+          <pre class="mt-2 mb-0"><code>playwright install chromium</code></pre>
+        </div>
+        {% else %}
+        <form
+          hx-post="/api/download/abn"
+          hx-target="#abn-status"
+          hx-swap="innerHTML"
+          hx-disabled-elt="button[type=submit]">
 
-      {% if abn_job and not abn_job.is_terminal() %}
-      <button type="submit" disabled>Running…</button>
-      {% else %}
-      <button type="submit">Start ABN download</button>
-      {% endif %}
-    </form>
-    {% endif %}
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label for="abn-from" class="form-label">From (DD-MM-YYYY)</label>
+              <input type="text" id="abn-from" class="form-control" name="from_date" value="{{ abn_from }}"
+                     pattern="\d{2}-\d{2}-\d{4}" placeholder="DD-MM-YYYY">
+            </div>
+            <div class="col-md-6">
+              <label for="abn-to" class="form-label">To (DD-MM-YYYY)</label>
+              <input type="text" id="abn-to" class="form-control" name="to_date" value="{{ abn_to }}"
+                     pattern="\d{2}-\d{2}-\d{4}" placeholder="DD-MM-YYYY">
+            </div>
+          </div>
 
-    <div id="abn-status">
-      {% if abn_job %}
-        {% set source = "abn" %}
-        {% set job = abn_job %}
-        {% include "_download_status.html" %}
-      {% endif %}
+          <p class="text-muted small mb-3">
+            A headed Chromium window will open. Authenticate with the ABN AMRO app when prompted.
+          </p>
+
+          {% if abn_job and not abn_job.is_terminal() %}
+          <button type="submit" class="btn btn-primary" disabled>
+            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+            Running…
+          </button>
+          {% else %}
+          <button type="submit" class="btn btn-primary">Start ABN download</button>
+          {% endif %}
+        </form>
+        {% endif %}
+      </div>
+      <div id="abn-status">
+        {% if abn_job %}
+          {% set source = "abn" %}
+          {% set job = abn_job %}
+          {% include "_download_status.html" %}
+        {% endif %}
+      </div>
     </div>
-  </article>
+  </div>
 
   {# ── PayPal card ────────────────────────────────────────────────────── #}
-  <article class="download-card" id="paypal-card">
-    <header><strong>PayPal</strong></header>
-
-    <p class="download-hint">
-      Start Chrome with remote debugging before clicking the button:
-    </p>
-    <pre class="chrome-cmd"><code>{{ chrome_launch_command }}</code></pre>
-
-    <form
-      hx-post="/api/download/paypal"
-      hx-target="#paypal-status"
-      hx-swap="innerHTML"
-      hx-disabled-elt="button[type=submit]">
-
-      <div class="download-dates">
-        <label>
-          From (YYYY-MM-DD)
-          <input type="text" name="from_date" value="{{ pp_from }}" pattern="\d{4}-\d{2}-\d{2}"
-                 placeholder="YYYY-MM-DD">
-        </label>
-        <label>
-          To (YYYY-MM-DD)
-          <input type="text" name="to_date" value="{{ pp_to }}" pattern="\d{4}-\d{2}-\d{2}"
-                 placeholder="YYYY-MM-DD">
-        </label>
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header bg-body-secondary">
+        <h5 class="mb-0">PayPal</h5>
       </div>
+      <div class="card-body">
 
-      <label>
-        CDP URL (optional)
-        <input type="text" name="cdp_url" value="http://127.0.0.1:9222" placeholder="http://127.0.0.1:9222">
-        <small>Default: http://127.0.0.1:9222</small>
-      </label>
+        <p class="text-muted small mb-3">
+          Start Chrome with remote debugging before clicking the button:
+        </p>
+        <pre class="bg-light p-2 rounded mb-3"><code>{{ chrome_launch_command }}</code></pre>
 
-      {% if paypal_job and not paypal_job.is_terminal() %}
-      <button type="submit" disabled>Running…</button>
-      {% else %}
-      <button type="submit">Start PayPal download</button>
-      {% endif %}
-    </form>
+        <form
+          hx-post="/api/download/paypal"
+          hx-target="#paypal-status"
+          hx-swap="innerHTML"
+          hx-disabled-elt="button[type=submit]">
 
-    <div id="paypal-status">
-      {% if paypal_job %}
-        {% set source = "paypal" %}
-        {% set job = paypal_job %}
-        {% include "_download_status.html" %}
-      {% endif %}
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label for="pp-from" class="form-label">From (YYYY-MM-DD)</label>
+              <input type="text" id="pp-from" class="form-control" name="from_date" value="{{ pp_from }}"
+                     pattern="\d{4}-\d{2}-\d{2}" placeholder="YYYY-MM-DD">
+            </div>
+            <div class="col-md-6">
+              <label for="pp-to" class="form-label">To (YYYY-MM-DD)</label>
+              <input type="text" id="pp-to" class="form-control" name="to_date" value="{{ pp_to }}"
+                     pattern="\d{4}-\d{2}-\d{2}" placeholder="YYYY-MM-DD">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="cdp-url" class="form-label">CDP URL <span class="text-muted">(optional)</span></label>
+            <input type="text" id="cdp-url" class="form-control" name="cdp_url" value="http://127.0.0.1:9222"
+                   placeholder="http://127.0.0.1:9222">
+            <small class="form-text text-muted">Default: http://127.0.0.1:9222</small>
+          </div>
+
+          {% if paypal_job and not paypal_job.is_terminal() %}
+          <button type="submit" class="btn btn-primary" disabled>
+            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+            Running…
+          </button>
+          {% else %}
+          <button type="submit" class="btn btn-primary">Start PayPal download</button>
+          {% endif %}
+        </form>
+      </div>
+      <div id="paypal-status">
+        {% if paypal_job %}
+          {% set source = "paypal" %}
+          {% set job = paypal_job %}
+          {% include "_download_status.html" %}
+        {% endif %}
+      </div>
     </div>
-  </article>
+  </div>
 
 </div>
 {% endblock %}
