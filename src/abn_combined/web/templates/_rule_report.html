@@ -40,6 +40,12 @@
       {% if report.rule_label %}
         <span class="text-muted small">{{ report.rule_label }}</span>
       {% endif %}
+
+      {% if report.is_tag_only %}
+        <span class="badge text-bg-info" title="This rule only applies tags, category is left unchanged">
+          <i class="bi bi-tags"></i> Tag only
+        </span>
+      {% endif %}
     </div>
 
     <!-- Timestamp (right-aligned, muted) -->
@@ -123,14 +129,22 @@
                 <br><code class="text-muted small">{{ item.transaction_id }}</code>
               </td>
               <td class="small">
-                <span class="text-danger">{{ item.old_category or '—' }}</span>
-                <i class="bi bi-arrow-right text-muted"></i>
-                <span class="text-success fw-semibold">{{ item.new_category or '—' }}</span>
+                {% if item.tag_only %}
+                  <span class="badge text-bg-light text-dark border">
+                    <i class="bi bi-tags"></i> Tags added: {{ item.new_tags or '—' }}
+                  </span>
+                {% else %}
+                  <span class="text-danger">{{ item.old_category or '—' }}</span>
+                  <i class="bi bi-arrow-right text-muted"></i>
+                  <span class="text-success fw-semibold">{{ item.new_category or '—' }}</span>
+                {% endif %}
               </td>
               <td class="small">
-                <span class="text-muted">{{ item.old_tags or '—' }}</span>
-                <i class="bi bi-arrow-right text-muted"></i>
-                <span class="text-success fw-semibold">{{ item.new_tags or '—' }}</span>
+                {% if not item.tag_only %}
+                  <span class="text-muted">{{ item.old_tags or '—' }}</span>
+                  <i class="bi bi-arrow-right text-muted"></i>
+                  <span class="text-success fw-semibold">{{ item.new_tags or '—' }}</span>
+                {% endif %}
               </td>
             </tr>
             {% endfor %}

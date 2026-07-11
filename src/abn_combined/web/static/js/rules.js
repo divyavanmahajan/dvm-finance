@@ -1,8 +1,9 @@
 // Alpine component for the rule editor's dynamic condition rows.
 // No build step (Golden Principle 9) — plain function picked up by Alpine.
-function ruleEditor(initialConditions) {
+function ruleEditor(initialConditions, initialTagOnly) {
   return {
     conditions: Array.isArray(initialConditions) ? initialConditions : [],
+    isTagOnly: !!initialTagOnly,
     addCondition() {
       this.conditions.push({
         field_target: "description",

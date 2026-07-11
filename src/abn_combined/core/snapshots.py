@@ -336,9 +336,10 @@ def _apply_rule_data(rule: CategorizationRule, data: dict[str, Any]) -> None:
     rule.match_pattern = data["match_pattern"]
     rule.field_target = data.get("field_target")
     rule.match_value = data["match_value"]
-    rule.category = data["category"]
+    rule.category = data.get("category")
     rule.tags = data.get("tags")
     rule.is_active = data.get("is_active", True)
+    rule.is_tag_only = data.get("is_tag_only", False)
     rule.notes = data.get("notes")
     rule.filter_account = data.get("filter_account")
     rule.filter_currency = data.get("filter_currency")

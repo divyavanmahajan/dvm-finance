@@ -107,6 +107,54 @@ def test_list_empty_state(client, app):
 
 
 # ---------------------------------------------------------------------------
+# Sortable column headers
+# ---------------------------------------------------------------------------
+
+
+def test_list_headers_are_sortable_links(client, seed):
+    r = client.get("/rules")
+    body = r.text
+    assert "sortable-th" in body
+    assert "sort=priority_desc" in body  # default sort is priority_asc
+
+
+def test_sort_by_priority_desc(client, seed):
+    r = client.get("/rules?sort=priority_desc")
+    body = r.text
+    # priority 50 (rent/housing) before priority 10 (albert heijn/groceries)
+    assert body.index(">rent<") < body.index(">albert heijn<")
+
+
+def test_sort_by_category_asc(client, seed):
+    r = client.get("/rules?sort=category_asc")
+    body = r.text
+    # "food:groceries" sorts before "housing" alphabetically
+    assert body.index("food:groceries") < body.index("housing")
+
+
+def test_sort_by_category_desc(client, seed):
+    r = client.get("/rules?sort=category_desc")
+    body = r.text
+    assert body.index("housing") < body.index("food:groceries")
+
+
+def test_sort_by_match_value(client, seed):
+    r = client.get("/rules?sort=match_value_asc")
+    body = r.text
+    # "albert heijn" < "rent" alphabetically
+    assert body.index(">albert heijn<") < body.index(">rent<")
+
+
+def test_sort_toggle_asc_desc_on_repeated_click(client, seed):
+    # priority_asc is the default sort, so its own header link omits `sort=`
+    # entirely (clean URL at the default) while still toggling to desc.
+    r_asc = client.get("/rules?sort=priority_asc")
+    assert "sort=priority_desc" in r_asc.text
+    r_desc = client.get("/rules?sort=priority_desc")
+    assert 'href="/rules"' in r_desc.text  # toggling back to default clears sort=
+
+
+# ---------------------------------------------------------------------------
 # Create
 # ---------------------------------------------------------------------------
 
@@ -148,6 +196,46 @@ def test_create_applies_rules_to_transactions(client, seed):
     t2 = db.get(Transaction, "t2")
     assert t2.category == "housing"
     db.close()
+
+
+def test_create_tag_only_rule_via_form(client, seed):
+    factory, _ = seed
+    data = _form(match_value="albert heijn", category="ignored-should-be-cleared",
+                 tags="brand-ah", is_tag_only="on")
+    r = client.post("/rules", data=data, follow_redirects=False)
+    assert r.status_code == 303
+    db = factory()
+    rule = db.query(CategorizationRule).filter_by(match_value="albert heijn", is_tag_only=True).one()
+    assert rule.is_tag_only is True
+    assert rule.category is None
+    assert rule.tags == "brand-ah"
+    db.close()
+
+
+def test_tag_only_rule_applies_to_manual_transaction_via_recategorize(client, seed):
+    factory, _ = seed
+    # t4 is manual (categorization_source == "manual").
+    client.post("/rules", data=_form(
+        match_value="coffee", category="", tags="drink", is_tag_only="on",
+    ))
+    db = factory()
+    t4 = db.get(Transaction, "t4")
+    assert t4.manual_category == "food:coffee"  # category untouched
+    assert t4.tags == "drink"  # tag-only rule still applied
+    db.close()
+
+
+def test_rules_list_tag_only_tab_filters_rules(client, seed):
+    client.post("/rules", data=_form(
+        match_value="albert heijn", category="", tags="brand-ah", is_tag_only="on",
+    ))
+    r_active = client.get("/rules?tab=active")
+    assert "housing" in r_active.text
+    assert "brand-ah" not in r_active.text
+
+    r_tag_only = client.get("/rules?tab=tag_only")
+    assert "brand-ah" in r_tag_only.text
+    assert "housing" not in r_tag_only.text
 
 
 def test_create_with_conditions(client, seed):

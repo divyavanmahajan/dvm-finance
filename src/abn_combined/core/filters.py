@@ -35,12 +35,37 @@ UNCATEGORIZED = "uncategorized"
 _SORTS: dict[str, tuple[Any, bool]] = {
     "date_desc": (Transaction.transactiondate, True),
     "date_asc": (Transaction.transactiondate, False),
+    "description_desc": (Transaction.description, True),
+    "description_asc": (Transaction.description, False),
     "amount_desc": (Transaction.amount, True),
     "amount_asc": (Transaction.amount, False),
     "category_desc": (func.coalesce(Transaction.manual_category, Transaction.category), True),
     "category_asc": (func.coalesce(Transaction.manual_category, Transaction.category), False),
+    "tags_desc": (func.coalesce(Transaction.manual_tags, Transaction.tags), True),
+    "tags_asc": (func.coalesce(Transaction.manual_tags, Transaction.tags), False),
 }
 DEFAULT_SORT = "date_desc"
+
+# column key -> (asc sort key, desc sort key), for header click-to-sort toggling.
+SORTABLE_COLUMNS: dict[str, tuple[str, str]] = {
+    "date": ("date_asc", "date_desc"),
+    "description": ("description_asc", "description_desc"),
+    "amount": ("amount_asc", "amount_desc"),
+    "category": ("category_asc", "category_desc"),
+    "tags": ("tags_asc", "tags_desc"),
+}
+
+
+def next_sort(current_sort: str, column: str) -> str:
+    """Given the active sort key and a clicked column, return the next sort key.
+
+    Clicking an unsorted column starts it ascending; clicking the already-active
+    column toggles asc <-> desc.
+    """
+    asc_key, desc_key = SORTABLE_COLUMNS[column]
+    if current_sort == asc_key:
+        return desc_key
+    return asc_key
 
 
 def _effective_category_expr():
@@ -235,6 +260,19 @@ class TransactionFilter:
 
     def with_sort(self, sort: str) -> TransactionFilter:
         return replace(self, sort=sort, page=1)
+
+    def sort_url_for_column(self, column: str) -> str:
+        """Query string for clicking the given sortable column's header."""
+        return self.with_sort(next_sort(self.sort, column)).to_query_string()
+
+    def sort_state_for_column(self, column: str) -> str | None:
+        """'asc', 'desc', or None if this column isn't the active sort."""
+        asc_key, desc_key = SORTABLE_COLUMNS[column]
+        if self.sort == asc_key:
+            return "asc"
+        if self.sort == desc_key:
+            return "desc"
+        return None
 
     def without(self, kind: str, value: str | None = None) -> str:
         """Return the query string with one active filter removed."""

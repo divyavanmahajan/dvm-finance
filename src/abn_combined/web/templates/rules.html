@@ -30,21 +30,63 @@
   </div>
 </div>
 
-<div class="card shadow-sm" id="rules-card"
-     hx-get="/rules"
+<ul class="nav nav-tabs mb-0" id="rules-tabs">
+  <li class="nav-item">
+    <a class="nav-link {% if tab != 'tag_only' %}active{% endif %}"
+       href="/rules?tab=active"
+       hx-get="/rules?tab=active"
+       hx-select="#rules-card" hx-target="#rules-card" hx-swap="outerHTML"
+       hx-push-url="/rules?tab=active">
+      Active rules <span class="badge text-bg-secondary ms-1">{{ category_rule_count }}</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'tag_only' %}active{% endif %}"
+       href="/rules?tab=tag_only"
+       hx-get="/rules?tab=tag_only"
+       hx-select="#rules-card" hx-target="#rules-card" hx-swap="outerHTML"
+       hx-push-url="/rules?tab=tag_only">
+      <i class="bi bi-tags"></i> Tag-only rules <span class="badge text-bg-info ms-1">{{ tag_only_rule_count }}</span>
+    </a>
+  </li>
+</ul>
+
+<div class="card shadow-sm rounded-top-0" id="rules-card"
+     hx-get="/rules?tab={{ tab }}"
      hx-trigger="rulesChanged from:body"
      hx-select="#rules-card"
      hx-target="#rules-card"
      hx-swap="outerHTML">
   <div class="table-responsive">
     <table class="table table-hover table-sm align-middle mb-0">
+      {% macro sort_th(column, label, style="") %}
+      {% set state = sort_state_for_column(column) %}
+      {% set qs = sort_url_for_column(column) %}
+      <th class="sortable-th {% if state %}sort-active{% endif %}" style="{{ style }}">
+        <a href="/rules?tab={{ tab }}{% if qs %}&{{ qs }}{% endif %}"
+           hx-get="/rules?tab={{ tab }}{% if qs %}&{{ qs }}{% endif %}"
+           hx-select="#rules-card" hx-target="#rules-card" hx-swap="outerHTML"
+           hx-push-url="/rules?tab={{ tab }}{% if qs %}&{{ qs }}{% endif %}"
+           aria-label="Sort by {{ label }}">
+          {{ label }}
+          {% if state == 'asc' %}<i class="bi bi-chevron-up sort-icon"></i>
+          {% elif state == 'desc' %}<i class="bi bi-chevron-down sort-icon"></i>
+          {% else %}<i class="bi bi-chevron-expand sort-icon"></i>
+          {% endif %}
+        </a>
+      </th>
+      {% endmacro %}
       <thead class="table-light">
         <tr>
-          <th style="width: 5%;">Pri</th>
+          {{ sort_th('priority', 'Pri', 'width: 5%;') }}
           <th style="width: 25%;">Type / Field</th>
-          <th style="width: 30%;">Match</th>
-          <th style="width: 15%;">Category</th>
+          {{ sort_th('match_value', 'Match', 'width: 30%;') }}
+          {% if tab == 'tag_only' %}
+          <th style="width: 15%;">Tags</th>
+          {% else %}
+          {{ sort_th('category', 'Category', 'width: 15%;') }}
           <th class="d-none d-lg-table-cell" style="width: 10%;">Tags</th>
+          {% endif %}
           <th style="width: 8%;">Active</th>
           <th style="width: 8%;">Matches</th>
           <th class="text-end" style="width: 12%;">Actions</th>
@@ -62,9 +104,15 @@
 
   {% if not rules %}
   <div class="card-body text-center py-5">
+    {% if tab == 'tag_only' %}
+    <i class="bi bi-tags display-4 text-muted d-block mb-3"></i>
+    <p class="lead text-muted mb-3">No tag-only rules yet</p>
+    <p class="text-muted small mb-3">Tag-only rules apply tags without changing the category, even on manually categorized transactions.</p>
+    {% else %}
     <i class="bi bi-sliders display-4 text-muted d-block mb-3"></i>
     <p class="lead text-muted mb-3">No rules yet</p>
     <p class="text-muted small mb-3">Create your first rule to automatically categorize transactions.</p>
+    {% endif %}
     <a href="/rules/create" class="btn btn-primary">
       <i class="bi bi-plus-lg"></i> Create your first rule
     </a>

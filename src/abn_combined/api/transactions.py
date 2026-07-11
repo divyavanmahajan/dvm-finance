@@ -12,10 +12,12 @@ import json
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..core.filters import (
     TransactionFilter,
+    build_query,
     effective_category,
     effective_tags,
     is_manual,
@@ -107,6 +109,21 @@ def _rule_for_source(db: Session, source: str | None) -> CategorizationRule | No
     return db.get(CategorizationRule, rid)
 
 
+def _summary_stats(db: Session, f: TransactionFilter) -> dict:
+    """Aggregate count/total over the *full* filtered set (not just the current page)."""
+    base = build_query(db, f).order_by(None)
+    total_amount, min_date, max_date = base.with_entities(
+        func.coalesce(func.sum(Transaction.amount), 0),
+        func.min(Transaction.transactiondate),
+        func.max(Transaction.transactiondate),
+    ).one()
+    return {
+        "total_amount": float(total_amount or 0),
+        "date_from": min_date,
+        "date_to": max_date,
+    }
+
+
 def _table_context(request: Request, db: Session, f: TransactionFilter) -> dict:
     page = paginate(db, f)
     return {
@@ -116,6 +133,7 @@ def _table_context(request: Request, db: Session, f: TransactionFilter) -> dict:
         "page": page,
         "rows": [_row_view(t) for t in page.items],
         "chips": f.active_chips(),
+        "summary": _summary_stats(db, f),
     }
 
 
