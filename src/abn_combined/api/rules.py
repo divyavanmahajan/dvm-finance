@@ -42,6 +42,59 @@ VALID_RULE_TYPES = ["keyword", "account_iban", "structured_field", "full_descrip
 VALID_PATTERNS = ["contains", "exact", "starts_with", "ends_with", "regex"]
 VALID_OPERATORS = ["AND", "OR"]
 
+# sort key -> (column, descending)
+#
+# NB: CategorizationRule has no `updated_at` column (no migration for it), so
+# "Updated" sort isn't offered here — only columns that already exist on the
+# model are sortable (Golden Principle: schema changes via Alembic only).
+_RULE_SORTS: dict[str, tuple[Any, bool]] = {
+    "priority_asc": (CategorizationRule.priority, False),
+    "priority_desc": (CategorizationRule.priority, True),
+    "category_asc": (CategorizationRule.category, False),
+    "category_desc": (CategorizationRule.category, True),
+    "match_value_asc": (CategorizationRule.match_value, False),
+    "match_value_desc": (CategorizationRule.match_value, True),
+}
+DEFAULT_RULE_SORT = "priority_asc"
+
+# column key -> (asc sort key, desc sort key), for header click-to-sort toggling.
+RULE_SORTABLE_COLUMNS: dict[str, tuple[str, str]] = {
+    "priority": ("priority_asc", "priority_desc"),
+    "category": ("category_asc", "category_desc"),
+    "match_value": ("match_value_asc", "match_value_desc"),
+}
+
+
+def _parse_rule_sort(value: str | None) -> str:
+    if value in _RULE_SORTS:
+        return value
+    return DEFAULT_RULE_SORT
+
+
+def _next_rule_sort(current_sort: str, column: str) -> str:
+    asc_key, desc_key = RULE_SORTABLE_COLUMNS[column]
+    if current_sort == asc_key:
+        return desc_key
+    return asc_key
+
+
+def rule_sort_url_for_column(current_sort: str, column: str) -> str:
+    from urllib.parse import urlencode
+
+    next_sort = _next_rule_sort(current_sort, column)
+    if next_sort == DEFAULT_RULE_SORT:
+        return ""
+    return urlencode({"sort": next_sort})
+
+
+def rule_sort_state_for_column(current_sort: str, column: str) -> str | None:
+    asc_key, desc_key = RULE_SORTABLE_COLUMNS[column]
+    if current_sort == asc_key:
+        return "asc"
+    if current_sort == desc_key:
+        return "desc"
+    return None
+
 # Common structured-description fields offered in field-target datalists.
 FIELD_TARGET_SUGGESTIONS = [
     "description", "name", "iban", "payer_iban", "merchant_name", "merchant_code",
@@ -79,6 +132,7 @@ class DraftRule:
     tags: str | None = None
     priority: int = 100
     is_active: bool = True
+    is_tag_only: bool = False
     notes: str | None = None
     filter_account: str | None = None
     filter_currency: str | None = None
@@ -117,6 +171,7 @@ async def _parse_rule_form(request: Request) -> dict[str, Any]:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="priority must be an integer") from exc
     vm["is_active"] = form.get("is_active") in ("on", "true", "1", "True")
+    vm["is_tag_only"] = form.get("is_tag_only") in ("on", "true", "1", "True")
 
     fields = form.getlist("cond_field_target")
     patterns = form.getlist("cond_match_pattern")
@@ -153,7 +208,10 @@ def _validate_vm(vm: dict[str, Any], require_category: bool = True) -> list[str]
         errors.append(f"match_pattern must be one of: {', '.join(VALID_PATTERNS)}")
     if not vm["match_value"]:
         errors.append("match_value is required")
-    if require_category and not vm["category"]:
+    if vm.get("is_tag_only"):
+        if not vm.get("tags"):
+            errors.append("tags is required for a tag-only rule")
+    elif require_category and not vm["category"]:
         errors.append("category is required")
     for i, cond in enumerate(vm["conditions"]):
         if not cond["field_target"] or not cond["match_value"]:
@@ -177,10 +235,14 @@ def _vm_to_draft(vm: dict[str, Any], rule_id: int | None = None) -> DraftRule:
         match_pattern=vm["match_pattern"],
         field_target=vm["field_target"] or None,
         match_value=vm["match_value"],
-        category=normalize_category(vm["category"]) or vm["category"] or None,
+        category=(
+            None if vm.get("is_tag_only")
+            else normalize_category(vm["category"]) or vm["category"] or None
+        ),
         tags=vm["tags"] or None,
         priority=vm["priority"],
         is_active=vm["is_active"],
+        is_tag_only=vm.get("is_tag_only", False),
         notes=vm["notes"] or None,
         filter_account=vm["filter_account"] or None,
         filter_currency=vm["filter_currency"] or None,
@@ -222,7 +284,11 @@ def _apply_vm_to_rule(rule: CategorizationRule, vm: dict[str, Any]) -> None:
     rule.match_pattern = vm["match_pattern"]
     rule.field_target = vm["field_target"] or None
     rule.match_value = vm["match_value"]
-    rule.category = normalize_category(vm["category"]) or vm["category"]
+    rule.is_tag_only = vm.get("is_tag_only", False)
+    rule.category = (
+        None if rule.is_tag_only
+        else normalize_category(vm["category"]) or vm["category"]
+    )
     rule.tags = vm["tags"] or None
     rule.is_active = vm["is_active"]
     rule.notes = vm["notes"] or None
@@ -255,6 +321,7 @@ def _rule_to_vm(rule: CategorizationRule) -> dict[str, Any]:
         "category": rule.category or "",
         "tags": rule.tags or "",
         "is_active": rule.is_active,
+        "is_tag_only": rule.is_tag_only,
         "notes": rule.notes or "",
         "filter_account": rule.filter_account or "",
         "filter_currency": rule.filter_currency or "",
@@ -366,8 +433,8 @@ def _render_editor(request: Request, db: Session, vm: dict[str, Any], *,
 
 _SNAPSHOT_DIFF_FIELDS = [
     "priority", "rule_type", "match_pattern", "field_target", "match_value",
-    "category", "tags", "is_active", "notes", "filter_account", "filter_currency",
-    "filter_date_from", "filter_date_to", "conditions",
+    "category", "tags", "is_active", "is_tag_only", "notes", "filter_account",
+    "filter_currency", "filter_date_from", "filter_date_to", "conditions",
 ]
 
 
@@ -406,7 +473,11 @@ def _report_vm(db: Session, report: RuleChangeReport) -> dict[str, Any]:
     same ``_rule_report.html`` partial by building the same shape.
     """
     snap = report.rule_after or report.rule_before or {}
-    label = snap.get("category") or snap.get("match_value") or ""
+    is_tag_only = bool(snap.get("is_tag_only"))
+    label = (
+        (f"Tags: {snap.get('tags')}" if is_tag_only else snap.get("category"))
+        or snap.get("match_value") or ""
+    )
     txn_ids = [i.transaction_id for i in report.items]
     txns = {}
     if txn_ids:
@@ -424,6 +495,7 @@ def _report_vm(db: Session, report: RuleChangeReport) -> dict[str, Any]:
             "new_category": i.new_category,
             "old_tags": i.old_tags,
             "new_tags": i.new_tags,
+            "tag_only": i.old_category == i.new_category and i.old_tags != i.new_tags,
         }
         for i in report.items
     ]
@@ -434,6 +506,7 @@ def _report_vm(db: Session, report: RuleChangeReport) -> dict[str, Any]:
         "rule_id": report.rule_id,
         "rule_uuid": report.rule_uuid,
         "rule_label": label,
+        "is_tag_only": is_tag_only,
         "diff": _snapshot_diff(report.rule_before, report.rule_after),
         "summary": report.summary or {},
         # NB: named txn_changes (not "items") — dicts expose .items as a method in Jinja.
@@ -454,13 +527,24 @@ def _row_context(request: Request, db: Session, rule: CategorizationRule) -> dic
     }
 
 
+def _parse_rule_tab(value: str | None) -> str:
+    return "tag_only" if value == "tag_only" else "active"
+
+
 @router.get("/rules", response_class=HTMLResponse, include_in_schema=False)
 def rules_list(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
-    rules = (
+    sort = _parse_rule_sort(request.query_params.get("sort"))
+    tab = _parse_rule_tab(request.query_params.get("tab"))
+    column, descending = _RULE_SORTS[sort]
+    order = column.desc() if descending else column.asc()
+    all_rules = (
         db.query(CategorizationRule)
-        .order_by(CategorizationRule.priority.asc(), CategorizationRule.id.asc())
+        .order_by(order, CategorizationRule.id.asc())
         .all()
     )
+    category_rules = [r for r in all_rules if not r.is_tag_only]
+    tag_only_rules = [r for r in all_rules if r.is_tag_only]
+    rules = tag_only_rules if tab == "tag_only" else category_rules
     counts = _matched_counts(db)
     ctx = {
         "request": request,
@@ -468,6 +552,12 @@ def rules_list(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
         "title": "Rules",
         "rules": rules,
         "counts": counts,
+        "sort": sort,
+        "tab": tab,
+        "category_rule_count": len(category_rules),
+        "tag_only_rule_count": len(tag_only_rules),
+        "sort_url_for_column": lambda col: rule_sort_url_for_column(sort, col),
+        "sort_state_for_column": lambda col: rule_sort_state_for_column(sort, col),
     }
     return _templates(request).TemplateResponse(request, "rules.html", ctx)
 

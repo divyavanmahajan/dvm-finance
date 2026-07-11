@@ -49,6 +49,7 @@ def blank_rule_vm() -> dict[str, Any]:
         "category": "",
         "tags": "",
         "is_active": True,
+        "is_tag_only": False,
         "notes": "",
         "filter_account": "",
         "filter_currency": "",

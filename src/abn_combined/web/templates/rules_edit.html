@@ -13,6 +13,9 @@
           {% if vm.is_active %}Active{% else %}Inactive{% endif %}
         </span>
         {% endif %}
+        <span class="badge text-bg-info" x-show="isTagOnly" style="display: none;">
+          <i class="bi bi-tags"></i> Tag only
+        </span>
       </h1>
       <p class="text-muted small mb-0">Use "Preview matches" to dry-run the draft before saving - nothing is written until you save, and every save is recorded in History.</p>
     </div>
@@ -37,7 +40,7 @@
         action="{% if vm.id %}/rules/{{ vm.id }}{% else %}/rules{% endif %}"
         hx-post="{% if vm.id %}/rules/{{ vm.id }}{% else %}/rules{% endif %}"
         hx-target="body" hx-swap="outerHTML"
-        x-data='ruleEditor({{ vm.conditions | tojson }})'>
+        x-data='ruleEditor({{ vm.conditions | tojson }}, {{ vm.is_tag_only | tojson }})'>
 
     {% if vm.id %}<input type="hidden" name="rule_id" value="{{ vm.id }}">{% endif %}
 
@@ -165,9 +168,23 @@
           <div class="card-body">
             <div class="row g-3">
               <div class="col-12">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="is_tag_only" name="is_tag_only"
+                         value="1" x-model="isTagOnly"
+                         {% if vm.is_tag_only %}checked{% endif %}>
+                  <label class="form-check-label" for="is_tag_only">
+                    Only apply tags (skip category change)
+                  </label>
+                  <div class="form-text">
+                    Tag-only rules apply after all category rules, in addition to every other
+                    matching tag-only rule — even on manually categorized transactions.
+                  </div>
+                </div>
+              </div>
+              <div class="col-12" x-show="!isTagOnly">
                 <label class="form-label" for="category">Category</label>
                 <input type="text" id="category" name="category" class="form-control"
-                       list="known-categories" value="{{ vm.category }}" required>
+                       list="known-categories" value="{{ vm.category }}" :required="!isTagOnly">
                 <datalist id="known-categories">
                   {% for c in categories %}<option value="{{ c }}"></option>{% endfor %}
                 </datalist>
@@ -176,7 +193,7 @@
                 <label class="form-label" for="tags">Tags</label>
                 <input type="text" id="tags" name="tags" class="form-control"
                        value="{{ vm.tags }}"
-                       placeholder="comma-separated">
+                       placeholder="comma-separated" :required="isTagOnly">
                 <div class="form-text">Comma-separated tags to apply to matched transactions</div>
               </div>
               <div class="col-12">

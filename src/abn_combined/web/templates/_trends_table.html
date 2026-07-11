@@ -14,16 +14,33 @@
   <td class="num total {% if value < 0 %}neg{% else %}pos{% endif %}">{{ '%.2f'|format(value) }}</td>
 {%- endmacro %}
 
+{% macro sort_th(column, label, extra_class="") %}
+{% set state = params.sort_state_for_column(column) %}
+<th class="sortable-th {{ extra_class }} {% if state %}sort-active{% endif %}">
+  <a href="/trends/table?{{ params.sort_url_for_column(column) }}"
+     hx-get="/trends/table?{{ params.sort_url_for_column(column) }}"
+     hx-target="#trends-table" hx-swap="innerHTML"
+     hx-push-url="/trends?{{ params.sort_url_for_column(column) }}"
+     aria-label="Sort by {{ label }}">
+    {{ label }}
+    {% if state == 'asc' %}<i class="bi bi-chevron-up sort-icon"></i>
+    {% elif state == 'desc' %}<i class="bi bi-chevron-down sort-icon"></i>
+    {% else %}<i class="bi bi-chevron-expand sort-icon"></i>
+    {% endif %}
+  </a>
+</th>
+{% endmacro %}
+
 {% if table.rows %}
 <div class="trends-scroll">
   <table class="trends-table">
     <thead>
       <tr>
-        <th class="cat-col">Category</th>
+        {{ sort_th('category', 'Category', 'cat-col') }}
         {% for period in table.periods %}
         <th class="num">{{ period.label }}</th>
         {% endfor %}
-        <th class="num total-col">Total</th>
+        {{ sort_th('total', 'Total', 'num total-col') }}
       </tr>
     </thead>
     {% for row in table.rows %}
