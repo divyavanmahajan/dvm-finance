@@ -10,3 +10,4 @@ dist/
 data/
 *.db
 .DS_Store
+.chrome/
