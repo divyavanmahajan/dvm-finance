@@ -33,6 +33,7 @@ ruff check .                        # lint gate
 - Manual categorizations are never overwritten by rule reapplication; only snapshot import may (explicitly, audited).
 - Every rule mutation goes through `record_rule_change` — no silent recategorization.
 - Schema changes via Alembic only. Filter state lives in the URL. No JS build step. No LLM/MCP/auth/charts/Docker.
+- **Never mention Claude, Anthropic, or model names in commit messages, PR titles, or PR descriptions.**
 
 ## Tag-only rules (v1.1.0+)
 
