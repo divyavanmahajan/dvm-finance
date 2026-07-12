@@ -1,9 +1,12 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [tool.hatch.version]
-path = "src/abn_combined/__init__.py"
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/abn_combined/_version.py"
 
 [project]
 name = "dvm-finance"
@@ -49,6 +52,8 @@ dev = [
     "ruff",
     "playwright",
     "pytest-playwright",
+    "hatch-vcs",
+    "build",
 ]
 
 [project.urls]

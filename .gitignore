@@ -11,3 +11,4 @@ data/
 *.db
 .DS_Store
 .chrome/
+src/abn_combined/_version.py
