@@ -15,9 +15,10 @@ jobs:
           python-version: "3.12"
       - name: Verify tag matches package version
         run: |
-          PKG_VERSION=$(python -c "import re; \
-            f=open('src/abn_combined/__init__.py').read(); \
-            print(re.search(r'__version__\s*=\s*\"([^\"]+)\"', f).group(1))")
+          PKG_VERSION=$(python -c "import ast; \
+            with open('src/abn_combined/__init__.py') as f: \
+              tree = ast.parse(f.read()); \
+              print([n.value.value for n in ast.walk(tree) if isinstance(n, ast.Assign) and isinstance(n.targets[0], ast.Name) and n.targets[0].id == '__version__'][0])")
           TAG_VERSION="${GITHUB_REF_NAME#v}"
           if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
             echo "Tag $TAG_VERSION != package version $PKG_VERSION"; exit 1
