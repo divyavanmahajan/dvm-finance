@@ -1,0 +1,177 @@
+{
+  "import_counts": {
+    "transactions": {
+      "inserted": 2,
+      "updated": 1,
+      "unchanged": 0
+    },
+    "rules": {
+      "inserted": 1,
+      "updated": 1,
+      "unchanged": 0
+    },
+    "budgets": {
+      "inserted": 1,
+      "updated": 0,
+      "unchanged": 0
+    },
+    "rule_change_reports": {
+      "inserted": 1,
+      "updated": 0,
+      "unchanged": 0
+    }
+  },
+  "overwrites": {
+    "transactions": [
+      {
+        "id": "t1",
+        "fields": {
+          "valuedate": {
+            "local": null,
+            "incoming": "2026-01-15"
+          },
+          "startsaldo": {
+            "local": null,
+            "incoming": "1000.00"
+          },
+          "endsaldo": {
+            "local": null,
+            "incoming": "987.70"
+          },
+          "description_structured": {
+            "local": null,
+            "incoming": "{\"merchant\": \"Albert Heijn\"}"
+          },
+          "category": {
+            "local": null,
+            "incoming": "groceries-ah"
+          },
+          "manual_category": {
+            "local": "local-manual",
+            "incoming": null
+          },
+          "tags": {
+            "local": null,
+            "incoming": "food"
+          },
+          "categorization_source": {
+            "local": "manual",
+            "incoming": "7"
+          },
+          "source_file": {
+            "local": null,
+            "incoming": "jan.sta"
+          },
+          "source_line": {
+            "local": null,
+            "incoming": 3
+          },
+          "transaction_hash": {
+            "local": null,
+            "incoming": "abc"
+          }
+        }
+      }
+    ],
+    "rules": [
+      {
+        "uuid": "11111111-1111-1111-1111-111111111111",
+        "fields": {
+          "priority": {
+            "local": 99,
+            "incoming": 10
+          },
+          "match_value": {
+            "local": "old value",
+            "incoming": "albert heijn"
+          },
+          "category": {
+            "local": "old-cat",
+            "incoming": "groceries-ah"
+          },
+          "tags": {
+            "local": null,
+            "incoming": "food"
+          },
+          "is_active": {
+            "local": false,
+            "incoming": true
+          },
+          "notes": {
+            "local": null,
+            "incoming": "ah rule"
+          },
+          "conditions": {
+            "local": [],
+            "incoming": [
+              {
+                "field_target": "merchant",
+                "match_pattern": "contains",
+                "match_value": "albert",
+                "operator": "AND",
+                "sort_order": 0
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "budgets": []
+  },
+  "final_state": {
+    "transactions": [
+      {
+        "id": "t-local",
+        "category": null,
+        "manual_category": null,
+        "tags": null,
+        "manual_tags": null,
+        "categorization_source": null
+      },
+      {
+        "id": "t1",
+        "category": "groceries-ah",
+        "manual_category": null,
+        "tags": "food",
+        "manual_tags": null,
+        "categorization_source": "7"
+      },
+      {
+        "id": "t2",
+        "category": null,
+        "manual_category": "entertainment",
+        "tags": null,
+        "manual_tags": "fun",
+        "categorization_source": "manual"
+      },
+      {
+        "id": "t3",
+        "category": null,
+        "manual_category": null,
+        "tags": null,
+        "manual_tags": null,
+        "categorization_source": null
+      }
+    ],
+    "rules": [
+      {
+        "id": 7,
+        "uuid": "11111111-1111-1111-1111-111111111111",
+        "priority": 10,
+        "match_value": "albert heijn",
+        "category": "groceries-ah",
+        "is_active": true,
+        "n_conditions": 1
+      },
+      {
+        "id": 8,
+        "uuid": "22222222-2222-2222-2222-222222222222",
+        "priority": 100,
+        "match_value": "subscription",
+        "category": null,
+        "is_active": true,
+        "n_conditions": 0
+      }
+    ]
+  }
+}

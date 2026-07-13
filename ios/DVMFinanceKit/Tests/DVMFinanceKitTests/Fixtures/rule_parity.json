@@ -1,0 +1,309 @@
+{
+  "match_matrix": {
+    "transactions": [
+      {
+        "description": "BEA, Betaalpas Albert Heijn 1234,PAS123",
+        "description_structured": null,
+        "accountNumber": "NL91",
+        "currency": "EUR",
+        "transactiondate": "2026-01-15"
+      },
+      {
+        "description": "SEPA Overboeking IBAN: NL91ABNA0417164300 Naam: J Doe",
+        "description_structured": "{\"iban\": \"NL91ABNA0417164300\", \"name\": \"J Doe\", \"recurring\": true}",
+        "accountNumber": "NL91",
+        "currency": "EUR",
+        "transactiondate": "2026-02-01"
+      },
+      {
+        "description": "WERO/Payment To John",
+        "description_structured": null,
+        "accountNumber": "NL02",
+        "currency": "USD",
+        "transactiondate": "2025-06-01"
+      },
+      {
+        "description": "Netflix subscription 12.99",
+        "description_structured": "{\"merchant\": \"Netflix\", \"kind\": \"subscription\"}",
+        "accountNumber": "NL91",
+        "currency": "EUR",
+        "transactiondate": "2026-03-10"
+      }
+    ],
+    "rules": [
+      {
+        "rule": "contains_desc",
+        "matches": [
+          true,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "rule": "exact_norm",
+        "matches": [
+          false,
+          false,
+          true,
+          false
+        ]
+      },
+      {
+        "rule": "starts_with",
+        "matches": [
+          true,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "rule": "ends_with",
+        "matches": [
+          true,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "rule": "regex_ok",
+        "matches": [
+          true,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "rule": "regex_on_normalized",
+        "matches": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "rule": "regex_invalid",
+        "matches": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "rule": "structured_field",
+        "matches": [
+          false,
+          false,
+          false,
+          true
+        ]
+      },
+      {
+        "rule": "structured_bool",
+        "matches": [
+          false,
+          true,
+          false,
+          false
+        ]
+      },
+      {
+        "rule": "structured_missing",
+        "matches": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "rule": "iban_exact",
+        "matches": [
+          false,
+          true,
+          false,
+          false
+        ]
+      },
+      {
+        "rule": "iban_ends",
+        "matches": [
+          false,
+          true,
+          false,
+          false
+        ]
+      },
+      {
+        "rule": "iban_from_desc_regex",
+        "matches": [
+          false,
+          true,
+          false,
+          false
+        ]
+      },
+      {
+        "rule": "iban_desc_target",
+        "matches": [
+          false,
+          true,
+          false,
+          false
+        ]
+      },
+      {
+        "rule": "cond_and_true",
+        "matches": [
+          false,
+          false,
+          false,
+          true
+        ]
+      },
+      {
+        "rule": "cond_and_false",
+        "matches": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "rule": "cond_or_rescue",
+        "matches": [
+          false,
+          false,
+          false,
+          true
+        ]
+      },
+      {
+        "rule": "filter_account_match",
+        "matches": [
+          true,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "rule": "filter_account_miss",
+        "matches": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "rule": "filter_currency",
+        "matches": [
+          false,
+          false,
+          true,
+          false
+        ]
+      },
+      {
+        "rule": "filter_date_window",
+        "matches": [
+          true,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "rule": "filter_date_excludes",
+        "matches": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "rule": "no_structured_no_field",
+        "matches": [
+          false,
+          false,
+          false,
+          true
+        ]
+      }
+    ]
+  },
+  "apply_rules_scenario": {
+    "changes": [
+      {
+        "id": "t1",
+        "old_category": null,
+        "new_category": "groceries-ah",
+        "old_tags": null,
+        "new_tags": "food"
+      },
+      {
+        "id": "t2",
+        "old_category": null,
+        "new_category": "entertainment",
+        "old_tags": null,
+        "new_tags": "recurring,large,video"
+      },
+      {
+        "id": "t3",
+        "old_category": "old-cat",
+        "new_category": "old-cat",
+        "old_tags": "old-tag",
+        "new_tags": "old-tag,recurring,large,video"
+      },
+      {
+        "id": "t4",
+        "old_category": "stale",
+        "new_category": null,
+        "old_tags": "staletag",
+        "new_tags": null
+      }
+    ],
+    "final": [
+      {
+        "id": "t1",
+        "category": "groceries-ah",
+        "manual_category": null,
+        "tags": "food",
+        "manual_tags": null,
+        "categorization_source": "1"
+      },
+      {
+        "id": "t2",
+        "category": "entertainment",
+        "manual_category": null,
+        "tags": "recurring,large,video",
+        "manual_tags": null,
+        "categorization_source": "2"
+      },
+      {
+        "id": "t3",
+        "category": "old-cat",
+        "manual_category": "entertainment-manual",
+        "tags": "old-tag,recurring,large,video",
+        "manual_tags": "keep",
+        "categorization_source": "manual"
+      },
+      {
+        "id": "t4",
+        "category": null,
+        "manual_category": null,
+        "tags": null,
+        "manual_tags": null,
+        "categorization_source": null
+      }
+    ]
+  }
+}
