@@ -91,8 +91,11 @@ field-for-field mapping.
 Key invariants (identical to desktop):
 
 - Effective category = `manual_category ?? category`; same for tags.
-- Amounts and saldi are stored as `Decimal` (SQLite TEXT/NUMERIC via GRDB
-  `Decimal` handling); snapshot serialization uses decimal **strings**.
+- Amounts and saldi are stored as `Decimal` in Swift records; snapshot
+  serialization uses decimal **strings with exactly two decimal places**
+  (`"-12.30"`, `"1000.00"`) — the desktop DB round-trips floats through
+  SQLAlchemy `Numeric(15, 2)`, so exported values are always 2-decimal
+  quantized. iOS export must format the same way.
 - Dates are ISO-8601 `yyyy-MM-dd` strings in snapshots; `DATE` in SQLite.
 - `rule_change_reports.rule_before/rule_after/summary` and
   `snapshot_imports.counts/overwrites` are JSON `TEXT` columns.
@@ -124,9 +127,16 @@ behavior, verified by tests that reuse the Python test fixtures.
   `"\(account)_\(date)_\(amount)_\(md5(description)[0..<16])"`.
   **MD5 hex, first 16 chars, of the UTF-8 description** — must match Python's
   `hashlib.md5(...).hexdigest()[:16]`. The `date` and `amount` components are
-  Python `str()` renderings: date as `yyyy-MM-dd`, amount as the parser
-  produced it (see plan: parsers must carry the string form so ids stay
-  stable — Python renders `Decimal("12.30")` as `"12.30"`).
+  Python `str()` renderings: date as `yyyy-MM-dd`; amount as `str(float)` —
+  the Python parsers produce **float** amounts, so `-12.30` renders as
+  `"-12.3"` and `5` as `"5.0"` inside ids (verified against the real
+  pipeline; see `Tests/Fixtures/parity.json`,
+  `transaction_id_float_amounts`). Swift parsers therefore parse amounts as
+  `Double` and render the id component with Swift's shortest-round-trip
+  `String(describing:)`, which matches Python's `repr(float)` for all
+  realistic monetary values; the parity fixtures guard this. Ids are computed
+  once at import and stored — they are never recomputed later, so DB storage
+  precision is a separate concern from id stability.
 - `checkDuplicates`: in-batch dedup first (first occurrence wins), then
   against existing DB ids. `insertTransactions` = upsert (merge semantics),
   applies `normalizeCategory` to category fields, computes
