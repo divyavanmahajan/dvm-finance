@@ -1,0 +1,18 @@
+# Generated Xcode project — regenerate with `xcodegen generate`.
+*.xcodeproj
+
+# Xcode user state (breakpoints, window layout, per-user scheme state).
+xcuserdata/
+
+# Build artifacts.
+DerivedData/
+.build/
+*.moved-aside
+*.xccheckout
+*.xcscmblueprint
+
+# Swift Package Manager local state.
+.swiftpm/
+
+# macOS
+.DS_Store

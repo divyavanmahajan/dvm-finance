@@ -70,9 +70,13 @@ extraction — required for rule parity), `mt940.py`, `csv.py` (ABN),
 `paypal.py`, `wise.py`, `seb.py`, and the format-detection entry point used
 by the upload API. Skip `xls.py` (backlog: CoreXLSX).
 
-Numeric fidelity: parse amounts as `Decimal` from the exact source string;
-keep the string rendering used in transaction ids identical to Python's
-`str(Decimal(...))` (no trailing-zero changes, no float round-trip).
+Numeric fidelity: the Python parsers produce **float** amounts and
+transaction ids embed `str(float)` (`"-12.3"`, `"5.0"`). Swift parsers parse
+amounts as `Double` and the id component uses Swift's shortest-round-trip
+`String(describing: Double)`, which agrees with Python `repr(float)` for
+monetary values — the checked-in parity fixtures
+(`transaction_id_float_amounts`) are the guard. Convert to `Decimal` only
+when constructing the DB record, after the id is computed.
 
 **Fixtures**: copy/derive the statement fixtures the Python tests use into
 `Tests/Fixtures/`; for each format assert transaction count, first/last
