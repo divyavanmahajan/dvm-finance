@@ -9,6 +9,8 @@ struct DVMFinanceApp: App {
         WindowGroup {
             RootTabView()
                 .environment(\.appDatabase, appEnvironment.database)
+                .environment(\.appDataDirectory, appEnvironment.dataDirectory)
+                .environment(\.appDatabaseURL, appEnvironment.databaseURL)
         }
     }
 }

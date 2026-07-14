@@ -13,10 +13,22 @@ import DVMFinanceKit
 @MainActor
 final class AppEnvironment: ObservableObject {
     let database: AppDatabase
+    /// `Application Support/DVMFinance` — also `SnapshotExporter`'s
+    /// `dataDirectory` (its `snapshots/` subdirectory holds exports) and
+    /// `MachineID`'s marker-file directory. Exposed so the Import screen
+    /// doesn't have to re-derive this path itself.
+    let dataDirectory: URL
+    /// The live SQLite file backing `database` — `SnapshotImporter.importSnapshot`
+    /// needs this to back up the file before merging.
+    let databaseURL: URL
 
     init() {
         do {
-            self.database = try AppEnvironment.makeLiveDatabase()
+            let directory = try AppEnvironment.makeDataDirectory()
+            let url = directory.appendingPathComponent("dvm_finance.sqlite")
+            self.dataDirectory = directory
+            self.databaseURL = url
+            self.database = try AppDatabase.live(at: url)
         } catch {
             // Phase A has no UI to surface a database-open failure, and a
             // broken database connection means the app has nothing useful
@@ -26,7 +38,7 @@ final class AppEnvironment: ObservableObject {
         }
     }
 
-    private static func makeLiveDatabase() throws -> AppDatabase {
+    private static func makeDataDirectory() throws -> URL {
         let fileManager = FileManager.default
         let supportDirectory = try fileManager.url(
             for: .applicationSupportDirectory,
@@ -38,8 +50,7 @@ final class AppEnvironment: ObservableObject {
         if !fileManager.fileExists(atPath: appDirectory.path) {
             try fileManager.createDirectory(at: appDirectory, withIntermediateDirectories: true)
         }
-        let databaseURL = appDirectory.appendingPathComponent("dvm_finance.sqlite")
-        return try AppDatabase.live(at: databaseURL)
+        return appDirectory
     }
 }
 
@@ -47,9 +58,27 @@ private struct AppDatabaseKey: EnvironmentKey {
     static let defaultValue: AppDatabase? = nil
 }
 
+private struct AppDataDirectoryKey: EnvironmentKey {
+    static let defaultValue: URL? = nil
+}
+
+private struct AppDatabaseURLKey: EnvironmentKey {
+    static let defaultValue: URL? = nil
+}
+
 extension EnvironmentValues {
     var appDatabase: AppDatabase? {
         get { self[AppDatabaseKey.self] }
         set { self[AppDatabaseKey.self] = newValue }
+    }
+
+    var appDataDirectory: URL? {
+        get { self[AppDataDirectoryKey.self] }
+        set { self[AppDataDirectoryKey.self] = newValue }
+    }
+
+    var appDatabaseURL: URL? {
+        get { self[AppDatabaseURLKey.self] }
+        set { self[AppDatabaseURLKey.self] = newValue }
     }
 }
