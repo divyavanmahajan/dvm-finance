@@ -39,6 +39,7 @@ from .categorizer import rule_snapshot
 from .models import (
     Budget,
     CategorizationRule,
+    ExportState,
     RuleChangeItem,
     RuleChangeReport,
     RuleCondition,
@@ -80,6 +81,7 @@ def get_machine_id(data_dir: Path) -> str:
 
 _TXN_COLUMNS = [c.name for c in Transaction.__table__.columns]
 _TXN_DATE_COLUMNS = {"transactiondate", "valuedate"}
+_TXN_DATETIME_COLUMNS = {"updated_at"}
 _TXN_NUMERIC_COLUMNS = {"startsaldo", "endsaldo", "amount"}
 
 
@@ -137,17 +139,37 @@ def _report_dict(report: RuleChangeReport) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def build_snapshot(db: Session, machine_id: str) -> dict[str, Any]:
-    """Serialise the full dataset into the (JSON-safe) snapshot payload."""
+def build_snapshot(
+    db: Session, machine_id: str, since: datetime | None = None
+) -> dict[str, Any]:
+    """Serialise the dataset into the (JSON-safe) snapshot payload.
+
+    When ``since`` is provided this is a **delta** snapshot: the ``transactions``
+    array is limited to rows whose ``updated_at >= since`` (rows never touched
+    since this column was added — ``updated_at IS NULL`` — are excluded), and
+    the header carries ``"delta": true`` and ``"since": "<iso8601>"`` so the
+    file is self-describing. The format is otherwise identical to a full
+    snapshot (same header/entity shape), and rules/budgets/reports are still
+    exported in full — the import path is unchanged (incoming-wins per present
+    transaction row, never deleting absent local rows), so a delta is just "a
+    snapshot with fewer transactions".
+    """
+    header: dict[str, Any] = {
+        "schema_version": SCHEMA_VERSION,
+        "exported_at": datetime.now().isoformat(timespec="seconds"),
+        "machine_id": machine_id,
+    }
+    txn_query = db.query(Transaction)
+    if since is not None:
+        header["delta"] = True
+        header["since"] = since.isoformat(timespec="seconds")
+        txn_query = txn_query.filter(Transaction.updated_at.isnot(None)).filter(
+            Transaction.updated_at >= since
+        )
     return {
-        "header": {
-            "schema_version": SCHEMA_VERSION,
-            "exported_at": datetime.now().isoformat(timespec="seconds"),
-            "machine_id": machine_id,
-        },
+        "header": header,
         "transactions": [
-            _txn_dict(t)
-            for t in db.query(Transaction).order_by(Transaction.id.asc()).all()
+            _txn_dict(t) for t in txn_query.order_by(Transaction.id.asc()).all()
         ],
         "rules": [
             rule_snapshot(r)
@@ -167,17 +189,46 @@ def build_snapshot(db: Session, machine_id: str) -> dict[str, Any]:
     }
 
 
-def export_snapshot(db: Session, data_dir: Path) -> Path:
-    """Write a gzipped snapshot to ``<data_dir>/snapshots/`` and return its path."""
+def get_export_state(db: Session) -> ExportState:
+    """Return the single ``export_state`` row, creating it (id=1) if absent."""
+    state = db.query(ExportState).order_by(ExportState.id.asc()).first()
+    if state is None:
+        state = ExportState()
+        db.add(state)
+        db.flush()
+    return state
+
+
+def get_last_delta_export_at(db: Session) -> datetime | None:
+    """The ``since`` boundary the delta-export form defaults to, or ``None``."""
+    state = db.query(ExportState).order_by(ExportState.id.asc()).first()
+    return state.last_delta_export_at if state is not None else None
+
+
+def export_snapshot(
+    db: Session, data_dir: Path, since: datetime | None = None
+) -> Path:
+    """Write a gzipped snapshot to ``<data_dir>/snapshots/`` and return its path.
+
+    When ``since`` is given, exports a **delta** snapshot (see
+    :func:`build_snapshot`) and advances the ``export_state`` marker to the
+    export time, so the next delta defaults to "changes since this one".
+    """
     snapshots_dir = data_dir / "snapshots"
     snapshots_dir.mkdir(parents=True, exist_ok=True)
-    payload = build_snapshot(db, machine_id=get_machine_id(data_dir))
+    export_started_at = datetime.now()
+    payload = build_snapshot(db, machine_id=get_machine_id(data_dir), since=since)
+    if since is not None:
+        state = get_export_state(db)
+        state.last_delta_export_at = export_started_at
+        db.commit()
+    prefix = "delta" if since is not None else "snapshot"
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    path = snapshots_dir / f"snapshot-{stamp}{SNAPSHOT_SUFFIX}"
+    path = snapshots_dir / f"{prefix}-{stamp}{SNAPSHOT_SUFFIX}"
     # Avoid clobbering a snapshot exported within the same second.
     n = 1
     while path.exists():
-        path = snapshots_dir / f"snapshot-{stamp}-{n}{SNAPSHOT_SUFFIX}"
+        path = snapshots_dir / f"{prefix}-{stamp}-{n}{SNAPSHOT_SUFFIX}"
         n += 1
     blob = gzip.compress(json.dumps(payload, ensure_ascii=False).encode("utf-8"))
     path.write_bytes(blob)
@@ -365,6 +416,8 @@ def _txn_from_data(data: dict[str, Any]) -> dict[str, Any]:
         value = data.get(col)
         if col in _TXN_DATE_COLUMNS:
             value = _parse_date(value)
+        elif col in _TXN_DATETIME_COLUMNS:
+            value = _parse_datetime(value)
         elif col in _TXN_NUMERIC_COLUMNS and value is not None:
             value = Decimal(str(value))
         values[col] = value
@@ -593,6 +646,8 @@ def import_snapshot(db: Session, snapshot: dict[str, Any], db_path: Path) -> Sna
             schema_version=header.get("schema_version"),
             counts=counts,
             overwrites=overwrites,
+            is_delta=bool(header.get("delta")),
+            delta_since=_parse_datetime(header.get("since")),
         )
         db.add(result)
         db.flush()

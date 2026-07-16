@@ -137,3 +137,31 @@ def test_import_rejects_corrupt_file(client, db):
     assert "Not a valid snapshot file" in resp.text
     # Nothing was recorded for a rejected file.
     assert db.query(SnapshotImport).count() == 0
+
+
+def test_export_delta_downloads_filtered_snapshot(client, settings, db):
+    from datetime import datetime, timedelta
+
+    since = datetime(2026, 6, 1, 12, 0, 0)
+    _seed_txn(db, "old", updated_at=since - timedelta(days=1))
+    _seed_txn(db, "recent", updated_at=since + timedelta(hours=1))
+
+    resp = client.post("/snapshots/export-delta", data={"since": since.isoformat()})
+    assert resp.status_code == 200
+    payload = json.loads(gzip.decompress(resp.content))
+    assert payload["header"]["delta"] is True
+    assert {t["id"] for t in payload["transactions"]} == {"recent"}
+
+    # Delta file persisted with a delta- prefix and listed on the page.
+    files = list(settings.snapshots_dir.glob("delta-*.json.gz"))
+    assert len(files) == 1
+
+
+def test_export_delta_defaults_to_last_marker(client, settings, db):
+    from datetime import datetime
+
+    _seed_txn(db, "t1", updated_at=datetime(2026, 6, 5))
+    # First delta with an explicit early boundary sets the marker.
+    client.post("/snapshots/export-delta", data={"since": datetime(2026, 1, 1).isoformat()})
+    page = client.get("/snapshots")
+    assert "Defaults to your last delta export" in page.text

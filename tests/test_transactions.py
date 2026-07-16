@@ -290,6 +290,81 @@ def test_set_manual_tags(client, seed):
     assert t.categorization_source == "manual"
 
 
+def test_row_response_uses_css_safe_ids_for_special_char_ids(client, app):
+    """PayPal-style ids (``pp:paypaleu_...``) and ABN-style ids with dots
+    contain characters that are valid HTML id values but invalid inside a
+    raw CSS `#id` selector (`:` starts a pseudo-class, `.` starts a class).
+    hx-target="#txn-row-{{ t.id }}" against such an id silently fails to
+    match in the browser — the POST still saves, but the outerHTML swap
+    never lands, so the UI looks like nothing happened. `id="txn-row-...`
+    and every hx-target referencing it must go through the `css_id` filter
+    so the id and its targets always match — see `app.py:_css_id`."""
+    factory = get_session_factory()
+    db = factory()
+    db.add(_mk(id="pp:paypaleu_weird.id", description="Special char id txn"))
+    db.commit()
+    db.close()
+
+    r = client.post("/transactions/pp:paypaleu_weird.id/tags", data={"manual_tags": "x"})
+    assert r.status_code == 200
+    body = r.text
+    # The escaped form (colons/dots -> underscores) must appear as both the
+    # row's own id and every hx-target that swaps into it — a mismatch
+    # between the two is exactly the bug.
+    escaped = "pp_paypaleu_weird_id"
+    assert f'id="txn-row-{escaped}"' in body
+    # hx-target must point at the <tbody id="txn-body-..."> (matching what
+    # _row_response actually renders: a full <tbody> with two <tr>s), not
+    # the inner <tr id="txn-row-...">  — outerHTML-swapping a <tbody>
+    # fragment onto a <tr> target causes browsers to silently drop the
+    # <tbody> wrapper tag, breaking the row's table layout (columns lose
+    # their sizing, text wraps unpredictably) even though the swap
+    # otherwise "worked".
+    assert f'id="txn-body-{escaped}"' in body
+    assert body.count(f'hx-target="#txn-body-{escaped}"') >= 2  # category + tags forms
+    # The raw, unescaped id must NOT appear as a CSS-selector target.
+    assert 'hx-target="#txn-body-pp:paypaleu_weird.id"' not in body
+
+
+def test_bulk_set_tags_merges_into_existing(client, seed):
+    """t5 already has rule-assigned tags "dining, work"; bulk tag must keep
+    them, not replace — Golden Principle 2's "manual edits never silently
+    discard state" spirit extended to bulk tagging."""
+    r = client.post(
+        "/transactions/bulk-tags",
+        data={"transaction_ids": '["t1", "t5"]', "tags": "reviewed, 2024"},
+    )
+    assert r.status_code == 200
+    t1 = _reload(seed, "t1")
+    t5 = _reload(seed, "t5")
+    assert t1.manual_tags == "reviewed, 2024"  # t1 had no prior tags
+    assert t5.manual_tags == "dining, work, reviewed, 2024"  # rule tags kept
+    assert t1.categorization_source == "manual"
+    assert t5.categorization_source == "manual"
+
+
+def test_bulk_set_tags_dedupes(client, seed):
+    r = client.post(
+        "/transactions/bulk-tags",
+        data={"transaction_ids": '["t5"]', "tags": "work, new"},
+    )
+    assert r.status_code == 200
+    t5 = _reload(seed, "t5")
+    assert t5.manual_tags == "dining, work, new"  # "work" not duplicated
+
+
+def test_bulk_set_tags_requires_ids_and_tags(client, seed):
+    assert client.post(
+        "/transactions/bulk-tags", data={"transaction_ids": "[]", "tags": "x"}
+    ).status_code == 400
+    assert client.post(
+        "/transactions/bulk-tags", data={"transaction_ids": '["t1"]', "tags": ""}
+    ).status_code == 400
+    assert client.post(
+        "/transactions/bulk-tags", data={"transaction_ids": "not json", "tags": "x"}
+    ).status_code == 400
+
+
 def test_clear_manual_category_restores_rule(client, seed):
     client.post("/transactions/t1/category", data={"manual_category": "Fun"})
     r = client.delete("/transactions/t1/category")

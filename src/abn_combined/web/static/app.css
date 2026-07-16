@@ -90,6 +90,12 @@
 .txn-table .pos { color: #1a7f37; }
 .txn-table .desc { max-width: 22rem; }
 .txn-count { font-size: 0.85rem; color: var(--pico-muted-color); margin: 0.25rem 0; }
+.txn-selected { background-color: rgba(13, 110, 253, 0.08); }
+.bulk-action-bar { background: #eef4ff; border: 1px solid #cfe0ff; border-radius: 0.375rem; }
+@media (prefers-color-scheme: dark) {
+  .txn-selected { background-color: rgba(13, 110, 253, 0.16); }
+  .bulk-action-bar { background: #16233d; border-color: #1e3a5f; }
+}
 button.link {
   background: none; border: none; padding: 0 0.2rem; margin: 0;
   color: var(--pico-primary, #1a56db); cursor: pointer; width: auto; display: inline;

@@ -114,7 +114,12 @@ def test_uncategorized_click_through(client, seed):
 
 
 def test_account_filter_propagates_to_links(client, seed):
-    r = client.get(f"/trends?{QS}&account=NL02")
+    # /trends/table (not /trends) — the full page's new Categories/Exclude
+    # filter pickers legitimately list every known category regardless of
+    # the active account filter (matching Transactions' own category
+    # picker), so "groceries" appearing there isn't a leak of filtered-out
+    # rows; this asserts against the matrix rows specifically.
+    r = client.get(f"/trends/table?{QS}&account=NL02")
     assert "salary" in r.text
     assert "groceries" not in r.text
     expected = (

@@ -10,6 +10,7 @@ import json
 import re
 from dataclasses import dataclass, field
 from datetime import date as date_type
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -349,6 +350,7 @@ def apply_rules(
             txn.category = new_category
             txn.tags = new_tags
             txn.categorization_source = new_source
+            txn.updated_at = datetime.now()
             changes[txn.id] = TxnChange(
                 txn.id, old_category, new_category, old_tags, new_tags
             )
@@ -375,6 +377,7 @@ def apply_rules(
                     txn.id, txn.category, txn.category, pre_tags, merged_tags
                 )
             txn.tags = merged_tags
+            txn.updated_at = datetime.now()
 
     if commit:
         db.commit()

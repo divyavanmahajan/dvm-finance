@@ -11,6 +11,11 @@
       {% if imp.source_machine_id %}
         <span class="text-muted small">from machine <code>{{ imp.source_machine_id[:8] }}</code></span>
       {% endif %}
+      {% if imp.is_delta %}
+        <span class="badge text-bg-info" title="Partial snapshot: only transactions changed since the shown time">
+          <i class="bi bi-clock-history"></i> delta{% if imp.delta_since %} since {{ imp.delta_since.strftime('%Y-%m-%d %H:%M') }}{% endif %}
+        </span>
+      {% endif %}
     </div>
 
     <!-- Timestamp (right-aligned, muted) -->

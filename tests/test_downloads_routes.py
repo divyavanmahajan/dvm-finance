@@ -198,6 +198,47 @@ def test_start_paypal_passes_custom_cdp_url(client, no_worker) -> None:
     assert no_worker and no_worker[0][3] == "http://127.0.0.1:9333"
 
 
+def test_download_page_uses_matching_cdp_default(client) -> None:
+    """The CDP URL input's default must match `DEFAULT_CDP_URL` (9226) —
+    previously hardcoded to 9222, a stale value that silently disagreed with
+    the actual default the backend/launch command use."""
+    from abn_combined.downloaders.paypal import DEFAULT_CDP_URL
+
+    resp = client.get("/download")
+    assert DEFAULT_CDP_URL in resp.text
+    assert "9222" not in resp.text
+
+
+def test_launch_chrome_for_paypal_button(client, monkeypatch) -> None:
+    # The route does a call-time `from ..downloaders.paypal import
+    # launch_chrome_for_paypal` (matching this module's existing convention
+    # of local-importing downloader functions, e.g. `run_paypal_job` above)
+    # — patch the source module, not `abn_combined.api.downloads`.
+    import abn_combined.downloaders.paypal as pp_mod
+
+    calls: list[str] = []
+    monkeypatch.setattr(pp_mod, "launch_chrome_for_paypal", lambda cdp_url: calls.append(cdp_url))
+
+    resp = client.post("/api/download/paypal/launch-chrome", data={"cdp_url": "http://127.0.0.1:9226"})
+    assert resp.status_code == 200
+    assert "Chrome launching" in resp.text
+    assert calls == ["http://127.0.0.1:9226"]
+
+
+def test_launch_chrome_for_paypal_button_missing_chrome(client, monkeypatch) -> None:
+    import abn_combined.downloaders.paypal as pp_mod
+
+    def _raise(cdp_url):
+        raise FileNotFoundError("Chrome not found at '/Applications/Google Chrome.app/...'")
+
+    monkeypatch.setattr(pp_mod, "launch_chrome_for_paypal", _raise)
+
+    resp = client.post("/api/download/paypal/launch-chrome", data={})
+    assert resp.status_code == 200
+    assert "Chrome not found" in resp.text
+    assert "alert-danger" in resp.text
+
+
 # ---------------------------------------------------------------------------
 # Status polling
 # ---------------------------------------------------------------------------

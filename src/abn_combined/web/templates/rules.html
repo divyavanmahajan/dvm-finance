@@ -3,6 +3,26 @@
 {% block content %}
 <link rel="stylesheet" href="/static/rules.css">
 
+{% if save_result %}
+<div id="rule-save-alert" class="alert alert-success alert-dismissible fade show" role="alert">
+  {% if save_result.action == 'created' %}Rule #{{ save_result.rule_id }} created
+  {% elif save_result.action == 'updated' %}Rule #{{ save_result.rule_id }} updated
+  {% else %}Rule #{{ save_result.rule_id }} saved
+  {% endif %}
+  &mdash;
+  {% if save_result.changed and save_result.changed > 0 %}
+    {{ save_result.changed }} transaction{{ 's' if save_result.changed != 1 else '' }} recategorized.
+  {% else %}
+    no transactions changed.
+  {% endif %}
+  {% if save_result.report_id %}
+  <a href="/rules/{{ save_result.rule_id }}/history#rule-report-{{ save_result.report_id }}"
+     class="alert-link">View change report</a>
+  {% endif %}
+  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
+
 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
   <div>
     <h1 class="h3 mb-2">Categorization Rules</h1>

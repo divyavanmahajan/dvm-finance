@@ -78,16 +78,19 @@ def test_separator_is_hyphen():
     assert SEPARATOR == "-"
 
 
-def test_default_window_last_12_full_months():
+def test_default_window_last_12_months_ends_today():
+    """The current in-progress month must be included, not just complete
+    months — a user opening Trends expects to see this month's spending
+    so far."""
     lo, hi = default_window(today=date(2026, 7, 7))
-    assert lo == date(2025, 7, 1)
-    assert hi == date(2026, 6, 30)
+    assert lo == date(2025, 8, 1)
+    assert hi == date(2026, 7, 7)
 
 
 def test_default_window_january():
     lo, hi = default_window(today=date(2026, 1, 15))
-    assert lo == date(2025, 1, 1)
-    assert hi == date(2025, 12, 31)
+    assert lo == date(2025, 2, 1)
+    assert hi == date(2026, 1, 15)
 
 
 def test_build_periods_month():
