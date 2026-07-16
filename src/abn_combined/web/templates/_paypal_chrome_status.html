@@ -1,0 +1,10 @@
+{% if error %}
+<div class="alert alert-danger py-2 px-3 mb-0" role="alert">
+  <pre class="mb-0" style="white-space: pre-wrap;">{{ error }}</pre>
+</div>
+{% else %}
+<div class="alert alert-success py-2 px-3 mb-0" role="alert">
+  Chrome launching… sign in to PayPal in the new window, then click
+  "Start PayPal download" below.
+</div>
+{% endif %}

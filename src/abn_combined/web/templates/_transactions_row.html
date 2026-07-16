@@ -1,8 +1,15 @@
 {# One transaction = one <tbody> so the main row and its detail row can share
    Alpine state (valid HTML: a table may contain multiple tbody elements). #}
 {% set t = row.txn %}
-<tbody x-data="{ open: false, editcat: false, edittags: false }">
-  <tr id="txn-row-{{ t.id }}" class="{% if row.is_manual %}manual-txn{% endif %}">
+<tbody id="txn-body-{{ t.id | css_id }}" x-data="{ open: false, editcat: false, edittags: false }">
+  <tr id="txn-row-{{ t.id | css_id }}" class="{% if row.is_manual %}manual-txn{% endif %}"
+      :class="selected.includes('{{ t.id }}') ? 'txn-selected' : ''">
+    <!-- Bulk-select checkbox -->
+    <td class="text-center">
+      <input type="checkbox" class="form-check-input" aria-label="Select transaction"
+             value="{{ t.id }}" x-model="selected">
+    </td>
+
     <!-- Expand button -->
     <td class="text-center">
       <button class="link" title="Show detail"
@@ -46,15 +53,19 @@
       </span>
       <form x-show="editcat" x-cloak class="inline-edit"
             hx-post="/transactions/{{ t.id }}/category"
-            hx-target="#txn-row-{{ t.id }}" hx-swap="outerHTML">
+            hx-target="#txn-body-{{ t.id | css_id }}" hx-swap="outerHTML"
+            hx-on::before-request="this.querySelector('.save-error').hidden = true"
+            hx-on::response-error="this.querySelector('.save-error').hidden = false"
+            hx-on::send-error="this.querySelector('.save-error').hidden = false">
         <input name="manual_category" list="known-categories" class="form-control form-control-sm"
                value="{{ row.effective_category or '' }}" autocomplete="off">
         <button type="submit" class="link" title="Save"><i class="bi bi-check-lg text-success"></i></button>
         <button type="button" class="link" title="Cancel" @click="editcat = false"><i class="bi bi-x-lg text-danger"></i></button>
+        <small class="save-error text-danger text-nowrap" hidden role="alert">Save failed — try again</small>
         {% if row.txn.manual_category %}
         <button type="button" class="link" title="Clear manual (restore rule)"
                 hx-delete="/transactions/{{ t.id }}/category"
-                hx-target="#txn-row-{{ t.id }}" hx-swap="outerHTML"><i class="bi bi-arrow-counterclockwise text-info"></i></button>
+                hx-target="#txn-body-{{ t.id | css_id }}" hx-swap="outerHTML"><i class="bi bi-arrow-counterclockwise text-info"></i></button>
         {% endif %}
       </form>
     </td>
@@ -73,15 +84,19 @@
       </span>
       <form x-show="edittags" x-cloak class="inline-edit"
             hx-post="/transactions/{{ t.id }}/tags"
-            hx-target="#txn-row-{{ t.id }}" hx-swap="outerHTML">
+            hx-target="#txn-body-{{ t.id | css_id }}" hx-swap="outerHTML"
+            hx-on::before-request="this.querySelector('.save-error').hidden = true"
+            hx-on::response-error="this.querySelector('.save-error').hidden = false"
+            hx-on::send-error="this.querySelector('.save-error').hidden = false">
         <input name="manual_tags" class="form-control form-control-sm" value="{{ row.effective_tags or '' }}"
                placeholder="comma,separated" autocomplete="off">
         <button type="submit" class="link" title="Save"><i class="bi bi-check-lg text-success"></i></button>
         <button type="button" class="link" title="Cancel" @click="edittags = false"><i class="bi bi-x-lg text-danger"></i></button>
+        <small class="save-error text-danger text-nowrap" hidden role="alert">Save failed — try again</small>
         {% if row.txn.manual_tags %}
         <button type="button" class="link" title="Clear manual (restore rule)"
                 hx-delete="/transactions/{{ t.id }}/tags"
-                hx-target="#txn-row-{{ t.id }}" hx-swap="outerHTML"><i class="bi bi-arrow-counterclockwise text-info"></i></button>
+                hx-target="#txn-body-{{ t.id | css_id }}" hx-swap="outerHTML"><i class="bi bi-arrow-counterclockwise text-info"></i></button>
         {% endif %}
       </form>
     </td>
@@ -106,7 +121,7 @@
 
   <!-- Detail row (expandable) -->
   <tr class="detail-row" x-show="open" x-cloak>
-    <td colspan="9" class="p-3">
+    <td colspan="10" class="p-3">
       <div id="txn-detail-body-{{ t.id | css_id }}">
         <small class="text-muted"><i class="bi bi-hourglass-split"></i> Loading…</small>
       </div>

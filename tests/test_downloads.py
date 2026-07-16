@@ -597,6 +597,13 @@ class TestConnectFailureMessage:
         assert "SomeElectronApp/1.0" in msg
         assert "9223" in msg          # suggests alternate port
         assert "9226" in msg          # names the conflicted port
+        # The suggested *launch command* must actually use the alternate
+        # port, not just the trailing "then use http://...9223" sentence —
+        # `.replace("9222", "9223")` was a no-op against a command that
+        # contains "9226", not "9222", so the command silently still showed
+        # the conflicted port; `.replace("9226", "9223")` is the real fix.
+        assert "--remote-debugging-port=9223" in msg
+        assert "--remote-debugging-port=9226" not in msg
 
     def test_browser_context_not_supported_no_browser_id(self, monkeypatch) -> None:
         """When nothing responds on the port, say 'did not identify itself'."""

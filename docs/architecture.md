@@ -164,3 +164,34 @@ Import contract (`POST /snapshots/import`):
    authoritative.
 
 Snapshots are not encrypted; users exchange them over a channel they trust (see spec).
+
+### Delta snapshots
+
+`POST /snapshots/export-delta` (form field `since`, a `datetime-local` value; empty
+falls back to the stored last-delta-export marker, or the epoch if that's unset too)
+writes a **delta** snapshot to `<data_dir>/snapshots/delta-YYYYMMDD-HHMMSS.json.gz` —
+the same format as a full snapshot, except:
+
+- `header` carries two extra keys: `"delta": true` and `"since": "<iso8601>"`, making
+  the file self-describing.
+- `transactions` is limited to rows with `updated_at >= since` (rows with a `null`
+  `updated_at` — never touched since that column was added — are excluded).
+  `updated_at` is stamped by every write that changes `category`/`manual_category`/
+  `tags`/`manual_tags`/`categorization_source`: manual set/clear (`api/transactions.py`),
+  `bulk_set_tags`, and rule-driven recategorization (`core/categorizer.py:apply_rules`).
+- `rules`/`budgets`/`rule_change_reports` are still exported **in full** — only
+  `transactions` is filtered. A delta is "a snapshot with fewer transactions," nothing
+  more.
+- Export advances the `export_state` table's `last_delta_export_at` marker to the
+  export's start time, so the next delta export defaults to "changes since this one."
+
+**Import is unchanged** — the same incoming-wins-per-present-row, never-delete-absent-
+rows merge already has exactly the right semantics for a partial transaction set, so no
+special-case delta merge logic exists. The only import-side addition is provenance:
+`snapshot_imports` gained `is_delta`/`delta_since` columns, populated from the header
+and surfaced in the import history list (`_snapshot_import_report.html`) so a delta
+import is visibly distinguishable from a full one.
+
+Intended use: lightweight device-to-device sync of just recent edits (e.g. from the iOS
+app, which ports this same `since`-filtered format) without re-transferring the entire
+transaction history each time.
