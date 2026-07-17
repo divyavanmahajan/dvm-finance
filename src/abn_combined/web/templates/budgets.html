@@ -11,21 +11,39 @@
       <strong>Note:</strong> Budget actuals exclude transfers. Transfer transactions are not counted toward budget spend.
     </p>
   </div>
+  <form method="post" action="/budgets/create-top-level">
+    <input type="hidden" name="period" value="{{ period }}">
+    <button type="submit" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-magic"></i> Create budgets for top-level categories
+    </button>
+    <div class="form-text">
+      {% if period == 'year' %}
+      One yearly budget per top-level category, proposing 12× the {{ average_months }}-month
+      average as the amount. Categories that already have a yearly budget are left alone.
+      {% else %}
+      One {{ period }} budget per top-level category, proposing the {{ average_months }}-month
+      average as the amount. Categories that already have a {{ period }} budget are left alone.
+      {% endif %}
+    </div>
+  </form>
 </div>
 
 {% if error %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endif %}
 
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item">
+    <a class="nav-link {% if period == 'month' %}active{% endif %}"
+       href="/budgets?period=month&ref={{ ref.isoformat() }}">Monthly</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if period == 'year' %}active{% endif %}"
+       href="/budgets?period=year&ref={{ ref.isoformat() }}">Yearly</a>
+  </li>
+</ul>
+
 <div class="card card-body mb-3">
   <form class="row g-3 align-items-end" method="get" action="/budgets">
-    <div class="col-auto">
-      <label class="form-label" for="budgets-period">Period type</label>
-      <select class="form-select form-select-sm" id="budgets-period" name="period" onchange="this.form.submit()">
-        <option value="">All</option>
-        {% for p in periods %}
-        <option value="{{ p }}" {% if period == p %}selected{% endif %}>{{ p.title() }}</option>
-        {% endfor %}
-      </select>
-    </div>
+    <input type="hidden" name="period" value="{{ period }}">
     <div class="col-auto">
       <label class="form-label" for="budgets-ref">Reference date</label>
       <input type="date" class="form-control form-control-sm" id="budgets-ref" name="ref" value="{{ ref.isoformat() }}" onchange="this.form.submit()">
@@ -42,27 +60,30 @@
     <form method="post" action="/budgets/create" class="row g-3 align-items-end">
       <div class="col-md-3">
         <label class="form-label" for="add-category">Category</label>
-        <input type="text" class="form-control" id="add-category" name="category" list="known-categories" required>
+        <input type="text" class="form-control" id="add-category" name="category" list="known-categories" required
+               hx-get="/budgets/average-hint" hx-target="#add-amount-hint" hx-swap="innerHTML"
+               hx-trigger="change, keyup changed delay:400ms">
       </div>
       <div class="col-md-2">
         <label class="form-label" for="add-amount">Amount €</label>
         <input type="number" class="form-control" id="add-amount" name="amount" step="0.01" min="0" required>
+        <div id="add-amount-hint" class="form-text"></div>
       </div>
       <div class="col-md-2">
         <label class="form-label" for="add-period">Period</label>
         <select class="form-select" id="add-period" name="period">
           {% for p in periods %}
-          <option value="{{ p }}" {% if p == 'month' %}selected{% endif %}>{{ p.title() }}</option>
+          <option value="{{ p }}" {% if p == period %}selected{% endif %}>{{ p.title() }}</option>
           {% endfor %}
         </select>
       </div>
       <div class="col-md-2">
         <label class="form-label" for="add-start-date">Valid from</label>
-        <input type="date" class="form-control" id="add-start-date" name="start_date">
+        <input type="date" class="form-control" id="add-start-date" name="start_date" value="{{ current_month_start.isoformat() }}">
       </div>
       <div class="col-md-2">
         <label class="form-label" for="add-end-date">Valid to</label>
-        <input type="date" class="form-control" id="add-end-date" name="end_date">
+        <input type="date" class="form-control" id="add-end-date" name="end_date" value="{{ current_month_end.isoformat() }}">
       </div>
       <div class="col-md-3">
         <label class="form-label" for="add-notes">Notes</label>
