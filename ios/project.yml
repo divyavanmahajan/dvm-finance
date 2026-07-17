@@ -33,14 +33,41 @@ targets:
         SWIFT_VERSION: "5.9"
         IPHONEOS_DEPLOYMENT_TARGET: "17.0"
         TARGETED_DEVICE_FAMILY: "1,2"
+        # Marketing version (App Store "Version") and build number. Bump
+        # CURRENT_PROJECT_VERSION for every upload of the same version.
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
         CODE_SIGN_STYLE: Automatic
         # No shared team id is checked in; set your personal team in Xcode's
         # Signing & Capabilities tab after `xcodegen generate` (see README).
         DEVELOPMENT_TEAM: ""
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: "DVM Finance"
+        INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.finance"
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        # iPhone + iPad, but the app runs full screen on iPad (opts out of
+        # Split View / Slide Over), so it need not support every orientation.
+        INFOPLIST_KEY_UIRequiresFullScreen: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations~ipad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        # App uses no non-exempt encryption (local SQLite only) — declaring
+        # this skips the export-compliance prompt on every upload.
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_PREVIEWS: YES
+
+  DVMFinanceUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: DVMFinanceUITests
+    dependencies:
+      - target: DVMFinance
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.dvm.finance.uitests
+        SWIFT_VERSION: "5.9"
+        IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+        TEST_TARGET_NAME: DVMFinance
+        GENERATE_INFOPLIST_FILE: YES

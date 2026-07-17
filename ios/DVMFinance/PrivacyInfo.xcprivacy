@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  App privacy manifest. DVM Finance is a fully local, single-user app: all
+  data lives in an on-device SQLite database, nothing is transmitted to a
+  server, and there is no analytics, advertising, or tracking. The app's own
+  code calls no "required reason" APIs (GRDB ships its own PrivacyInfo.xcprivacy
+  covering the file-timestamp / disk-space reasons it needs), so the collected
+  data and accessed-API lists below are empty.
+-->
+<plist version="1.0">
+<dict>
+    <key>NSPrivacyTracking</key>
+    <false/>
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array/>
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array/>
+</dict>
+</plist>

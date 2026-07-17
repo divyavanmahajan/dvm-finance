@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Export options for `xcodebuild -exportArchive` when distributing to the
+  App Store. Fill in <teamID> with your 10-character Apple Developer Team ID
+  (App Store Connect ▸ Membership, or `xcrun xcodebuild -showBuildSettings |
+  grep DEVELOPMENT_TEAM`). With automatic signing, Xcode manages the
+  distribution certificate and provisioning profile for you.
+
+  Usage:
+    xcodebuild -exportArchive \
+      -archivePath build/DVMFinance.xcarchive \
+      -exportPath build/export \
+      -exportOptionsPlist ExportOptions.plist
+-->
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>app-store-connect</string>
+    <key>teamID</key>
+    <string>REPLACE_WITH_YOUR_TEAM_ID</string>
+    <key>signingStyle</key>
+    <string>automatic</string>
+    <key>destination</key>
+    <string>export</string>
+    <key>uploadSymbols</key>
+    <true/>
+    <key>manageAppVersionAndBuildNumber</key>
+    <false/>
+</dict>
+</plist>
