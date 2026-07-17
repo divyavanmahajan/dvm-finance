@@ -39,6 +39,7 @@ dependencies = [
     "pandas",
     "openpyxl",
     "xlrd",
+    "markdown",
 ]
 
 [project.optional-dependencies]
