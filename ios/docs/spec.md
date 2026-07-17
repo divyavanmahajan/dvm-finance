@@ -16,9 +16,22 @@ with file import and snapshot sync**.
    auto-import. XLS import is deferred (needs CoreXLSX; note in backlog).
    Browser-automation downloads (Playwright/CDP) are impossible on iOS and
    permanently out of scope.
-3. **v1 scope — read-only viewer**: browse Transactions and Category Trends.
-   **No rule editing, no manual categorization, no budgets, no cash flow** in
-   v1. Rules arrive via snapshot import and are applied automatically to
+3. **v1 scope — review-first viewer with manual categorization**: browse
+   Transactions and Category Trends. **No rule editing, no budgets, no cash
+   flow** in v1. **Manual categorization is now included** (updated
+   2026-07-16): the original "read-only viewer" decision excluded it, but
+   manual category/tag editing was added because file import is the only place
+   categorization state is created on the phone, and without a way to correct
+   a mis-categorized (or uncategorized) imported transaction the viewer was a
+   dead end for exactly the transactions the phone originates. It is a direct
+   port of desktop `api/transactions.py`'s `set_manual_category`/
+   `set_manual_tags`/`clear_manual_category`/`clear_manual_tags` (manual edits
+   pin `categorization_source = "manual"`, stamp `updated_at`, and are cleared
+   back to the rule value only when both manual fields are empty), and it
+   honours Golden Principle 2 the same way desktop does — manual edits are
+   never overwritten by rule reapplication, only by explicit snapshot import.
+   The `updated_at` stamp also feeds delta snapshots (see below). Rules arrive
+   via snapshot import and are applied automatically to
    file-imported transactions (identical semantics to desktop auto-import,
    audited as an `import` change report). Snapshot **export** is included so
    transactions imported on the phone can flow back to the desktop app —
@@ -233,9 +246,11 @@ system in v1.
 
 ## Non-goals (v1)
 
-Rule editing/creation/preview, manual categorization, budgets UI, cash-flow
-UI, XLS parsing, downloads, iCloud sync, widgets, charts, auth, App Store
-distribution (personal signing/sideload only).
+Rule editing/creation/preview, budgets UI, cash-flow UI, XLS parsing,
+downloads, iCloud sync, widgets, charts, auth, App Store distribution
+(personal signing/sideload only). (Manual categorization was originally
+listed here as a non-goal; it moved into scope on 2026-07-16 — see "Product
+decisions" §3 above for the rationale.)
 
 ## Verification
 

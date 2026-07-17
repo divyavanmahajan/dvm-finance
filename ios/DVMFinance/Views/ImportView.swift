@@ -26,6 +26,12 @@ struct ImportView: View {
     @State private var snapshotImportSummary: SnapshotImportSummaryDisplay?
     @State private var exportedFileURL: URL?
 
+    /// The `since` boundary for a delta export. Defaults to the stored
+    /// last-delta-export marker (`export_state.last_delta_export_at`) when one
+    /// exists, else 30 days ago — never blank, so the picker is always
+    /// meaningful. Loaded in `.task` (see `loadDeltaSinceDefault`).
+    @State private var deltaSince = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+
     var body: some View {
         NavigationStack {
             List {
@@ -49,6 +55,19 @@ struct ImportView: View {
                         ShareLink(item: exportedFileURL) {
                             Label("Share \(exportedFileURL.lastPathComponent)", systemImage: "square.and.arrow.up.circle")
                         }
+                    }
+                }
+
+                Section("Export changes since…") {
+                    DatePicker(
+                        "Since",
+                        selection: $deltaSince,
+                        displayedComponents: [.date]
+                    )
+                    Button {
+                        Task { await exportDeltaSnapshot() }
+                    } label: {
+                        Label("Export delta snapshot", systemImage: "square.and.arrow.up.badge.clock")
                     }
                 }
 
@@ -81,6 +100,7 @@ struct ImportView: View {
                 }
             }
             .navigationTitle("Import")
+            .task { await loadDeltaSinceDefault() }
             .fileImporter(
                 isPresented: $showStatementImporter,
                 allowedContentTypes: Self.statementContentTypes,
@@ -254,6 +274,33 @@ struct ImportView: View {
             exportedFileURL = url
         } catch {
             errorMessage = "Couldn't export snapshot: \(error.localizedDescription)"
+        }
+    }
+
+    /// Loads the stored last-delta-export marker into `deltaSince` so the
+    /// picker defaults to "changes since the previous delta export"; keeps the
+    /// 30-days-ago fallback when no delta has been exported yet.
+    private func loadDeltaSinceDefault() async {
+        guard let appDatabase else { return }
+        if let marker = try? await AppQueries.lastDeltaExportAt(appDatabase: appDatabase) {
+            deltaSince = marker
+        }
+    }
+
+    private func exportDeltaSnapshot() async {
+        guard let appDatabase, let appDataDirectory else { return }
+        isBusy = true
+        errorMessage = nil
+        defer { isBusy = false }
+        do {
+            let url = try SnapshotExporter.exportDeltaSnapshot(
+                appDatabase: appDatabase,
+                dataDirectory: appDataDirectory,
+                since: deltaSince
+            )
+            exportedFileURL = url
+        } catch {
+            errorMessage = "Couldn't export delta snapshot: \(error.localizedDescription)"
         }
     }
 }

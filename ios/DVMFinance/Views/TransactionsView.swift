@@ -91,7 +91,7 @@ struct TransactionsListView: View {
             }
         }
         .sheet(isPresented: $showFilterSheet) {
-            FilterSheet(filter: $filter)
+            FilterSheet(filter: $filter) { draft in draft.page = 1 }
         }
         .navigationDestination(for: String.self) { transactionId in
             TransactionDetailView(transactionId: transactionId)
@@ -175,9 +175,10 @@ struct TransactionsListView: View {
         guard let appDatabase else { return }
         var reloadFilter = filter
         reloadFilter.page = 1
+        let capturedFilter = reloadFilter
         do {
-            async let pageTask = AppQueries.transactionsPage(appDatabase: appDatabase, filter: reloadFilter)
-            async let sumTask = AppQueries.transactionsSum(appDatabase: appDatabase, filter: reloadFilter)
+            async let pageTask = AppQueries.transactionsPage(appDatabase: appDatabase, filter: capturedFilter)
+            async let sumTask = AppQueries.transactionsSum(appDatabase: appDatabase, filter: capturedFilter)
             let (page, sum) = try await (pageTask, sumTask)
             items = page.items
             total = page.total
@@ -214,36 +215,23 @@ private struct TransactionRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(transaction.description?.isEmpty == false ? transaction.description! : "(no description)")
                     .font(.body)
                     .lineLimit(2)
                 HStack(spacing: 6) {
-                    categoryChip
+                    CategoryChip(category: TransactionQuery.effectiveCategory(transaction))
                     if let tags = TransactionQuery.effectiveTags(transaction), !tags.isEmpty {
-                        Text(tags)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                        TagChips(tags: tags)
                     }
                 }
             }
             Spacer(minLength: 8)
             Text(DisplayFormat.currency(transaction.amount, code: transaction.currency))
-                .font(.body.monospacedDigit())
-                .foregroundStyle(transaction.amount < 0 ? Color.red : Color.primary)
+                .font(.callout.weight(.medium).monospacedDigit())
+                .foregroundStyle(transaction.amount > 0 ? Theme.income : Color.primary)
         }
-        .padding(.vertical, 2)
-    }
-
-    private var categoryChip: some View {
-        let category = TransactionQuery.effectiveCategory(transaction)
-        return Text(category?.isEmpty == false ? category! : "Uncategorized")
-            .font(.caption)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Capsule().fill(Color.secondary.opacity(0.15)))
-            .foregroundStyle(.secondary)
+        .padding(.vertical, 4)
     }
 }
 
