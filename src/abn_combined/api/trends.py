@@ -90,6 +90,11 @@ def trends_page(request: Request, db: Session = Depends(get_db)) -> HTMLResponse
 
 @router.get("/trends/table", response_class=HTMLResponse)
 def trends_table(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
+    # A direct navigation/refresh (no HX-Request header) lands here because
+    # hx-push-url puts this partial's own URL in the address bar. Render the
+    # full page in that case instead of a bare, unstyled table fragment.
+    if request.headers.get("HX-Request") != "true":
+        return _templates().TemplateResponse(request, "trends.html", _context(request, db))
     return _templates().TemplateResponse(
         request, "_trends_table.html", _context(request, db)
     )
