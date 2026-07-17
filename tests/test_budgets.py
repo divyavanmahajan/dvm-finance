@@ -161,6 +161,61 @@ class TestComputeActual:
         assert actual == pytest.approx(1500.0, abs=0.01)
 
 
+class TestAverageMonthlySpend:
+    """`average_monthly_spend` proposes an amount for the bulk-create button
+    and the manual "Add budget" form's hint — average abs(amount) over the
+    last N *full* months before `reference_date`'s month (current
+    in-progress month excluded so a partial month never drags it down)."""
+
+    @pytest.fixture
+    def seeded(self, app):
+        factory = get_session_factory()
+        db = factory()
+        # reference_date = 2024-04-15: last 3 full months are Jan, Feb, Mar.
+        db.add(_txn("m1", -100.0, category="food", txdate=date(2024, 1, 10)))
+        db.add(_txn("m2", -200.0, category="food-restaurants", txdate=date(2024, 2, 10)))
+        db.add(_txn("m3", -300.0, category="food", txdate=date(2024, 3, 10)))
+        db.add(_txn("m4", -9999.0, category="food", txdate=date(2024, 4, 10)))  # current month, excluded
+        db.commit()
+        db.close()
+        return factory
+
+    def test_average_over_last_three_full_months(self, seeded):
+        from abn_combined.core.budget_report import average_monthly_spend
+
+        db = seeded()
+        avg = average_monthly_spend(db, "food", reference_date=date(2024, 4, 15))
+        db.close()
+        # (100 + 200 + 300) / 3 = 200 — includes the "food-restaurants" child
+        # (hierarchical match) and excludes the April (current month) row.
+        assert avg == pytest.approx(200.0, abs=0.01)
+
+    def test_no_recent_spend_is_zero(self, app):
+        from abn_combined.core.budget_report import average_monthly_spend
+
+        factory = get_session_factory()
+        db = factory()
+        avg = average_monthly_spend(db, "nonexistent", reference_date=date(2024, 4, 15))
+        db.close()
+        assert avg == 0.0
+
+
+class TestDistinctTopLevelCategories:
+    def test_groups_by_first_hyphen_segment(self, app):
+        from abn_combined.core.budget_report import distinct_top_level_categories
+
+        factory = get_session_factory()
+        db = factory()
+        db.add(_txn("t1", -10.0, category="food-groceries"))
+        db.add(_txn("t2", -10.0, category="food-restaurants", txdate=date(2024, 2, 1)))
+        db.add(_txn("t3", -10.0, category="housing", txdate=date(2024, 3, 1)))
+        db.add(_txn("t4", 1000.0, manual_category="income-salary", txdate=date(2024, 4, 1)))
+        db.commit()
+        tops = distinct_top_level_categories(db)
+        db.close()
+        assert tops == ["food", "housing", "income"]
+
+
 class TestBudgetVsActualTable:
     @pytest.fixture
     def seeded(self, app):
@@ -334,4 +389,171 @@ def test_budget_update(client, app):
     db2 = factory()
     b = db2.get(Budget, 52)
     assert float(b.amount) == pytest.approx(300.0, abs=0.01)
+    db2.close()
+
+
+# ---------------------------------------------------------------------------
+# New: average hint + bulk-create-for-top-level-categories
+# ---------------------------------------------------------------------------
+
+
+def test_budgets_page_defaults_add_form_dates_to_current_month(client):
+    """Valid from/to on the "Add budget" form must default to the current
+    month's start/end, not be left blank."""
+    from abn_combined.core.budget_report import get_period_dates
+
+    start, end = get_period_dates("month", date.today())
+    r = client.get("/budgets")
+    assert r.status_code == 200
+    assert f'value="{start.isoformat()}"' in r.text
+    assert f'value="{end.isoformat()}"' in r.text
+
+
+def test_average_hint_route_shows_recent_average(client, app):
+    factory = get_session_factory()
+    db = factory()
+    ref = date.today().replace(day=15)
+    prev_year, prev_month = (ref.year, ref.month - 1) if ref.month > 1 else (ref.year - 1, 12)
+    db.add(_txn("h1", -60.0, category="hint-cat", txdate=date(prev_year, prev_month, 5)))
+    db.commit()
+    db.close()
+
+    r = client.get("/budgets/average-hint", params={"category": "hint-cat"})
+    assert r.status_code == 200
+    assert "Recent average" in r.text
+
+
+def test_average_hint_route_empty_category_returns_blank(client) -> None:
+    r = client.get("/budgets/average-hint", params={"category": ""})
+    assert r.status_code == 200
+    assert r.text.strip() == ""
+
+
+def test_average_hint_route_no_recent_spend(client) -> None:
+    r = client.get("/budgets/average-hint", params={"category": "never-seen-category"})
+    assert r.status_code == 200
+    assert "No recent spend" in r.text
+
+
+def test_create_top_level_budgets(client, app):
+    """One month budget per top-level category, amount = 3-month average."""
+    factory = get_session_factory()
+    db = factory()
+    ref = date.today().replace(day=15)
+    prev_year, prev_month = (ref.year, ref.month - 1) if ref.month > 1 else (ref.year - 1, 12)
+    db.add(_txn("c1", -80.0, category="food-groceries", txdate=date(prev_year, prev_month, 5)))
+    db.commit()
+    db.close()
+
+    r = client.post("/budgets/create-top-level")
+    assert r.status_code in (200, 302, 303)
+
+    db2 = factory()
+    created = db2.query(Budget).filter(Budget.category == "food", Budget.period == "month").first()
+    db2.close()
+    assert created is not None
+    assert float(created.amount) == pytest.approx(80.0 / 3, abs=0.01)
+
+
+def test_create_top_level_budgets_yearly_annualized(client, app):
+    """Yearly seeding creates year-period budgets whose amount is 12× the
+    3-month monthly average, valid for the full current calendar year."""
+    from abn_combined.core.budget_report import get_period_dates
+
+    factory = get_session_factory()
+    db = factory()
+    ref = date.today().replace(day=15)
+    prev_year, prev_month = (ref.year, ref.month - 1) if ref.month > 1 else (ref.year - 1, 12)
+    db.add(_txn("y1", -90.0, category="food-groceries", txdate=date(prev_year, prev_month, 5)))
+    db.commit()
+    db.close()
+
+    r = client.post("/budgets/create-top-level", data={"period": "year"})
+    assert r.status_code in (200, 302, 303)
+
+    db2 = factory()
+    created = db2.query(Budget).filter(Budget.category == "food", Budget.period == "year").first()
+    db2.close()
+    assert created is not None
+    # 3-month average = 90 / 3 = 30, annualized = 30 * 12 = 360
+    assert float(created.amount) == pytest.approx(360.0, abs=0.01)
+    year_start, year_end = get_period_dates("year", date.today())
+    assert created.start_date == year_start
+    assert created.end_date == year_end
+    assert "annualized" in (created.notes or "")
+
+
+def test_create_top_level_budgets_monthly_default(client, app):
+    """Monthly seeding (no/period=month) still creates month-period budgets
+    valid for the current month window, unannualized amount."""
+    from abn_combined.core.budget_report import get_period_dates
+
+    factory = get_session_factory()
+    db = factory()
+    ref = date.today().replace(day=15)
+    prev_year, prev_month = (ref.year, ref.month - 1) if ref.month > 1 else (ref.year - 1, 12)
+    db.add(_txn("mo1", -90.0, category="food-groceries", txdate=date(prev_year, prev_month, 5)))
+    db.commit()
+    db.close()
+
+    client.post("/budgets/create-top-level", data={"period": "month"})
+
+    db2 = factory()
+    created = db2.query(Budget).filter(Budget.category == "food", Budget.period == "month").first()
+    db2.close()
+    assert created is not None
+    assert float(created.amount) == pytest.approx(30.0, abs=0.01)  # 90/3, not annualized
+    month_start, month_end = get_period_dates("month", date.today())
+    assert created.start_date == month_start
+    assert created.end_date == month_end
+
+
+def test_budgets_page_defaults_to_month_tab(client):
+    """With no ``period`` query param the page opens on the Monthly tab —
+    the tab link is marked active and the yearly one is not."""
+    import re
+
+    r = client.get("/budgets")
+    assert r.status_code == 200
+    assert 'href="/budgets?period=month' in r.text
+    assert 'href="/budgets?period=year' in r.text
+    # The Monthly tab link carries the active class; the Yearly one does not.
+    monthly = re.search(r'class="nav-link([^"]*)"\s+href="/budgets\?period=month', r.text)
+    yearly = re.search(r'class="nav-link([^"]*)"\s+href="/budgets\?period=year', r.text)
+    assert monthly and "active" in monthly.group(1)
+    assert yearly and "active" not in yearly.group(1)
+
+
+def test_create_top_level_budgets_skips_existing(client, app):
+    """A top-level category that already has a month budget is left alone —
+    the bulk action never overwrites a budget the user already set."""
+    factory = get_session_factory()
+    db = factory()
+    db.add(Budget(id=60, category="food", amount=999.0, period="month"))
+    db.add(_txn("c2", -80.0, category="food-groceries", txdate=date(2024, 1, 5)))
+    db.commit()
+    db.close()
+
+    client.post("/budgets/create-top-level")
+
+    db2 = factory()
+    budgets = db2.query(Budget).filter(Budget.category == "food", Budget.period == "month").all()
+    db2.close()
+    assert len(budgets) == 1
+    assert float(budgets[0].amount) == pytest.approx(999.0, abs=0.01)  # untouched
+
+
+def test_create_top_level_budgets_skips_categories_with_no_recent_spend(client, app):
+    """A category whose only spend is outside the averaging window (e.g. a
+    single transaction from over a year ago) proposes nothing to create."""
+    factory = get_session_factory()
+    db = factory()
+    db.add(_txn("old", -80.0, category="stale-cat", txdate=date(2020, 1, 5)))
+    db.commit()
+    db.close()
+
+    client.post("/budgets/create-top-level")
+
+    db2 = factory()
+    assert db2.query(Budget).filter(Budget.category == "stale").count() == 0
     db2.close()

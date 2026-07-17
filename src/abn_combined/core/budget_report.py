@@ -73,6 +73,50 @@ def compute_actual(db: Session, category: str, period_start: date,
     return float(result) if result is not None else 0.0
 
 
+DEFAULT_AVERAGE_MONTHS = 3
+
+
+def average_monthly_spend(db: Session, category: str, months: int = DEFAULT_AVERAGE_MONTHS,
+                          reference_date: date | None = None,
+                          exclude_transfers: bool = True) -> float:
+    """Average monthly actual spend for ``category`` (incl. subtree) over the
+    last ``months`` **full** calendar months before the month containing
+    ``reference_date`` — the current in-progress month is deliberately
+    excluded so a partial month never drags the average down. Used both to
+    propose an amount when manually adding a budget and to seed the
+    bulk "one budget per top-level category" action.
+    """
+    ref = reference_date or date.today()
+    year, month = ref.year, ref.month
+    total = 0.0
+    for _ in range(months):
+        year, month = (year, month - 1) if month > 1 else (year - 1, 12)
+        start, end = get_period_dates("month", date(year, month, 1))
+        total += compute_actual(db, category, start, end, exclude_transfers=exclude_transfers)
+    return total / months if months else 0.0
+
+
+def seed_amount_for_period(avg_monthly: float, period: str) -> float:
+    """Proposed seed amount for a budget of ``period`` from an average monthly
+    spend. Month/week seed at the monthly average as-is; year annualizes it
+    (12 × monthly), rounded to 2dp — matching the seeded-budget contract."""
+    if period == "year":
+        return round(avg_monthly * 12, 2)
+    return round(avg_monthly, 2)
+
+
+def distinct_top_level_categories(db: Session) -> list[str]:
+    """Distinct top-level (first-hyphen-segment) effective categories observed
+    across transactions, sorted alphabetically — the same rollup convention
+    Trends uses to group a full category value under its parent."""
+    eff = _effective_category_expr()
+    tops: set[str] = set()
+    for (value,) in db.query(func.lower(eff)).distinct():
+        if value:
+            tops.add(value.split(CATEGORY_SEPARATOR, 1)[0])
+    return sorted(tops)
+
+
 def budget_status(actual: float, budget_amount: float) -> str:
     """'over' / 'near' (>= 80%) / 'under'."""
     amt = Decimal(str(budget_amount))

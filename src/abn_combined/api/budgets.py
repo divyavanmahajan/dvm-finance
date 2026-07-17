@@ -15,7 +15,15 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
-from ..core.budget_report import PERIODS, budget_vs_actual_table
+from ..core.budget_report import (
+    DEFAULT_AVERAGE_MONTHS,
+    PERIODS,
+    average_monthly_spend,
+    budget_vs_actual_table,
+    distinct_top_level_categories,
+    get_period_dates,
+    seed_amount_for_period,
+)
 from ..core.filters import TransactionFilter
 from ..core.models import Budget, CategorizationRule, Transaction
 from ..core.utils import normalize_category
@@ -61,14 +69,18 @@ def _txn_link(category: str, period_start: date, period_end: date) -> str:
 
 def _render(request: Request, db: Session, error: str | None = None) -> HTMLResponse:
     params = request.query_params
-    period = params.get("period") or None
+    # Monthly / Yearly tabs drive ``?period=``; default to month (not "All")
+    # when absent so the page always opens on a concrete tab.
+    period = params.get("period") or "month"
     if period not in PERIODS:
-        period = None
+        period = "month"
     ref = _parse_date(params.get("ref")) or date.today()
     rows = budget_vs_actual_table(db, reference_date=ref, period=period)
     for row in rows:
         row["txn_url"] = _txn_link(row["category"], row["period_start"],
                                    row["period_end"])
+    # "Valid from/to" defaults on the Add form follow the active tab's window.
+    add_start, add_end = get_period_dates(period, date.today())
     ctx = {
         "request": request,
         "active_path": "/budgets",
@@ -79,6 +91,9 @@ def _render(request: Request, db: Session, error: str | None = None) -> HTMLResp
         "ref": ref,
         "categories": _known_categories(db),
         "error": error,
+        "current_month_start": add_start,
+        "current_month_end": add_end,
+        "average_months": DEFAULT_AVERAGE_MONTHS,
     }
     return _templates(request).TemplateResponse(request, "budgets.html", ctx)
 
@@ -86,6 +101,73 @@ def _render(request: Request, db: Session, error: str | None = None) -> HTMLResp
 @router.get("/budgets", response_class=HTMLResponse, include_in_schema=False)
 def budgets_page(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
     return _render(request, db)
+
+
+@router.get("/budgets/average-hint", response_class=HTMLResponse, include_in_schema=False)
+def budget_average_hint(category: str = "", db: Session = Depends(get_db)) -> HTMLResponse:
+    """Small htmx-triggered fragment shown below the Amount field on the "Add
+    budget" form — the average monthly actual spend for whatever category is
+    currently typed in, so the user has a concrete number to anchor the
+    manual amount against."""
+    cat = normalize_category(category)
+    if not cat:
+        return HTMLResponse("")
+    avg = average_monthly_spend(db, cat)
+    if avg <= 0:
+        return HTMLResponse(
+            '<small class="text-muted">No recent spend for this category.</small>'
+        )
+    return HTMLResponse(
+        f'<small class="text-muted">Recent average: {avg:.2f} '
+        f"(last {DEFAULT_AVERAGE_MONTHS} months)</small>"
+    )
+
+
+@router.post("/budgets/create-top-level", include_in_schema=False)
+def budgets_create_top_level(period: str = Form("month"),
+                             db: Session = Depends(get_db)):
+    """One button: create a budget of the active tab's ``period`` for every
+    top-level category that doesn't already have one of that period, proposing
+    the last-N-months average as the amount (annualized to 12× for a year
+    budget). Categories with no recent spend (average <= 0) are skipped —
+    nothing meaningful to propose. Existing budgets are never touched."""
+    if period not in PERIODS:
+        period = "month"
+    today = date.today()
+    start, end = get_period_dates(period, today)
+    annualized = period == "year"
+    notes = (
+        f"Auto-created from {DEFAULT_AVERAGE_MONTHS}-month average"
+        + (" (annualized)" if annualized else "")
+    )
+    created: list[str] = []
+    skipped: list[str] = []
+    for cat in distinct_top_level_categories(db):
+        existing = (
+            db.query(Budget)
+            .filter(Budget.category == cat, Budget.period == period)
+            .first()
+        )
+        if existing:
+            skipped.append(cat)
+            continue
+        avg = average_monthly_spend(db, cat, reference_date=today)
+        if avg <= 0:
+            skipped.append(cat)
+            continue
+        db.add(Budget(
+            category=cat,
+            amount=Decimal(str(seed_amount_for_period(avg, period))),
+            period=period,
+            start_date=start,
+            end_date=end,
+            notes=notes,
+        ))
+        created.append(cat)
+    db.commit()
+    logger.info("budgets_bulk_created", period=period, created=created,
+                skipped=skipped)
+    return RedirectResponse(f"/budgets?period={period}", status_code=303)
 
 
 def _parse_budget_form(category: str, amount: str, period: str,
@@ -130,7 +212,7 @@ def budget_create(request: Request, category: str = Form(...),
     db.add(Budget(**data))
     db.commit()
     logger.info("budget_created", **{k: str(v) for k, v in data.items()})
-    return RedirectResponse("/budgets", status_code=303)
+    return RedirectResponse(f"/budgets?period={data['period']}", status_code=303)
 
 
 def _get_budget_or_404(db: Session, budget_id: int) -> Budget:
