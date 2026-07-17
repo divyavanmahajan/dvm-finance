@@ -29,6 +29,13 @@ final class AppEnvironment: ObservableObject {
             self.dataDirectory = directory
             self.databaseURL = url
             self.database = try AppDatabase.live(at: url)
+            #if DEBUG
+            // Screenshot / UI-test hook: repopulate with deterministic demo
+            // data when launched with `-UITestSeed`. Never runs in Release.
+            if ProcessInfo.processInfo.arguments.contains("-UITestSeed") {
+                try? SampleData.populate(into: self.database)
+            }
+            #endif
         } catch {
             // Phase A has no UI to surface a database-open failure, and a
             // broken database connection means the app has nothing useful
