@@ -82,26 +82,60 @@
 </th>
 {% endmacro %}
 
-<table class="table table-hover align-middle txn-table">
-  <thead>
-    <tr>
-      <th style="width: 40px;"></th>
-      {{ sort_th('date', 'Date') }}
-      <th>Account</th>
-      {{ sort_th('description', 'Description') }}
-      {{ sort_th('amount', 'Amount', 'num') }}
-      {{ sort_th('category', 'Category') }}
-      {{ sort_th('tags', 'Tags') }}
-      <th>Source</th>
-      <th style="width: 60px;"></th>
-    </tr>
-  </thead>
-  {% for row in rows %}
-    {% include "_transactions_row.html" %}
-  {% else %}
-  <tbody><tr><td colspan="9" class="text-center text-muted py-4"><em>Nothing here.</em></td></tr></tbody>
-  {% endfor %}
-</table>
+<div x-data='{ selected: [], pageIds: [{% for row in rows %}{{ row.txn.id | tojson }}{% if not loop.last %}, {% endif %}{% endfor %}] }'>
+  <!-- Bulk-tag action bar: appears once at least one row is checked. Tags are
+       merged (additive, de-duplicated) into each selected transaction's
+       existing effective tags — never a wholesale replace — see
+       api/transactions.py:bulk_set_tags. -->
+  <div class="bulk-action-bar d-flex flex-wrap align-items-center gap-2 mb-2 p-2"
+       x-show="selected.length > 0" x-cloak>
+    <span class="fw-semibold" x-text="selected.length + ' selected'"></span>
+    <form class="d-flex align-items-center gap-2 flex-grow-1"
+          hx-post="/transactions/bulk-tags"
+          hx-target="#txn-table" hx-swap="innerHTML"
+          @htmx:after-request="if ($event.detail.successful) selected = []"
+          hx-on::before-request="this.querySelector('.save-error').hidden = true"
+          hx-on::response-error="this.querySelector('.save-error').hidden = false"
+          hx-on::send-error="this.querySelector('.save-error').hidden = false">
+      <!-- hx-vals' "js:" prefix evaluates in the global scope, not Alpine's
+           component scope, so it can't see `selected` — a real hidden field
+           kept in sync via x-bind, submitted as normal form data, works
+           reliably instead. -->
+      <input type="hidden" name="transaction_ids" x-bind:value="JSON.stringify(selected)">
+      <input name="tags" list="known-tags" class="form-control form-control-sm" style="max-width: 260px;"
+             placeholder="Add tag(s), comma-separated" autocomplete="off" required>
+      <button type="submit" class="btn btn-sm btn-primary">Apply to selected</button>
+      <small class="save-error text-danger text-nowrap" hidden role="alert">Save failed — try again</small>
+    </form>
+    <button type="button" class="btn btn-sm btn-outline-secondary" @click="selected = []">Clear selection</button>
+  </div>
+
+  <table class="table table-hover align-middle txn-table">
+    <thead>
+      <tr>
+        <th style="width: 32px;">
+          <input type="checkbox" class="form-check-input" aria-label="Select all on this page"
+                 :checked="pageIds.length > 0 && selected.length >= pageIds.length"
+                 @change="selected = $event.target.checked ? [...pageIds] : []">
+        </th>
+        <th style="width: 40px;"></th>
+        {{ sort_th('date', 'Date') }}
+        <th>Account</th>
+        {{ sort_th('description', 'Description') }}
+        {{ sort_th('amount', 'Amount', 'num') }}
+        {{ sort_th('category', 'Category') }}
+        {{ sort_th('tags', 'Tags') }}
+        <th>Source</th>
+        <th style="width: 60px;"></th>
+      </tr>
+    </thead>
+    {% for row in rows %}
+      {% include "_transactions_row.html" %}
+    {% else %}
+    <tbody><tr><td colspan="10" class="text-center text-muted py-4"><em>Nothing here.</em></td></tr></tbody>
+    {% endfor %}
+  </table>
+</div>
 
 <!-- Table footer: transaction count and net total -->
 {% if page.total %}

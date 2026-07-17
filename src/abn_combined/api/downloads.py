@@ -101,7 +101,7 @@ def download_page(
     abn_from, abn_to = _abn_default_dates(db)
     pp_from, pp_to = _paypal_default_dates(db)
 
-    from ..downloaders.paypal import CHROME_LAUNCH_COMMAND
+    from ..downloaders.paypal import CHROME_LAUNCH_COMMAND, DEFAULT_CDP_URL
 
     return _templates(request).TemplateResponse(
         request,
@@ -117,6 +117,7 @@ def download_page(
             "pp_from": pp_from,
             "pp_to": pp_to,
             "chrome_launch_command": CHROME_LAUNCH_COMMAND,
+            "default_cdp_url": DEFAULT_CDP_URL,
         },
     )
 
@@ -165,6 +166,30 @@ def start_abn_download(
 
     logger.info("abn_job_started", from_date=from_date, to_date=to_date)
     return _status_partial(request, "abn")
+
+
+@router.post("/api/download/paypal/launch-chrome", response_class=HTMLResponse)
+def launch_chrome_for_paypal(
+    request: Request,
+    cdp_url: Annotated[str, Form()] = "",
+) -> HTMLResponse:
+    """Launch real Chrome with remote debugging, so the user no longer has to
+    copy `chrome_launch_command` into a terminal by hand before starting a
+    PayPal download."""
+    from ..downloaders.paypal import DEFAULT_CDP_URL
+    from ..downloaders.paypal import launch_chrome_for_paypal as _launch
+
+    try:
+        _launch(cdp_url or DEFAULT_CDP_URL)
+    except FileNotFoundError as exc:
+        logger.warning("paypal_chrome_launch_failed", error=str(exc))
+        return _templates(request).TemplateResponse(
+            request, "_paypal_chrome_status.html", {"error": str(exc)}
+        )
+    logger.info("paypal_chrome_launched", cdp_url=cdp_url or DEFAULT_CDP_URL)
+    return _templates(request).TemplateResponse(
+        request, "_paypal_chrome_status.html", {"error": None}
+    )
 
 
 @router.post("/api/download/paypal", response_class=HTMLResponse)

@@ -9,6 +9,7 @@ deep-links built by other steps (e.g. ``/transactions?rule_id=N`` or
 from __future__ import annotations
 
 import json
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -179,6 +180,11 @@ def transactions_alias(request: Request, db: Session = Depends(get_db)) -> HTMLR
 
 @router.get("/transactions/table", response_class=HTMLResponse, include_in_schema=False)
 def transactions_table(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
+    # A direct navigation/refresh (no HX-Request header) lands here because
+    # hx-push-url puts this partial's own URL in the address bar. Render the
+    # full page in that case instead of a bare, unstyled table fragment.
+    if request.headers.get("HX-Request") != "true":
+        return _render_page(request, db, active_path="/")
     f = TransactionFilter.from_params(request.query_params)
     ctx = _table_context(request, db, f)
     return _templates(request).TemplateResponse(request, "_transactions_table.html", ctx)
@@ -219,6 +225,7 @@ def set_manual_category(request: Request, transaction_id: str,
     txn = _get_txn_or_404(db, transaction_id)
     txn.manual_category = normalize_category(manual_category)
     txn.categorization_source = "manual"
+    txn.updated_at = datetime.now()
     db.commit()
     logger.info("manual_category_set", txn=transaction_id, category=txn.manual_category)
     return _row_response(request, db, txn)
@@ -234,9 +241,48 @@ def set_manual_tags(request: Request, transaction_id: str,
     cleaned = ", ".join(p.strip() for p in manual_tags.split(",") if p.strip())
     txn.manual_tags = cleaned or None
     txn.categorization_source = "manual"
+    txn.updated_at = datetime.now()
     db.commit()
     logger.info("manual_tags_set", txn=transaction_id, tags=txn.manual_tags)
     return _row_response(request, db, txn)
+
+
+@router.post("/transactions/bulk-tags", response_class=HTMLResponse, include_in_schema=False)
+def bulk_set_tags(request: Request, transaction_ids: str = Form(""),
+                  tags: str = Form(""), db: Session = Depends(get_db)) -> HTMLResponse:
+    """Merge tags into manual_tags for every selected transaction.
+
+    Additive, not a replace: each transaction's existing *effective* tags
+    (manual if set, else rule-assigned) are kept and the new tags are
+    unioned in, de-duplicated — bulk-tagging never drops a tag a
+    transaction already had, matching the single-row edit's "manual
+    precedence" semantics but without discarding prior state.
+    """
+    try:
+        ids = json.loads(transaction_ids)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="invalid transaction_ids") from exc
+    if not isinstance(ids, list) or not ids:
+        raise HTTPException(status_code=400, detail="transaction_ids must be a non-empty list")
+
+    new_tags = [t.strip() for t in tags.split(",") if t.strip()]
+    if not new_tags:
+        raise HTTPException(status_code=400, detail="tags is required")
+
+    txns = db.query(Transaction).filter(Transaction.id.in_(ids)).all()
+    for txn in txns:
+        existing = [t.strip() for t in (txn.manual_tags or txn.tags or "").split(",") if t.strip()]
+        merged = list(dict.fromkeys(existing + new_tags))  # de-dup, preserve order
+        txn.manual_tags = ", ".join(merged)
+        txn.categorization_source = "manual"
+        txn.updated_at = datetime.now()
+    db.commit()
+    logger.info("bulk_manual_tags_set", txn_count=len(txns), tags=new_tags,
+                txn_ids=[t.id for t in txns])
+
+    f = TransactionFilter.from_params(request.query_params)
+    ctx = _table_context(request, db, f)
+    return _templates(request).TemplateResponse(request, "_transactions_table.html", ctx)
 
 
 @router.delete("/transactions/{transaction_id}/category", response_class=HTMLResponse,
@@ -252,6 +298,7 @@ def clear_manual_category(request: Request, transaction_id: str,
     txn.manual_category = None
     if txn.categorization_source == "manual" and not txn.manual_tags:
         txn.categorization_source = None
+    txn.updated_at = datetime.now()
     db.commit()
     logger.info("manual_category_cleared", txn=transaction_id)
     return _row_response(request, db, txn)
@@ -266,6 +313,7 @@ def clear_manual_tags(request: Request, transaction_id: str,
     txn.manual_tags = None
     if txn.categorization_source == "manual" and not txn.manual_category:
         txn.categorization_source = None
+    txn.updated_at = datetime.now()
     db.commit()
     logger.info("manual_tags_cleared", txn=transaction_id)
     return _row_response(request, db, txn)

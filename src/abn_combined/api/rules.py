@@ -558,8 +558,35 @@ def rules_list(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
         "tag_only_rule_count": len(tag_only_rules),
         "sort_url_for_column": lambda col: rule_sort_url_for_column(sort, col),
         "sort_state_for_column": lambda col: rule_sort_state_for_column(sort, col),
+        "save_result": _save_result_from_query(request),
     }
     return _templates(request).TemplateResponse(request, "rules.html", ctx)
+
+
+def _save_result_from_query(request: Request) -> dict[str, Any] | None:
+    """Build the success-alert view-model from ?saved=&action=&changed=&report= params.
+
+    Returns None if the `saved` param is absent (no alert to show).
+    """
+    saved = request.query_params.get("saved")
+    if saved is None:
+        return None
+    try:
+        rule_id = int(saved)
+    except ValueError:
+        return None
+    action = request.query_params.get("action") or "saved"
+    try:
+        changed = int(request.query_params.get("changed") or 0)
+    except ValueError:
+        changed = 0
+    report_id = request.query_params.get("report")
+    return {
+        "rule_id": rule_id,
+        "action": action,
+        "changed": changed,
+        "report_id": report_id,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -709,9 +736,13 @@ async def rule_create(request: Request, db: Session = Depends(get_db)):
     db.add(rule)
     db.flush()  # assign id so apply_rules + snapshot see the new rule
     report = record_rule_change(db, "create", before=None, after=rule_snapshot(rule))
-    logger.info("rule_created", rule_id=rule.id, report_id=report.id,
-                changed=report.summary.get("changed"))
-    return RedirectResponse(url="/rules", status_code=303)
+    changed = report.summary.get("changed", 0)
+    logger.info("rule_created", rule_id=rule.id, report_id=report.id, changed=changed)
+    url = (
+        f"/rules?saved={rule.id}&action=created"
+        f"&changed={changed}&report={report.id}"
+    )
+    return RedirectResponse(url=url, status_code=303)
 
 
 @router.post("/rules/recategorize", include_in_schema=False)
@@ -739,9 +770,13 @@ async def rule_update(request: Request, rule_id: int, db: Session = Depends(get_
     _apply_vm_to_rule(rule, vm)
     db.flush()
     report = record_rule_change(db, "update", before=before, after=rule_snapshot(rule))
-    logger.info("rule_updated", rule_id=rule.id, report_id=report.id,
-                changed=report.summary.get("changed"))
-    return RedirectResponse(url="/rules", status_code=303)
+    changed = report.summary.get("changed", 0)
+    logger.info("rule_updated", rule_id=rule.id, report_id=report.id, changed=changed)
+    url = (
+        f"/rules?saved={rule.id}&action=updated"
+        f"&changed={changed}&report={report.id}"
+    )
+    return RedirectResponse(url=url, status_code=303)
 
 
 @router.post("/rules/{rule_id}/toggle", response_class=HTMLResponse, include_in_schema=False)

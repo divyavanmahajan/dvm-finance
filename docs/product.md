@@ -1,6 +1,6 @@
 # Product
 
-`abn-combined` merges abn-download (statement downloaders) and abn-analyst (categorizer/viewer) into one local web app run via `uvx abn-combined`.
+`abn-combined` merges abn-download (statement downloaders) and abn-analyst (categorizer/viewer) into one local web app, distributed on PyPI as `dvm-finance` and run via `uvx dvm-finance`.
 
 ## Goals
 
@@ -8,8 +8,11 @@
 - Rule-based categorization with conditions, priorities, tags; fast "create rule from transaction"; preview before saving; stored change reports after every rule change.
 - Two main tabs: **Transactions** (redesigned simple filter bar, URL-encoded filters; include and **exclude** category filters with subtree semantics; **transfer exclusion by default**) and **Category Trends** (table with cell/row click-through to filtered transactions). Plus Rules, Tags, Budgets, Cash Flow, Download/Upload, Snapshots.
 - **Transfer exclusion**: Transfers (inter-account movements) excluded from all views by default to focus financial reporting on actual spending. Toggles on Transactions, Trends, and Cash Flow pages allow opting-in per-session.
+- Budgets per category on **Monthly** and **Yearly** tabs, with budget-vs-actual and one-click "seed from average" (annualized on the Yearly tab).
 - Share data with one other person via export/import snapshots (incoming wins).
 - One-time migration from the legacy `abn_analyst.db`.
+- In-app **Help** page (`/help`) rendering the Markdown user guide plus an iOS companion-app section.
+- **iOS/iPadOS companion app** (`ios/`): review transactions, trends and budgets on the go and sync via snapshots. See [`ios/README.md`](../ios/README.md).
 
 Removed on purpose: graphs, LLM categorization, MCP servers, login.
 

@@ -20,7 +20,7 @@
           hx-swap="innerHTML"
           hx-push-url="true"
           hx-indicator="#txn-loading"
-          hx-trigger="submit, change from:select, change from:input[type=date], change from:input[type=checkbox], change from:input[name=account]"
+          hx-trigger="submit, change from:select, change from:input[type=date], change from:(#filter-bar input[type=checkbox]), change from:input[name=account]"
           x-data="txnFilterBar()">
 
       <!-- Primary filter row: search | preset | sort | toggle -->
@@ -162,6 +162,11 @@
 <!-- Known categories datalist for autocomplete -->
 <datalist id="known-categories">
   {% for c in categories %}<option value="{{ c }}"></option>{% endfor %}
+</datalist>
+
+<!-- Known tags datalist for autocomplete (single-row and bulk tag inputs) -->
+<datalist id="known-tags">
+  {% for t in tags %}<option value="{{ t }}"></option>{% endfor %}
 </datalist>
 
 <!-- Loading indicator (HTMX) -->

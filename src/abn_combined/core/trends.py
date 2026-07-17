@@ -20,10 +20,19 @@ from dataclasses import dataclass, field
 from datetime import date
 from urllib.parse import parse_qsl
 
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
-from .filters import UNCATEGORIZED, TransactionFilter, _parse_date
+from .filters import (
+    PRESETS,
+    UNCATEGORIZED,
+    TransactionFilter,
+    _num,
+    _parse_date,
+    _parse_float,
+    category_condition,
+    resolve_preset_range,
+)
 from .models import Transaction
 from .utils import CATEGORY_SEPARATOR as SEPARATOR
 
@@ -53,11 +62,17 @@ def _shift_month(year: int, month: int, delta: int) -> tuple[int, int]:
 
 
 def default_window(today: date | None = None) -> tuple[date, date]:
-    """The default date window: the last 12 full months (current month excluded)."""
+    """The default date window: the last 12 months, ending today.
+
+    Ends on `today` itself (not the last full month's end) so the
+    in-progress current month is included by default — a user opening
+    Trends expects to see this month's spending so far, not just complete
+    months. The start is 11 months before today's month, day 1, so the
+    window still spans 12 calendar months.
+    """
     today = today or date.today()
-    end_year, end_month = _shift_month(today.year, today.month, -1)
-    start_year, start_month = _shift_month(end_year, end_month, -11)
-    return date(start_year, start_month, 1), _month_end(end_year, end_month)
+    start_year, start_month = _shift_month(today.year, today.month, -11)
+    return date(start_year, start_month, 1), today
 
 
 # ---------------------------------------------------------------------------
@@ -84,12 +99,27 @@ def next_trends_sort(current_sort: str, column: str) -> str:
 
 @dataclass
 class TrendsParams:
-    """Typed representation of the /trends query string."""
+    """Typed representation of the /trends query string.
+
+    Deviation from the original port: `q`/`preset`/`categories`/
+    `exclude_categories`/`tags`/`amount_min`/`amount_max` were added so
+    Trends can share the exact same filter fields as Transactions (see
+    `web/templates/trends.html` reusing the Transactions filter-bar
+    markup/behavior) — the desktop Trends view originally had no such
+    filtering, only date range/granularity/account/transfers.
+    """
 
     granularity: str = DEFAULT_GRANULARITY
+    q: str | None = None
     date_from: date | None = None
     date_to: date | None = None
+    preset: str | None = None
+    categories: list[str] = field(default_factory=list)
+    exclude_categories: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     accounts: list[str] = field(default_factory=list)
+    amount_min: float | None = None
+    amount_max: float | None = None
     include_transfers: bool = False
     sort: str = DEFAULT_TRENDS_SORT
 
@@ -104,11 +134,21 @@ class TrendsParams:
         sort = one("sort") or DEFAULT_TRENDS_SORT
         if sort not in TRENDS_SORTS:
             sort = DEFAULT_TRENDS_SORT
+        preset = one("preset")
+        if preset not in PRESETS:
+            preset = None
         return cls(
             granularity=granularity,
+            q=(one("q") or None),
             date_from=_parse_date(one("date_from")),
             date_to=_parse_date(one("date_to")),
+            preset=preset,
+            categories=[c for c in many("category") if c],
+            exclude_categories=[c for c in many("exclude_category") if c],
+            tags=[t for t in many("tag") if t],
             accounts=[a for a in many("account") if a],
+            amount_min=_parse_float(one("amount_min")),
+            amount_max=_parse_float(one("amount_max")),
             include_transfers=include_transfers,
             sort=sort,
         )
@@ -134,12 +174,26 @@ class TrendsParams:
         pairs: list[tuple[str, str]] = []
         if self.granularity != DEFAULT_GRANULARITY:
             pairs.append(("granularity", self.granularity))
+        if self.q:
+            pairs.append(("q", self.q))
         if self.date_from:
             pairs.append(("date_from", self.date_from.isoformat()))
         if self.date_to:
             pairs.append(("date_to", self.date_to.isoformat()))
+        if self.preset:
+            pairs.append(("preset", self.preset))
+        for c in self.categories:
+            pairs.append(("category", c))
+        for c in self.exclude_categories:
+            pairs.append(("exclude_category", c))
+        for t in self.tags:
+            pairs.append(("tag", t))
         for a in self.accounts:
             pairs.append(("account", a))
+        if self.amount_min is not None:
+            pairs.append(("amount_min", _num(self.amount_min)))
+        if self.amount_max is not None:
+            pairs.append(("amount_max", _num(self.amount_max)))
         if self.include_transfers:
             pairs.append(("include_transfers", "1"))
         if self.sort != DEFAULT_TRENDS_SORT:
@@ -152,7 +206,11 @@ class TrendsParams:
         return urlencode(self.to_pairs())
 
     def effective_window(self, today: date | None = None) -> tuple[date, date]:
-        """The (from, to) window, defaulting each missing side to the last 12 full months."""
+        """The (from, to) window: `preset` takes priority (matching
+        `TransactionFilter.effective_dates`), then explicit date_from/to,
+        then each missing side defaults to the last 12 full months."""
+        if self.preset:
+            return resolve_preset_range(self.preset, today)
         lo, hi = default_window(today)
         return self.date_from or lo, self.date_to or hi
 
@@ -268,10 +326,45 @@ def aggregate(db: Session, params: TrendsParams, today: date | None = None) -> T
         query = query.filter(Transaction.accountNumber.in_(params.accounts))
     # Exclude transfers by default (unless include_transfers is True)
     if not params.include_transfers:
-        from sqlalchemy import or_
         query = query.filter(
             or_(eff_cat.is_(None), eff_cat == "", ~eff_cat.ilike('%transfer%'))
         )
+
+    # Deviation from the original port: category/amount/tags/search
+    # filtering, added so Trends can share the same filter fields as
+    # Transactions (`build_query`) — reuses `category_condition` for
+    # byte-identical subtree-match semantics between the two screens.
+    if params.q:
+        like = f"%{params.q}%"
+        query = query.filter(
+            or_(
+                Transaction.description.ilike(like),
+                Transaction.description_structured.ilike(like),
+            )
+        )
+    if params.categories:
+        query = query.filter(
+            or_(*[category_condition(eff_cat, cat) for cat in params.categories])
+        )
+    for cat in params.exclude_categories:
+        if cat == UNCATEGORIZED:
+            query = query.filter(~category_condition(eff_cat, cat))
+        else:
+            query = query.filter(
+                or_(eff_cat.is_(None), eff_cat == "", ~category_condition(eff_cat, cat))
+            )
+    if params.tags:
+        eff_tags = func.coalesce(func.nullif(Transaction.manual_tags, ""), Transaction.tags)
+        query = query.filter(or_(*[eff_tags.ilike(f"%{tag}%") for tag in params.tags]))
+    if params.amount_min is not None or params.amount_max is not None:
+        abs_amount = func.abs(Transaction.amount)
+        if params.amount_min is not None and params.amount_max is not None:
+            query = query.filter(and_(abs_amount >= params.amount_min, abs_amount <= params.amount_max))
+        elif params.amount_min is not None:
+            query = query.filter(abs_amount >= params.amount_min)
+        else:
+            query = query.filter(abs_amount <= params.amount_max)
+
     grouped = query.group_by(period_expr, eff_cat).all()
 
     # cat -> {period_key: amount}; None/"" categories fold into the uncategorized
@@ -366,12 +459,32 @@ def transactions_link(
     date_from: date,
     date_to: date,
     accounts: list[str],
+    params: TrendsParams | None = None,
 ) -> str:
-    """The /transactions URL selecting exactly the transactions behind a cell/row."""
+    """The /transactions URL selecting exactly the transactions behind a cell/row.
+
+    `categories` stays the exact set the tapped cell/row summed (`row.categories`
+    from `aggregate`), not `params.categories` — a broader include-list only
+    narrows which rows exist, it never changes what a surviving row's own
+    `categories` should filter to. `exclude_categories`/`tags`/`amount_min`/
+    `amount_max`/`q` from `params` (new filter fields, added alongside
+    Trends' own filtering above) are carried through so the linked list's sum
+    still matches the cell exactly. `include_transfers` deliberately is NOT
+    carried through — pre-existing desktop behavior, matches the original
+    port; a cell reached with transfers included would otherwise land on a
+    Transactions view excluding them again, but fixing that is out of scope
+    here (see the iOS port's equivalent function for the same documented
+    quirk).
+    """
     f = TransactionFilter(
         date_from=date_from,
         date_to=date_to,
         categories=list(categories),
         accounts=list(accounts),
+        exclude_categories=list(params.exclude_categories) if params else [],
+        tags=list(params.tags) if params else [],
+        amount_min=params.amount_min if params else None,
+        amount_max=params.amount_max if params else None,
+        q=params.q if params else None,
     )
     return f"/transactions?{f.to_query_string()}"

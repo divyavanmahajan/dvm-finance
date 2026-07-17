@@ -42,15 +42,61 @@ POLL_RETRY_WAIT_SECONDS = 60
 MAX_RESPONSE_LOG_BYTES = 500
 NAVIGATION_DELAY_SECONDS = 2
 
+# Real path to the Google Chrome binary this is launched/connected to —
+# macOS-specific, matching the rest of this module's scope. Used both to
+# build the human-facing `CHROME_LAUNCH_COMMAND` string (still shown as a
+# fallback for manual launch, e.g. after a `launch_chrome_for_paypal`
+# failure) and as `argv[0]` for `launch_chrome_for_paypal`'s `subprocess.Popen`.
+CHROME_APP_PATH = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+CHROME_USER_DATA_DIR = "~/.chrome/debugdir"
+
 # Exact Chrome launch command shown to the user when CDP connection fails.
 CHROME_LAUNCH_COMMAND = (
-    "/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome "
-    "--remote-debugging-port=9226 --user-data-dir=~/.chrome/debugdir "
+    f"{CHROME_APP_PATH.replace(' ', '\\ ')} "
+    f"--remote-debugging-port=9226 --user-data-dir={CHROME_USER_DATA_DIR} "
     "https://www.paypal.com/reports/dlog"
 )
 
 # Thread-local CSRF cache (reset per job run).
 _csrf_token: str | None = None
+
+
+def launch_chrome_for_paypal(cdp_url: str = DEFAULT_CDP_URL) -> None:
+    """Launch real Chrome with remote debugging enabled, detached from this
+    process — the button-driven equivalent of manually running
+    `CHROME_LAUNCH_COMMAND` in a terminal.
+
+    Parses the port from `cdp_url` so a non-default CDP URL (e.g. the
+    "port already in use" fallback suggested by `_connect_failure_message`)
+    launches Chrome on the matching port. Raises `FileNotFoundError` if
+    Chrome isn't installed at `CHROME_APP_PATH` — the caller (the
+    `/api/download/paypal/launch-chrome` route) turns that into a
+    user-facing message pointing at `CHROME_LAUNCH_COMMAND` as a manual
+    fallback.
+    """
+    import os
+    import subprocess
+    from urllib.parse import urlparse
+
+    if not os.path.exists(CHROME_APP_PATH):
+        raise FileNotFoundError(
+            f"Chrome not found at {CHROME_APP_PATH!r}. Run this in your terminal:\n"
+            f"{CHROME_LAUNCH_COMMAND}"
+        )
+
+    port = urlparse(cdp_url).port or urlparse(DEFAULT_CDP_URL).port
+    user_data_dir = os.path.expanduser(CHROME_USER_DATA_DIR)
+    subprocess.Popen(
+        [
+            CHROME_APP_PATH,
+            f"--remote-debugging-port={port}",
+            f"--user-data-dir={user_data_dir}",
+            PAYPAL_REPORTS_URL,
+        ],
+        start_new_session=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
 
 
 def identify_cdp_endpoint(cdp_url: str, timeout: float = 3.0) -> str | None:
@@ -76,7 +122,7 @@ def _connect_failure_message(cdp_url: str, exc: Exception) -> str:
             "so the Chrome you launched could not bind it. Either quit that application, "
             "or launch Chrome on a different port and put the matching URL in the "
             "'CDP URL' field, e.g.:\n"
-            + CHROME_LAUNCH_COMMAND.replace("9222", "9223")
+            + CHROME_LAUNCH_COMMAND.replace("9226", "9223")
             + "\nthen use http://127.0.0.1:9223"
         )
     return (

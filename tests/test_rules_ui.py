@@ -185,6 +185,41 @@ def test_create_rule_persists_and_records_report(client, seed):
     assert reports[0].rule_before is None
 
 
+def test_create_rule_redirect_carries_save_result_for_alert(client, seed):
+    """Save gives no visible confirmation today — the fix redirects to
+    /rules?saved=<id>&action=created&changed=<n>&report=<id> so the list
+    page can render a success alert with the recategorization count."""
+    factory, _ = seed
+    r = client.post("/rules", data=_form(match_value="coffee", category="food:coffee"),
+                    follow_redirects=False)
+    assert r.status_code == 303
+    location = r.headers["location"]
+    assert location.startswith("/rules?saved=")
+    assert "action=created" in location
+    assert "changed=" in location
+    assert "report=" in location
+
+    # Following the redirect renders a dismissible success alert with the
+    # matched rule id and a non-zero recategorized count (t2's "coffee"
+    # description matches this rule per test_create_applies_rules_to_transactions).
+    r2 = client.get(location)
+    assert r2.status_code == 200
+    assert 'id="rule-save-alert"' in r2.text
+    assert "created" in r2.text
+    assert "recategorized" in r2.text
+
+    reports = _reports(factory, "create")
+    report_id = reports[0].id
+    assert f"report={report_id}" in location
+    assert f"/rules/{reports[0].rule_id}/history#rule-report-{report_id}" in r2.text
+
+
+def test_rules_list_without_saved_param_shows_no_alert(client, seed):
+    r = client.get("/rules")
+    assert r.status_code == 200
+    assert 'id="rule-save-alert"' not in r.text
+
+
 def test_create_applies_rules_to_transactions(client, seed):
     factory, _ = seed
     client.post("/rules", data=_form(match_value="coffee", category="food:coffee"))

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Help — Your Finance{% endblock %}
+{% block content %}
+<div class="markdown-body mx-auto" style="max-width: 820px;">
+  {{ features_html | safe }}
+
+  <hr class="my-5">
+
+  <section id="ios-app">
+    {{ ios_html | safe }}
+  </section>
+</div>
+{% endblock %}
