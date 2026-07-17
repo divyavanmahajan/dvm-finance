@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Local single-user finance app: download/upload bank statements, categorize with auditable rules, review trends. FastAPI + SQLite + Jinja2/htmx/Alpine (no JS build step). Runs via `uvx abn-combined`.
+Local single-user finance app: download/upload bank statements, categorize with auditable rules, review trends. FastAPI + SQLite + Jinja2/htmx/Alpine (no JS build step). Distributed on PyPI as `dvm-finance`; runs via `uvx dvm-finance` (the repo/source dir is `abn-combined`).
 
 ## Environment
 
@@ -14,7 +14,7 @@ pip install -e ".[dev]"
 ## Commands
 
 ```bash
-abn-combined --data-dir ./devdata   # run the app (http://127.0.0.1:8000)
+dvm-finance --data-dir ./devdata    # run the app (http://127.0.0.1:8000)
 pytest                              # unit + integration (e2e/slow deselected)
 pytest -m e2e                       # Playwright e2e (5 user flows)
 pytest --cov=abn_combined           # coverage, fail_under=80

@@ -6,9 +6,11 @@ SwiftUI + local SQLite via GRDB, fully offline. See
 [`docs/plan.md`](docs/plan.md) for the phased implementation plan.
 
 The desktop Python app stays the primary tool; this app is a review-first
-viewer with statement file import and snapshot sync. The two apps never
-share a database file directly — they interoperate exclusively through the
-gzipped-JSON snapshot format also used for desktop-to-desktop sharing.
+viewer for transactions, trends and budgets (Monthly/Yearly), with quick
+edits/tagging, statement file import, snapshot sync, and an in-app Help tab.
+The two apps never share a database file directly — they interoperate
+exclusively through the gzipped-JSON snapshot format also used for
+desktop-to-desktop sharing.
 
 ## Prerequisites
 
