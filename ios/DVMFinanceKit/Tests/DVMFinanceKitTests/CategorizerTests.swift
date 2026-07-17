@@ -143,8 +143,8 @@ final class CategorizerTests: XCTestCase {
     private func makeRule(
         _ name: String,
         ruleType: String = "full_description",
-        matchPattern: String = "contains",
         fieldTarget: String? = "description",
+        matchPattern: String = "contains",
         matchValue: String,
         conditions: [RuleConditionRecord] = [],
         filterAccount: String? = nil,

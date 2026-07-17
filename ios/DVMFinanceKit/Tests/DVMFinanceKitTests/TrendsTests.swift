@@ -197,8 +197,7 @@ final class TrendsTests: XCTestCase {
         let cellFilter = TrendsBuilder.transactionFilter(
             for: educationRow,
             period: januaryPeriod,
-            accounts: params.accounts,
-            includeTransfers: params.includeTransfers
+            params: params
         )
         let sum = try appDatabase.dbWriter.read { db in
             try TransactionQuery.sum(db: db, filter: cellFilter)

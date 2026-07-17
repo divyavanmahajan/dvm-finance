@@ -171,8 +171,10 @@ public enum TransactionQuery {
     }
 
     /// Port of `core/filters.py:_category_cond` — matches a category exactly
-    /// or any hierarchical child (hyphen-separated subtree).
-    private static func categoryCondition(_ cat: String) -> (sql: String, arguments: [(any DatabaseValueConvertible)?]) {
+    /// or any hierarchical child (hyphen-separated subtree). Internal (not
+    /// `private`) so `TrendsBuilder`'s own WHERE-clause builder can share it
+    /// — both need byte-identical subtree-match semantics.
+    static func categoryCondition(_ cat: String) -> (sql: String, arguments: [(any DatabaseValueConvertible)?]) {
         if cat == TransactionFilter.uncategorized {
             return ("(\(effectiveCategorySQL) IS NULL OR \(effectiveCategorySQL) = '')", [])
         }
@@ -314,6 +316,36 @@ public enum TransactionQuery {
                 ORDER BY source_file
                 """
         )
+    }
+
+    /// Distinct individual tags present in the data, for the filter sheet's
+    /// tag autocomplete. Tags are stored as a comma-separated string per row
+    /// (effective = `COALESCE(NULLIF(manual_tags, ''), tags)`); this fetches
+    /// every effective-tags string, splits on commas, trims, de-duplicates
+    /// case-insensitively (keeping first-seen casing), and returns them sorted
+    /// case-insensitively. Done in Swift rather than SQL because SQLite has no
+    /// built-in string-split.
+    public static func distinctEffectiveTags(db: Database) throws -> [String] {
+        let rows = try String.fetchAll(
+            db,
+            sql: """
+                SELECT DISTINCT \(effectiveTagsSQL) AS t FROM transactions
+                WHERE \(effectiveTagsSQL) IS NOT NULL AND \(effectiveTagsSQL) != ''
+                """
+        )
+        var seen: Set<String> = []
+        var result: [String] = []
+        for row in rows {
+            for piece in row.split(separator: ",") {
+                let tag = piece.trimmingCharacters(in: .whitespaces)
+                guard !tag.isEmpty else { continue }
+                let key = tag.lowercased()
+                if seen.insert(key).inserted {
+                    result.append(tag)
+                }
+            }
+        }
+        return result.sorted { $0.lowercased() < $1.lowercased() }
     }
 
     // MARK: - Display helpers (port of core/filters.py's free functions)

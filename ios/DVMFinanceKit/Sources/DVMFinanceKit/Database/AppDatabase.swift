@@ -198,6 +198,36 @@ public struct AppDatabase {
             // created here — see spec.md "Data model": no downloads on iOS.
         }
 
+        // MARK: v2 — updated_at + delta-snapshot support
+        //
+        // Mirrors desktop Alembic revision
+        // `7dd060546159_add_updated_at_export_state_snapshot_delta`.
+        // Append-only (never edit v1): `updated_at` stamps every write that
+        // changes category/tags/manual fields/source (manual set/clear,
+        // bulk-tag, rule recategorization) so a delta snapshot can carry
+        // "only transactions changed since <since>". `export_state` tracks the
+        // last delta-export boundary; `snapshot_imports` gains delta
+        // provenance columns.
+        migrator.registerMigration("v2") { db in
+            // `.text` affinity (a raw ISO-8601 string, like the amount/date
+            // columns in v1) — `TransactionRecord.updatedAt` is a `String`,
+            // and a lexicographic index over ISO-8601 strings orders the same
+            // as chronological order, which is what the delta filter needs.
+            try db.alter(table: "transactions") { t in
+                t.add(column: "updated_at", .text).indexed()
+            }
+
+            try db.create(table: "export_state") { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("last_delta_export_at", .datetime)
+            }
+
+            try db.alter(table: "snapshot_imports") { t in
+                t.add(column: "is_delta", .boolean).notNull().defaults(to: false)
+                t.add(column: "delta_since", .datetime)
+            }
+        }
+
         return migrator
     }
 }

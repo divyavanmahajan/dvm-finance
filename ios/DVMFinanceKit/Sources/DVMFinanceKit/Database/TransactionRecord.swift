@@ -46,6 +46,24 @@ public struct TransactionRecord: Codable, Equatable, FetchableRecord, Persistabl
     public var transactionTypeCode: String?
     public var transactionReference: String?
     public var transactionHash: String?
+    /// Stamped on every write that changes category/tags/manual fields/source
+    /// (manual set/clear, bulk-tag, rule recategorization). Powers delta
+    /// snapshots ("only transactions changed since <since>"). `nil` for rows
+    /// never touched since this column was added (schema `v2`). Port of
+    /// `core/models.py: Transaction.updated_at`.
+    ///
+    /// Stored as an ISO-8601 second-precision **string**
+    /// (`yyyy-MM-dd'T'HH:mm:ss`, UTC — `DatabaseDateFormat.dateTime`), **not**
+    /// a `Date`: GRDB's per-record `databaseDateDecodingStrategy` is a single
+    /// record-wide setting, already pinned to date-only (`yyyy-MM-dd`) for
+    /// `transactiondate`/`valuedate`. A `Date`-typed datetime column here
+    /// would be silently truncated to day precision by that same strategy.
+    /// ISO-8601 strings also sort lexicographically in the same order as
+    /// chronologically, so the delta filter (`updated_at >= since`) is a
+    /// plain string comparison in SQL. Use `updatedAtDate` for a parsed
+    /// `Date`, and `TransactionMutations.timestampNow()` to produce the
+    /// stamp string.
+    public var updatedAt: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -69,6 +87,7 @@ public struct TransactionRecord: Codable, Equatable, FetchableRecord, Persistabl
         case transactionTypeCode = "transaction_type_code"
         case transactionReference = "transaction_reference"
         case transactionHash = "transaction_hash"
+        case updatedAt = "updated_at"
     }
 
     public init(
@@ -92,7 +111,8 @@ public struct TransactionRecord: Codable, Equatable, FetchableRecord, Persistabl
         sourceLine: Int? = nil,
         transactionTypeCode: String? = nil,
         transactionReference: String? = nil,
-        transactionHash: String? = nil
+        transactionHash: String? = nil,
+        updatedAt: String? = nil
     ) {
         self.id = id
         self.accountNumber = accountNumber
@@ -115,6 +135,7 @@ public struct TransactionRecord: Codable, Equatable, FetchableRecord, Persistabl
         self.transactionTypeCode = transactionTypeCode
         self.transactionReference = transactionReference
         self.transactionHash = transactionHash
+        self.updatedAt = updatedAt
     }
 
     public static var databaseDateDecodingStrategy: DatabaseDateDecodingStrategy {
@@ -131,4 +152,12 @@ public struct TransactionRecord: Codable, Equatable, FetchableRecord, Persistabl
 
     /// Effective tags = `manual_tags ?? tags` — spec.md "Key invariants".
     public var effectiveTags: String? { manualTags ?? tags }
+
+    /// `updatedAt` parsed to a `Date` (second precision, UTC), or `nil` if
+    /// unset/unparseable. Also tolerates a microseconds-suffixed value the way
+    /// `SnapshotCodec.parseDateTime` does, so a desktop-exported
+    /// `updated_at` (SQLAlchemy `DateTime` can carry microseconds) round-trips.
+    public var updatedAtDate: Date? {
+        updatedAt.flatMap(SnapshotCodec.parseDateTime)
+    }
 }
