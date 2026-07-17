@@ -9,7 +9,7 @@ Single Python package `abn_combined` serving a local, single-user, server-render
 | Frontend | htmx + Alpine.js (vendored), Pico.css — no build step |
 | DB | SQLite (data dir via platformdirs), SQLAlchemy 2.x, Alembic migrations |
 | Browser automation | Playwright sync API (ABN download), CDP attach (PayPal download) |
-| Packaging | hatchling, `src/` layout, console script `abn-combined`, runnable via uvx; Alembic tree bundled into the wheel (`abn_combined/alembic{,.ini}` via force-include) so packaged installs migrate on startup |
+| Packaging | hatchling, `src/` layout, PyPI package + console script `dvm-finance`, runnable via `uvx dvm-finance`; Alembic tree bundled into the wheel (`abn_combined/alembic{,.ini}` via force-include) so packaged installs migrate on startup |
 | Auth | None (binds 127.0.0.1) |
 
 ```

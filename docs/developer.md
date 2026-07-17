@@ -5,7 +5,7 @@
 - Python 3.12+, FastAPI, SQLAlchemy 2.x, Alembic, Jinja2
 - htmx + Alpine.js (vendored, no build step), Pico.css
 - Playwright (downloads + e2e tests), platformdirs
-- Packaging: `src/abn_combined/` layout, hatchling, console script `abn-combined`.
+- Packaging: `src/abn_combined/` layout, hatchling, PyPI package `dvm-finance`, console script `dvm-finance`.
   The Alembic tree (`alembic.ini` + `alembic/`) is force-included in the wheel as
   `abn_combined/alembic{,.ini}` so packaged/uvx installs migrate on startup
   (`migrations.py` prefers the bundled tree, falls back to the repo root for
@@ -38,7 +38,7 @@ pytest -m e2e                   # Playwright e2e: boots real app instances on ra
                                 # tests/test_snapshots_e2e.py); headless Chromium
 
 # Run the app (dev)
-abn-combined --data-dir ./devdata
+dvm-finance --data-dir ./devdata
 ```
 
 ## E2E harness
