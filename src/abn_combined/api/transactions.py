@@ -180,6 +180,11 @@ def transactions_alias(request: Request, db: Session = Depends(get_db)) -> HTMLR
 
 @router.get("/transactions/table", response_class=HTMLResponse, include_in_schema=False)
 def transactions_table(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
+    # A direct navigation/refresh (no HX-Request header) lands here because
+    # hx-push-url puts this partial's own URL in the address bar. Render the
+    # full page in that case instead of a bare, unstyled table fragment.
+    if request.headers.get("HX-Request") != "true":
+        return _render_page(request, db, active_path="/")
     f = TransactionFilter.from_params(request.query_params)
     ctx = _table_context(request, db, f)
     return _templates(request).TemplateResponse(request, "_transactions_table.html", ctx)

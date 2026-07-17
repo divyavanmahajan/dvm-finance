@@ -74,10 +74,20 @@ def test_alias_route_renders(client, seed):
 
 
 def test_table_partial(client, seed):
-    r = client.get("/transactions/table")
+    r = client.get("/transactions/table", headers={"HX-Request": "true"})
     assert r.status_code == 200
     # partial: no <html> shell
     assert "<html" not in r.text.lower()
+    assert "txn-table" in r.text
+
+
+def test_table_direct_navigation_renders_full_page(client, seed):
+    # A refresh lands here because hx-push-url puts /transactions/table?...
+    # in the address bar; without the HX-Request header it must render the
+    # full page, not a bare table fragment.
+    r = client.get("/transactions/table")
+    assert r.status_code == 200
+    assert "<html" in r.text.lower()
     assert "txn-table" in r.text
 
 
@@ -87,71 +97,71 @@ def test_table_partial(client, seed):
 
 
 def test_filter_q(client, seed):
-    r = client.get("/transactions/table?q=albert")
+    r = client.get("/transactions/table?q=albert", headers={"HX-Request": "true"})
     assert "Albert Heijn" in r.text
     assert "Salary" not in r.text
 
 
 def test_filter_account(client, seed):
-    r = client.get("/transactions/table?account=NL02")
+    r = client.get("/transactions/table?account=NL02", headers={"HX-Request": "true"})
     assert "Rent payment" in r.text
     assert "Albert Heijn" not in r.text
 
 
 def test_filter_category_hierarchical(client, seed):
     # "food" matches both "food" and "food-restaurants" (hyphen separator)
-    r = client.get("/transactions/table?category=food")
+    r = client.get("/transactions/table?category=food", headers={"HX-Request": "true"})
     assert "Albert Heijn" in r.text
     assert "Restaurant dinner" in r.text
     assert "Salary" not in r.text
 
 
 def test_filter_uncategorized(client, seed):
-    r = client.get("/transactions/table?category=uncategorized")
+    r = client.get("/transactions/table?category=uncategorized", headers={"HX-Request": "true"})
     assert "Coffee shop" in r.text
     assert "Albert Heijn" not in r.text
 
 
 def test_filter_tag(client, seed):
-    r = client.get("/transactions/table?tag=work")
+    r = client.get("/transactions/table?tag=work", headers={"HX-Request": "true"})
     assert "Restaurant dinner" in r.text
     assert "Albert Heijn" not in r.text
 
 
 def test_filter_amount_range(client, seed):
-    r = client.get("/transactions/table?amount_min=90&amount_max=200")
+    r = client.get("/transactions/table?amount_min=90&amount_max=200", headers={"HX-Request": "true"})
     assert "Rent payment" in r.text
     assert "Coffee shop" not in r.text
 
 
 def test_filter_rule_id(client, seed):
-    r = client.get("/transactions/table?rule_id=7")
+    r = client.get("/transactions/table?rule_id=7", headers={"HX-Request": "true"})
     assert "Rent payment" in r.text
     assert "Salary" not in r.text
 
 
 def test_filter_source_file(client, seed):
-    r = client.get("/transactions/table?source_file=march.STA")
+    r = client.get("/transactions/table?source_file=march.STA", headers={"HX-Request": "true"})
     assert "Coffee shop" in r.text
     assert "Salary" not in r.text
 
 
 def test_filter_date_range(client, seed):
-    r = client.get("/transactions/table?date_from=2024-03-01&date_to=2024-03-31")
+    r = client.get("/transactions/table?date_from=2024-03-01&date_to=2024-03-31", headers={"HX-Request": "true"})
     assert "Salary" in r.text
     assert "Coffee shop" in r.text
     assert "Albert Heijn" not in r.text
 
 
 def test_filter_combined(client, seed):
-    r = client.get("/transactions/table?account=NL01&category=food")
+    r = client.get("/transactions/table?account=NL01&category=food", headers={"HX-Request": "true"})
     assert "Albert Heijn" in r.text
     assert "Restaurant dinner" not in r.text  # NL02
 
 
 def test_filter_exclude_category_subtree(client, seed):
     """exclude_category=food hides food and food-* children."""
-    r = client.get("/transactions/table?exclude_category=food")
+    r = client.get("/transactions/table?exclude_category=food", headers={"HX-Request": "true"})
     assert "Albert Heijn" not in r.text       # category="food" → excluded
     assert "Restaurant dinner" not in r.text  # category="food-restaurants" → excluded
     assert "Rent payment" in r.text
@@ -160,13 +170,13 @@ def test_filter_exclude_category_subtree(client, seed):
 
 def test_filter_exclude_keeps_uncategorized(client, seed):
     """Excluding a named category must NOT drop uncategorized rows (NULL-safe)."""
-    r = client.get("/transactions/table?exclude_category=food")
+    r = client.get("/transactions/table?exclude_category=food", headers={"HX-Request": "true"})
     assert "Coffee shop" in r.text            # category=None → must survive
 
 
 def test_filter_include_exclude_combined(client, seed):
     """include=food, exclude=food-restaurants → only exact 'food' rows show."""
-    r = client.get("/transactions/table?category=food&exclude_category=food-restaurants")
+    r = client.get("/transactions/table?category=food&exclude_category=food-restaurants", headers={"HX-Request": "true"})
     assert "Albert Heijn" in r.text           # category="food" (included, not excluded)
     assert "Restaurant dinner" not in r.text  # excluded by exclude_category
 
@@ -191,25 +201,25 @@ def test_ancestor_prefixes_in_known_categories(client, seed):
 
 
 def test_sort_amount_asc(client, seed):
-    r = client.get("/transactions/table?sort=amount_asc")
+    r = client.get("/transactions/table?sort=amount_asc", headers={"HX-Request": "true"})
     body = r.text
     # most negative (Rent -100) should appear before Salary (+1500)
     assert body.index("Rent payment") < body.index("Salary")
 
 
 def test_sort_description_asc(client, seed):
-    r = client.get("/transactions/table?sort=description_asc")
+    r = client.get("/transactions/table?sort=description_asc", headers={"HX-Request": "true"})
     body = r.text
     assert body.index("Albert Heijn groceries") < body.index("Salary")
 
 
 def test_sort_tags_desc(client, seed):
-    r = client.get("/transactions/table?sort=tags_desc")
+    r = client.get("/transactions/table?sort=tags_desc", headers={"HX-Request": "true"})
     assert r.status_code == 200
 
 
 def test_column_headers_are_sortable_links(client, seed):
-    r = client.get("/transactions/table")
+    r = client.get("/transactions/table", headers={"HX-Request": "true"})
     body = r.text
     assert "sortable-th" in body
     # Clicking Date (already active desc) should link to date_asc
@@ -218,9 +228,9 @@ def test_column_headers_are_sortable_links(client, seed):
 
 def test_sort_toggle_asc_desc_on_repeated_click(client, seed):
     """Clicking the active column's header toggles asc <-> desc."""
-    r_desc = client.get("/transactions/table?sort=amount_desc")
+    r_desc = client.get("/transactions/table?sort=amount_desc", headers={"HX-Request": "true"})
     assert "sort=amount_asc" in r_desc.text
-    r_asc = client.get("/transactions/table?sort=amount_asc")
+    r_asc = client.get("/transactions/table?sort=amount_asc", headers={"HX-Request": "true"})
     assert "sort=amount_desc" in r_asc.text
 
 
