@@ -519,7 +519,12 @@ public enum SnapshotImporter {
                 sourceMachineId: document.header.machineId,
                 schemaVersion: document.header.schemaVersion,
                 counts: SnapshotCodec.jsonColumnString(countsJSON),
-                overwrites: SnapshotCodec.jsonColumnString(overwritesJSON)
+                overwrites: SnapshotCodec.jsonColumnString(overwritesJSON),
+                // Delta provenance from the imported file's header — mirrors
+                // desktop `import_snapshot`'s `is_delta=bool(header.get("delta"))`
+                // / `delta_since=_parse_datetime(header.get("since"))`.
+                isDelta: document.header.delta ?? false,
+                deltaSince: document.header.since.flatMap(SnapshotCodec.parseDateTime)
             )
             try importRecord.insert(db)
             return importRecord

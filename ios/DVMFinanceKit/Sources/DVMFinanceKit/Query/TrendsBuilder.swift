@@ -28,10 +28,65 @@ public enum TrendsBuilder {
             public var id: String { rawValue }
         }
 
+        /// Deviation from `core/trends.py`: rolling "last N months ending
+        /// today" quick ranges, added so the in-progress current month
+        /// (deliberately excluded from `defaultWindow`'s last-12-*full*-
+        /// months default) is one tap away — see `ios/docs/plan.md` iOS UI
+        /// feedback: "no way to quick select the last few months... to
+        /// ensure all transactions for this month are included". Setting a
+        /// `quickRange` takes priority over `preset`/`dateFrom`/`dateTo` in
+        /// `effectiveWindow`; picking a custom date or a calendar `preset`
+        /// clears it, same pattern as `TransactionFilter.preset` clearing
+        /// `dateFrom`/`dateTo`.
+        public enum QuickRange: String, CaseIterable, Identifiable, Sendable, Hashable {
+            case last3Months = "last-3-months"
+            case last6Months = "last-6-months"
+            case last12Months = "last-12-months"
+            case last12FullMonths = "last-12-full-months"
+
+            public var id: String { rawValue }
+
+            public var label: String {
+                switch self {
+                case .last3Months: return "3mo"
+                case .last6Months: return "6mo"
+                case .last12Months: return "12mo"
+                case .last12FullMonths: return "12mo (full)"
+                }
+            }
+
+            /// Rolling ranges end today (current partial month included);
+            /// `.last12FullMonths` reproduces `DateMath.defaultWindow`
+            /// (ends last full month) as an explicit, nameable option.
+            func resolve(today: Date) -> (from: Date, to: Date) {
+                if self == .last12FullMonths {
+                    return DateMath.defaultWindow(today: today)
+                }
+                let monthsBack: Int
+                switch self {
+                case .last3Months: monthsBack = 2
+                case .last6Months: monthsBack = 5
+                case .last12Months: monthsBack = 11
+                case .last12FullMonths: monthsBack = 11 // unreachable, handled above
+                }
+                let (ty, tm, _) = DateMath.components(today)
+                let (startYear, startMonth) = DateMath.shiftMonth(year: ty, month: tm, by: -monthsBack)
+                return (DateMath.date(startYear, startMonth, 1), today)
+            }
+        }
+
         public var granularity: Granularity
         public var dateFrom: Date?
         public var dateTo: Date?
+        public var preset: TransactionFilter.Preset?
+        public var quickRange: QuickRange?
+        public var q: String?
+        public var categories: [String]
+        public var excludeCategories: [String]
+        public var tags: [String]
         public var accounts: [String]
+        public var amountMin: Double?
+        public var amountMax: Double?
         public var includeTransfers: Bool
         public var sort: Sort
 
@@ -39,22 +94,45 @@ public enum TrendsBuilder {
             granularity: Granularity = .month,
             dateFrom: Date? = nil,
             dateTo: Date? = nil,
+            preset: TransactionFilter.Preset? = nil,
+            quickRange: QuickRange? = nil,
+            q: String? = nil,
+            categories: [String] = [],
+            excludeCategories: [String] = [],
+            tags: [String] = [],
             accounts: [String] = [],
+            amountMin: Double? = nil,
+            amountMax: Double? = nil,
             includeTransfers: Bool = false,
             sort: Sort = .categoryAsc
         ) {
             self.granularity = granularity
             self.dateFrom = dateFrom
             self.dateTo = dateTo
+            self.preset = preset
+            self.quickRange = quickRange
+            self.q = q
+            self.categories = categories
+            self.excludeCategories = excludeCategories
+            self.tags = tags
             self.accounts = accounts
+            self.amountMin = amountMin
+            self.amountMax = amountMax
             self.includeTransfers = includeTransfers
             self.sort = sort
         }
 
-        /// Port of `core/trends.py: TrendsParams.effective_window` — each
-        /// missing side defaults independently to the last-12-full-months
-        /// window.
+        /// Port of `core/trends.py: TrendsParams.effective_window`, extended
+        /// with `quickRange` (highest priority) and `preset` (same
+        /// resolution as `TransactionFilter`) ahead of the original
+        /// dateFrom/dateTo-or-default-window fallback.
         public func effectiveWindow(today: Date = Date()) -> (from: Date, to: Date) {
+            if let quickRange {
+                return quickRange.resolve(today: today)
+            }
+            if let preset {
+                return TransactionFilter.resolvePresetRange(preset, today: today)
+            }
             let (lo, hi) = DateMath.defaultWindow(today: today)
             return (dateFrom ?? lo, dateTo ?? hi)
         }
@@ -199,6 +277,54 @@ public enum TrendsBuilder {
             )
         }
 
+        // Deviation from `core/trends.py:aggregate`: category/amount/tags/
+        // search filtering, added so Trends can share the same filter
+        // fields as Transactions (`TransactionQuery.whereClause`) — the
+        // desktop Python trends view has no such filtering. Reuses
+        // `TransactionQuery.categoryCondition` for byte-identical subtree
+        // match semantics between the two screens.
+        if !params.categories.isEmpty {
+            let parts = params.categories.map(TransactionQuery.categoryCondition)
+            conditions.append("(" + parts.map(\.sql).joined(separator: " OR ") + ")")
+            arguments.append(contentsOf: parts.flatMap(\.arguments))
+        }
+        for cat in params.excludeCategories {
+            let cond = TransactionQuery.categoryCondition(cat)
+            if cat == TransactionFilter.uncategorized {
+                conditions.append("NOT \(cond.sql)")
+            } else {
+                conditions.append(
+                    "(\(effCatExpr) IS NULL OR \(effCatExpr) = '' OR NOT \(cond.sql))"
+                )
+            }
+            arguments.append(contentsOf: cond.arguments)
+        }
+        if !params.tags.isEmpty {
+            let parts = params.tags.map { _ in "(\(TransactionQuery.effectiveTagsSQL) LIKE ?)" }
+            conditions.append("(" + parts.joined(separator: " OR ") + ")")
+            for tag in params.tags { arguments.append("%\(tag)%") }
+        }
+        if params.amountMin != nil || params.amountMax != nil {
+            let absExpr = "ABS(CAST(amount AS REAL))"
+            if let mn = params.amountMin, let mx = params.amountMax {
+                conditions.append("(\(absExpr) >= ? AND \(absExpr) <= ?)")
+                arguments.append(mn)
+                arguments.append(mx)
+            } else if let mn = params.amountMin {
+                conditions.append("\(absExpr) >= ?")
+                arguments.append(mn)
+            } else if let mx = params.amountMax {
+                conditions.append("\(absExpr) <= ?")
+                arguments.append(mx)
+            }
+        }
+        if let q = params.q, !q.isEmpty {
+            let like = "%\(q)%"
+            conditions.append("(description LIKE ? OR description_structured LIKE ?)")
+            arguments.append(like)
+            arguments.append(like)
+        }
+
         let sql = """
             SELECT \(periodExpr) AS period_key, \(effCatExpr) AS cat, SUM(CAST(amount AS REAL)) AS total
             FROM transactions
@@ -327,18 +453,31 @@ public enum TrendsBuilder {
     /// the very rows the cell just summed. Passing it through keeps the
     /// spec's round-trip guarantee ("its linked transactions sum exactly to
     /// the cell value") true in every toggle state, not just the default.
+    ///
+    /// Further deviation, added alongside Trends' own category/amount/tags/
+    /// search filtering (`aggregate` above): `excludeCategories`/
+    /// `amountMin`/`amountMax`/`tags`/`q` from `params` are also carried
+    /// through unchanged. `categories` itself deliberately stays
+    /// `row.categories` (the exact set the tapped cell/row summed), not
+    /// `params.categories` — a broader include-list on `params` only
+    /// narrows which rows exist, it never changes what a given surviving
+    /// row's `categories` should filter to.
     public static func transactionFilter(
         for row: TrendRow,
         period: Period,
-        accounts: [String],
-        includeTransfers: Bool = false
+        params: TrendsParams
     ) -> TransactionFilter {
         TransactionFilter(
+            q: params.q,
             dateFrom: period.start,
             dateTo: period.end,
             categories: row.categories,
-            accounts: accounts,
-            includeTransfers: includeTransfers
+            excludeCategories: params.excludeCategories,
+            tags: params.tags,
+            accounts: params.accounts,
+            amountMin: params.amountMin,
+            amountMax: params.amountMax,
+            includeTransfers: params.includeTransfers
         )
     }
 }

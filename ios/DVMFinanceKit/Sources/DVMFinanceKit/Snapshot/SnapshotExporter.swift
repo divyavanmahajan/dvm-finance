@@ -26,16 +26,54 @@ public enum SnapshotExporter {
             try SnapshotCodec.build(db: db, machineId: machineId)
         }
 
-        let stamp = SnapshotCodec.localFilenameStampFormatter.string(from: Date())
-        var path = snapshotsDirectory.appendingPathComponent("snapshot-\(stamp)\(SnapshotCodec.snapshotSuffix)")
-        var suffixCounter = 1
-        while FileManager.default.fileExists(atPath: path.path) {
-            path = snapshotsDirectory.appendingPathComponent("snapshot-\(stamp)-\(suffixCounter)\(SnapshotCodec.snapshotSuffix)")
-            suffixCounter += 1
-        }
-
+        let path = uniquePath(in: snapshotsDirectory, prefix: "snapshot")
         let blob = try SnapshotCodec.write(document)
         try blob.write(to: path, options: .atomic)
+        return path
+    }
+
+    /// Port of `core/snapshots.py:export_snapshot(since=...)`. Builds a
+    /// **delta** snapshot (only transactions with `updated_at >= since`, plus
+    /// full rules/budgets/reports), writes it gzipped to
+    /// `<dataDirectory>/snapshots/delta-<stamp>.json.gz`, and advances the
+    /// `export_state` marker to the export start time — so the next delta
+    /// defaults to "changes since this one". Returns the written file's URL.
+    @discardableResult
+    public static func exportDeltaSnapshot(
+        appDatabase: AppDatabase,
+        dataDirectory: URL,
+        since: Date
+    ) throws -> URL {
+        let snapshotsDirectory = dataDirectory.appendingPathComponent(subdirectoryName, isDirectory: true)
+        try FileManager.default.createDirectory(at: snapshotsDirectory, withIntermediateDirectories: true)
+
+        let machineId = try MachineID.get(dataDirectory: dataDirectory)
+        // Captured before the build, matching desktop's `export_started_at =
+        // datetime.now()` taken ahead of `build_snapshot`.
+        let exportStartedAt = Date()
+        let document = try appDatabase.dbWriter.write { db -> SnapshotDocument in
+            let document = try SnapshotCodec.build(db: db, machineId: machineId, since: since)
+            try ExportStateRecord.setLastDeltaExportAt(db, exportStartedAt)
+            return document
+        }
+
+        let path = uniquePath(in: snapshotsDirectory, prefix: "delta")
+        let blob = try SnapshotCodec.write(document)
+        try blob.write(to: path, options: .atomic)
+        return path
+    }
+
+    /// Builds `<directory>/<prefix>-<stamp>.json.gz`, deduping with a `-1`,
+    /// `-2`, ... suffix exactly like Python's `export_snapshot` (so two
+    /// exports within the same second never clobber each other).
+    private static func uniquePath(in directory: URL, prefix: String) -> URL {
+        let stamp = SnapshotCodec.localFilenameStampFormatter.string(from: Date())
+        var path = directory.appendingPathComponent("\(prefix)-\(stamp)\(SnapshotCodec.snapshotSuffix)")
+        var suffixCounter = 1
+        while FileManager.default.fileExists(atPath: path.path) {
+            path = directory.appendingPathComponent("\(prefix)-\(stamp)-\(suffixCounter)\(SnapshotCodec.snapshotSuffix)")
+            suffixCounter += 1
+        }
         return path
     }
 }

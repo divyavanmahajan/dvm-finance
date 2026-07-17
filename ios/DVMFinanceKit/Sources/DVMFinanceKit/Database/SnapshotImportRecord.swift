@@ -17,6 +17,13 @@ public struct SnapshotImportRecord: Codable, Equatable, FetchableRecord, Mutable
     public var schemaVersion: Int?
     public var counts: String?
     public var overwrites: String?
+    /// Delta-snapshot provenance, read from the imported file's header
+    /// (`SnapshotHeader.delta`/`since`): `isDelta` is `true` and `deltaSince`
+    /// carries the `since` boundary when the imported file was a delta/partial
+    /// snapshot. Port of `core/models.py: SnapshotImport.is_delta`/
+    /// `delta_since` (columns added by the `v2` migration).
+    public var isDelta: Bool
+    public var deltaSince: Date?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -25,6 +32,8 @@ public struct SnapshotImportRecord: Codable, Equatable, FetchableRecord, Mutable
         case schemaVersion = "schema_version"
         case counts
         case overwrites
+        case isDelta = "is_delta"
+        case deltaSince = "delta_since"
     }
 
     public init(
@@ -33,7 +42,9 @@ public struct SnapshotImportRecord: Codable, Equatable, FetchableRecord, Mutable
         sourceMachineId: String? = nil,
         schemaVersion: Int? = nil,
         counts: String? = nil,
-        overwrites: String? = nil
+        overwrites: String? = nil,
+        isDelta: Bool = false,
+        deltaSince: Date? = nil
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -41,6 +52,8 @@ public struct SnapshotImportRecord: Codable, Equatable, FetchableRecord, Mutable
         self.schemaVersion = schemaVersion
         self.counts = counts
         self.overwrites = overwrites
+        self.isDelta = isDelta
+        self.deltaSince = deltaSince
     }
 
     public static var databaseDateDecodingStrategy: DatabaseDateDecodingStrategy {

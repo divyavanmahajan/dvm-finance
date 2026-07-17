@@ -39,21 +39,37 @@ public enum SnapshotError: Error, LocalizedError, Equatable {
 // MARK: - Snapshot document model
 
 /// Port of `core/snapshots.py:build_snapshot`'s `header` dict.
+///
+/// `delta`/`since` are only present (both, or neither) when this is a delta
+/// snapshot — a full snapshot omits both keys entirely, matching desktop's
+/// `header["delta"] = True` only being set inside `if since is not None`.
 public struct SnapshotHeader: Codable, Equatable {
     public var schemaVersion: Int
     public var exportedAt: String
     public var machineId: String
+    public var delta: Bool?
+    public var since: String?
 
     enum CodingKeys: String, CodingKey {
         case schemaVersion = "schema_version"
         case exportedAt = "exported_at"
         case machineId = "machine_id"
+        case delta
+        case since
     }
 
-    public init(schemaVersion: Int, exportedAt: String, machineId: String) {
+    public init(
+        schemaVersion: Int,
+        exportedAt: String,
+        machineId: String,
+        delta: Bool? = nil,
+        since: String? = nil
+    ) {
         self.schemaVersion = schemaVersion
         self.exportedAt = exportedAt
         self.machineId = machineId
+        self.delta = delta
+        self.since = since
     }
 }
 
@@ -84,6 +100,13 @@ public struct SnapshotTransaction: Codable, Equatable {
     public var transactionTypeCode: String?
     public var transactionReference: String?
     public var transactionHash: String?
+    /// ISO-8601 datetime string (or `nil`); passed through verbatim between
+    /// the DB column and the snapshot — desktop renders it via
+    /// `datetime.isoformat()` (possibly microsecond-precision), iOS at second
+    /// precision, and the delta filter/round-trip only need lexicographic
+    /// ordering, so no normalization is applied here. Port of the
+    /// `updated_at` key `core/snapshots.py:_txn_dict` now emits.
+    public var updatedAt: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -107,6 +130,7 @@ public struct SnapshotTransaction: Codable, Equatable {
         case transactionTypeCode = "transaction_type_code"
         case transactionReference = "transaction_reference"
         case transactionHash = "transaction_hash"
+        case updatedAt = "updated_at"
     }
 }
 
@@ -364,7 +388,8 @@ public enum SnapshotCodec {
             sourceLine: record.sourceLine,
             transactionTypeCode: record.transactionTypeCode,
             transactionReference: record.transactionReference,
-            transactionHash: record.transactionHash
+            transactionHash: record.transactionHash,
+            updatedAt: record.updatedAt
         )
     }
 
@@ -404,7 +429,8 @@ public enum SnapshotCodec {
             sourceLine: snapshot.sourceLine,
             transactionTypeCode: snapshot.transactionTypeCode,
             transactionReference: snapshot.transactionReference,
-            transactionHash: snapshot.transactionHash
+            transactionHash: snapshot.transactionHash,
+            updatedAt: snapshot.updatedAt
         )
     }
 
@@ -548,6 +574,7 @@ public enum SnapshotCodec {
             "transaction_type_code": .from(snapshot.transactionTypeCode),
             "transaction_reference": .from(snapshot.transactionReference),
             "transaction_hash": .from(snapshot.transactionHash),
+            "updated_at": .from(snapshot.updatedAt),
         ]
     }
 
@@ -568,15 +595,31 @@ public enum SnapshotCodec {
     /// Port of `core/snapshots.py:build_snapshot`. Transactions ordered by
     /// `id asc`, rules by `uuid asc`, budgets by `id asc`, reports by
     /// `created_at asc, id asc` — the same orderings the Python query uses.
-    public static func build(db: Database, machineId: String) throws -> SnapshotDocument {
+    ///
+    /// When `since` is provided this is a **delta** snapshot: `transactions`
+    /// is limited to rows with `updated_at >= since` (rows with a `nil`
+    /// `updated_at` — never touched since that column was added — are
+    /// excluded, matching desktop's `.isnot(None)` filter), and the header
+    /// carries `delta: true`/`since: <iso8601>`. Rules/budgets/reports are
+    /// still exported in full either way — only `transactions` is filtered,
+    /// same as desktop.
+    public static func build(db: Database, machineId: String, since: Date? = nil) throws -> SnapshotDocument {
         let header = SnapshotHeader(
             schemaVersion: schemaVersion,
             exportedAt: renderDateTime(Date()),
-            machineId: machineId
+            machineId: machineId,
+            delta: since != nil ? true : nil,
+            since: since.map(renderDateTime)
         )
 
-        let transactions = try TransactionRecord
-            .order(Column("id").asc)
+        var transactionRequest = TransactionRecord.order(Column("id").asc)
+        if let since {
+            let sinceString = renderDateTime(since)
+            transactionRequest = transactionRequest
+                .filter(Column("updated_at") != nil)
+                .filter(Column("updated_at") >= sinceString)
+        }
+        let transactions = try transactionRequest
             .fetchAll(db)
             .map(makeSnapshotTransaction)
 

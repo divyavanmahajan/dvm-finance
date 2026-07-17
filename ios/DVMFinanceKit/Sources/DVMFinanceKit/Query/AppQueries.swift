@@ -56,6 +56,14 @@ public enum AppQueries {
         }
     }
 
+    /// Distinct individual tags present in the data, for the filter sheet's
+    /// tag autocomplete. Wraps `TransactionQuery.distinctEffectiveTags`.
+    public static func distinctTags(appDatabase: AppDatabase) async throws -> [String] {
+        try await appDatabase.dbWriter.read { db in
+            try TransactionQuery.distinctEffectiveTags(db: db)
+        }
+    }
+
     // MARK: - Transaction detail
 
     public struct TransactionDetail {
@@ -140,6 +148,152 @@ public enum AppQueries {
                 categorized: categorizedCount,
                 uncategorized: newIds.count - categorizedCount
             )
+        }
+    }
+
+    // MARK: - Manual category/tag edits
+
+    /// Sets the manual category and returns the updated transaction. Wraps
+    /// `TransactionMutations.setManualCategory` (port of
+    /// `api/transactions.py:set_manual_category`).
+    @discardableResult
+    public static func setManualCategory(
+        appDatabase: AppDatabase,
+        transactionId: String,
+        manualCategory: String
+    ) async throws -> TransactionRecord {
+        try await appDatabase.dbWriter.write { db in
+            try TransactionMutations.setManualCategory(db: db, transactionId: transactionId, manualCategory: manualCategory)
+        }
+    }
+
+    /// Sets manual tags and returns the updated transaction. Wraps
+    /// `TransactionMutations.setManualTags`.
+    @discardableResult
+    public static func setManualTags(
+        appDatabase: AppDatabase,
+        transactionId: String,
+        manualTags: String
+    ) async throws -> TransactionRecord {
+        try await appDatabase.dbWriter.write { db in
+            try TransactionMutations.setManualTags(db: db, transactionId: transactionId, manualTags: manualTags)
+        }
+    }
+
+    /// Clears the manual category (restoring the rule value). Wraps
+    /// `TransactionMutations.clearManualCategory`.
+    @discardableResult
+    public static func clearManualCategory(
+        appDatabase: AppDatabase,
+        transactionId: String
+    ) async throws -> TransactionRecord {
+        try await appDatabase.dbWriter.write { db in
+            try TransactionMutations.clearManualCategory(db: db, transactionId: transactionId)
+        }
+    }
+
+    /// Clears manual tags (restoring the rule value). Wraps
+    /// `TransactionMutations.clearManualTags`.
+    @discardableResult
+    public static func clearManualTags(
+        appDatabase: AppDatabase,
+        transactionId: String
+    ) async throws -> TransactionRecord {
+        try await appDatabase.dbWriter.write { db in
+            try TransactionMutations.clearManualTags(db: db, transactionId: transactionId)
+        }
+    }
+
+    // MARK: - Budgets
+
+    /// The budget-vs-actual report for the given period filter and reference
+    /// date. Wraps `BudgetReport.budgetVsActual`.
+    public static func budgetReport(
+        appDatabase: AppDatabase,
+        reference: Date = Date(),
+        period: BudgetReport.Period? = nil,
+        excludeTransfers: Bool = true
+    ) async throws -> [BudgetReport.Row] {
+        try await appDatabase.dbWriter.read { db in
+            try BudgetReport.budgetVsActual(
+                db: db, reference: reference, period: period, excludeTransfers: excludeTransfers)
+        }
+    }
+
+    /// The average monthly actual spend for a category over the last N full
+    /// months, used to propose an amount on the "add budget" form. Wraps
+    /// `BudgetReport.averageMonthlySpend`.
+    public static func budgetAverageHint(
+        appDatabase: AppDatabase,
+        category: String,
+        reference: Date = Date()
+    ) async throws -> Double {
+        let normalized = CoreNormalize.normalizeCategory(category)
+        guard let normalized, !normalized.isEmpty else { return 0 }
+        return try await appDatabase.dbWriter.read { db in
+            try BudgetReport.averageMonthlySpend(db: db, category: normalized, reference: reference)
+        }
+    }
+
+    /// Top-level effective categories present in the data — the suggestion
+    /// list for the "add budget" category field. Wraps
+    /// `BudgetReport.distinctTopLevelCategories`.
+    public static func budgetCategorySuggestions(appDatabase: AppDatabase) async throws -> [String] {
+        try await appDatabase.dbWriter.read { db in
+            try BudgetReport.distinctTopLevelCategories(db: db)
+        }
+    }
+
+    @discardableResult
+    public static func createBudget(
+        appDatabase: AppDatabase,
+        input: BudgetMutations.Input
+    ) async throws -> BudgetRecord {
+        try await appDatabase.dbWriter.write { db in
+            try BudgetMutations.create(db: db, input: input)
+        }
+    }
+
+    @discardableResult
+    public static func updateBudget(
+        appDatabase: AppDatabase,
+        budgetId: Int64,
+        input: BudgetMutations.Input
+    ) async throws -> BudgetRecord {
+        try await appDatabase.dbWriter.write { db in
+            try BudgetMutations.update(db: db, budgetId: budgetId, input: input)
+        }
+    }
+
+    public static func deleteBudget(appDatabase: AppDatabase, budgetId: Int64) async throws {
+        try await appDatabase.dbWriter.write { db in
+            try BudgetMutations.delete(db: db, budgetId: budgetId)
+        }
+    }
+
+    /// Creates a budget of `period` for every top-level category without one,
+    /// seeded from its recent average (annualized for `.year`). Returns the
+    /// categories created. Wraps `BudgetMutations.seedTopLevelBudgets`.
+    @discardableResult
+    public static func seedTopLevelBudgets(
+        appDatabase: AppDatabase,
+        period: BudgetReport.Period = .month,
+        reference: Date = Date()
+    ) async throws -> [String] {
+        try await appDatabase.dbWriter.write { db in
+            try BudgetMutations.seedTopLevelBudgets(db: db, period: period, reference: reference)
+        }
+    }
+
+    // MARK: - Delta export
+
+    /// The stored last-delta-export boundary the "Export changes since..."
+    /// UI defaults to, or `nil` if no delta has been exported yet. Wraps
+    /// `ExportStateRecord.getLastDeltaExportAt` so the app target never spells
+    /// a GRDB `Database` type.
+    public static func lastDeltaExportAt(appDatabase: AppDatabase) async throws -> Date? {
+        try await appDatabase.dbWriter.read { db in
+            try ExportStateRecord.getLastDeltaExportAt(db)
         }
     }
 
