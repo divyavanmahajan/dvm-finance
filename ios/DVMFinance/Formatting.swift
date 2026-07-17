@@ -54,6 +54,13 @@ enum DisplayFormat {
         return formatter.string(from: NSDecimalNumber(decimal: amount)) ?? "\(amount) \(code)"
     }
 
+    /// Currency-formatted `Double`, for budget/actual figures which come off
+    /// the report builder as `Double` sums rather than a single record's
+    /// `Decimal`. Defaults to EUR (the app's home currency).
+    static func currency(_ value: Double, code: String = "EUR") -> String {
+        currency(Decimal(value), code: code)
+    }
+
     /// Compact form for narrow trends-table cells, e.g. `-1.2K`, `3.4M`. Full
     /// precision is always available on tap (row/cell detail), so lossy
     /// rounding here is a deliberate legibility trade-off, not a data

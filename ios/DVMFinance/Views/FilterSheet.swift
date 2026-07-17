@@ -1,23 +1,34 @@
 import SwiftUI
 import DVMFinanceKit
 
-/// Modal filter editor for `TransactionsView` (`ios/docs/spec.md` "UI" §1).
-/// Edits a local draft and only writes back to the bound `filter` when the
-/// user taps Apply, so backing out (Cancel/swipe-to-dismiss) never mutates
-/// the live list.
-struct FilterSheet: View {
+/// Modal filter editor, generic over `DVMFinanceKit.FilterFields` so
+/// Transactions (`TransactionFilter`) and Trends (`TrendsBuilder.TrendsParams`)
+/// share one editing UI (`ios/docs/plan.md` iOS UI feedback: "Trends page -
+/// there are no filters on this page - use the same filters as
+/// transactions"). Edits a local draft and only writes back to the bound
+/// `filter` when the user taps Apply, so backing out (Cancel/swipe-to-
+/// dismiss) never mutates the live list.
+struct FilterSheet<F: FilterFields>: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appDatabase) private var appDatabase
 
-    @Binding var filter: TransactionFilter
+    @Binding var filter: F
 
-    @State private var draft: TransactionFilter
+    @State private var draft: F
     @State private var availableCategories: [String] = []
     @State private var availableAccounts: [String] = []
+    @State private var availableTags: [String] = []
 
-    init(filter: Binding<TransactionFilter>) {
+    /// Only `TransactionFilter` paginates; `TrendsBuilder.TrendsParams` has
+    /// no `page` field, so resetting to page 1 on Apply is expressed as a
+    /// closure the Transactions call site supplies instead of a protocol
+    /// requirement every conforming type would otherwise need.
+    var onApply: (inout F) -> Void = { _ in }
+
+    init(filter: Binding<F>, onApply: @escaping (inout F) -> Void = { _ in }) {
         self._filter = filter
         self._draft = State(initialValue: filter.wrappedValue)
+        self.onApply = onApply
     }
 
     var body: some View {
@@ -25,11 +36,10 @@ struct FilterSheet: View {
             Form {
                 searchSection
                 dateSection
-                categorySection
-                excludeCategorySection
+                categoriesSection
+                tagsSection
                 accountSection
                 amountSection
-                tagsSection
                 transfersSection
                 clearSection
             }
@@ -41,7 +51,7 @@ struct FilterSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Apply") {
-                        draft.page = 1
+                        onApply(&draft)
                         filter = draft
                         dismiss()
                     }
@@ -106,13 +116,32 @@ struct FilterSheet: View {
         )
     }
 
-    private var categorySection: some View {
+    private var categoriesSection: some View {
         Section("Categories") {
             Toggle("Uncategorized only", isOn: uncategorizedToggle)
-            ForEach(availableCategories, id: \.self) { category in
-                pickerRow(category, selection: $draft.categories)
+            NavigationLink {
+                CategoryPickerView(
+                    categories: $draft.categories,
+                    excludeCategories: $draft.excludeCategories,
+                    availableCategories: availableCategories
+                )
+            } label: {
+                HStack {
+                    Text("Categories")
+                    Spacer()
+                    Text(categoriesSummary)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
         }
+    }
+
+    private var categoriesSummary: String {
+        var parts: [String] = []
+        if !draft.categories.isEmpty { parts.append("\(draft.categories.count) included") }
+        if !draft.excludeCategories.isEmpty { parts.append("\(draft.excludeCategories.count) excluded") }
+        return parts.isEmpty ? "Any" : parts.joined(separator: ", ")
     }
 
     private var uncategorizedToggle: Binding<Bool> {
@@ -128,14 +157,6 @@ struct FilterSheet: View {
                 }
             }
         )
-    }
-
-    private var excludeCategorySection: some View {
-        Section("Exclude categories") {
-            ForEach(availableCategories, id: \.self) { category in
-                pickerRow(category, selection: $draft.excludeCategories)
-            }
-        }
     }
 
     private var accountSection: some View {
@@ -165,20 +186,18 @@ struct FilterSheet: View {
 
     private var tagsSection: some View {
         Section("Tags") {
-            TextField("Comma-separated tags", text: tagsText)
-        }
-    }
-
-    private var tagsText: Binding<String> {
-        Binding(
-            get: { draft.tags.joined(separator: ", ") },
-            set: { text in
-                draft.tags = text
-                    .split(separator: ",")
-                    .map { $0.trimmingCharacters(in: .whitespaces) }
-                    .filter { !$0.isEmpty }
+            NavigationLink {
+                TagPickerView(selected: $draft.tags, availableTags: availableTags)
+            } label: {
+                HStack {
+                    Text("Tags")
+                    Spacer()
+                    Text(draft.tags.isEmpty ? "Any" : draft.tags.joined(separator: ", "))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
-        )
+        }
     }
 
     private var transfersSection: some View {
@@ -192,7 +211,7 @@ struct FilterSheet: View {
     private var clearSection: some View {
         Section {
             Button("Clear all filters", role: .destructive) {
-                draft = TransactionFilter()
+                draft = F.empty()
             }
         }
     }
@@ -226,9 +245,11 @@ struct FilterSheet: View {
         do {
             async let categoriesTask = AppQueries.distinctEffectiveCategories(appDatabase: appDatabase)
             async let accountsTask = AppQueries.distinctAccounts(appDatabase: appDatabase)
-            let (categories, accounts) = try await (categoriesTask, accountsTask)
+            async let tagsTask = AppQueries.distinctTags(appDatabase: appDatabase)
+            let (categories, accounts, tags) = try await (categoriesTask, accountsTask, tagsTask)
             availableCategories = categories
             availableAccounts = accounts
+            availableTags = tags
         } catch {
             // Best-effort: pickers just stay empty if this fails.
         }

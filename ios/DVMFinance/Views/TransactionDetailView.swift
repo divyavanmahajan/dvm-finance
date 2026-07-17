@@ -15,6 +15,19 @@ struct TransactionDetailView: View {
     @State private var structuredFields: [(key: String, value: String)] = []
     @State private var loadErrorMessage: String?
 
+    // Manual edit state. `isEditing` swaps the Categorization section from the
+    // read-only rows to editable fields; the draft strings are seeded from the
+    // current manual values when editing begins. Writes go through
+    // `AppQueries.setManual*`/`clearManual*` (ports of
+    // `api/transactions.py`), which pin `categorization_source = "manual"` and
+    // stamp `updated_at` so the change reaches the next delta snapshot.
+    @State private var isEditing = false
+    @State private var draftManualCategory = ""
+    @State private var draftManualTagList: [String] = []
+    @State private var availableTags: [String] = []
+    @State private var availableCategories: [String] = []
+    @State private var saveErrorMessage: String?
+
     var body: some View {
         Group {
             if let transaction {
@@ -31,14 +44,36 @@ struct TransactionDetailView: View {
                     }
 
                     Section("Categorization") {
-                        labeledRow("Effective category", TransactionQuery.effectiveCategory(transaction) ?? "Uncategorized")
-                        labeledRow("Effective tags", TransactionQuery.effectiveTags(transaction) ?? "—")
+                        HStack {
+                            Text("Effective category").foregroundStyle(.secondary)
+                            Spacer(minLength: 12)
+                            CategoryChip(category: TransactionQuery.effectiveCategory(transaction))
+                        }
+                        .font(.subheadline)
+                        if let tags = TransactionQuery.effectiveTags(transaction), !tags.isEmpty {
+                            HStack(alignment: .top) {
+                                Text("Effective tags").foregroundStyle(.secondary)
+                                Spacer(minLength: 12)
+                                HStack(spacing: 6) { TagChips(tags: tags) }
+                            }
+                            .font(.subheadline)
+                        }
                         labeledRow("Raw category", transaction.category ?? "—")
-                        labeledRow("Manual category", transaction.manualCategory ?? "—")
                         labeledRow("Raw tags", transaction.tags ?? "—")
-                        labeledRow("Manual tags", transaction.manualTags ?? "—")
+
+                        if isEditing {
+                            editableManualFields(transaction)
+                        } else {
+                            labeledRow("Manual category", transaction.manualCategory ?? "—")
+                            labeledRow("Manual tags", transaction.manualTags ?? "—")
+                        }
+
                         labeledRow("Categorized by", categorizationSourceLabel)
                         labeledRow("Manually categorized", TransactionQuery.isManual(transaction) ? "Yes" : "No")
+
+                        if let saveErrorMessage {
+                            Text(saveErrorMessage).foregroundStyle(.red).font(.subheadline)
+                        }
                     }
 
                     Section("Source") {
@@ -78,7 +113,162 @@ struct TransactionDetailView: View {
         }
         .navigationTitle("Transaction")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if transaction != nil {
+                ToolbarItem(placement: .primaryAction) {
+                    Button(isEditing ? "Done" : "Edit") {
+                        if isEditing {
+                            isEditing = false
+                        } else {
+                            beginEditing()
+                        }
+                    }
+                }
+            }
+        }
         .task { await load() }
+    }
+
+    /// Editable manual category/tags plus a per-field "clear (restore rule)"
+    /// action. Category is normalized on save (`CoreNormalize.normalizeCategory`
+    /// via the Kit); tags keep their case (`set_manual_tags` semantics).
+    @ViewBuilder
+    private func editableManualFields(_ transaction: TransactionRecord) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Manual category").foregroundStyle(.secondary).font(.subheadline)
+            TextField("Category (e.g. fixed-insurance)", text: $draftManualCategory)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .onSubmit { Task { await saveManualCategory() } }
+            if !categorySuggestions.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(categorySuggestions, id: \.self) { suggestion in
+                            Button { draftManualCategory = suggestion } label: {
+                                CategoryChip(category: suggestion)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+            HStack {
+                Button("Save category") { Task { await saveManualCategory() } }
+                    .buttonStyle(.borderless)
+                Spacer()
+                if transaction.manualCategory != nil {
+                    Button("Clear", role: .destructive) { Task { await clearCategory() } }
+                        .buttonStyle(.borderless)
+                }
+            }
+            .font(.subheadline)
+        }
+
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Manual tags").foregroundStyle(.secondary).font(.subheadline)
+            NavigationLink {
+                TagPickerView(selected: $draftManualTagList, availableTags: availableTags)
+            } label: {
+                HStack(spacing: 6) {
+                    if draftManualTagList.isEmpty {
+                        Text("Add tags…").foregroundStyle(.secondary)
+                    } else {
+                        HStack(spacing: 6) { TagChips(tags: draftManualTagList.joined(separator: ", ")) }
+                    }
+                    Spacer()
+                }
+            }
+            HStack {
+                Button("Save tags") { Task { await saveManualTags() } }
+                    .buttonStyle(.borderless)
+                Spacer()
+                if transaction.manualTags != nil {
+                    Button("Clear", role: .destructive) { Task { await clearTags() } }
+                        .buttonStyle(.borderless)
+                }
+            }
+            .font(.subheadline)
+        }
+    }
+
+    private func beginEditing() {
+        draftManualCategory = transaction?.manualCategory ?? ""
+        draftManualTagList = Self.splitTags(transaction?.manualTags)
+        saveErrorMessage = nil
+        isEditing = true
+    }
+
+    /// Effective-category values matching what's currently typed, for quick
+    /// one-tap manual categorization (partial, case-insensitive contains).
+    private var categorySuggestions: [String] {
+        let trimmed = draftManualCategory.trimmingCharacters(in: .whitespaces).lowercased()
+        let base = trimmed.isEmpty
+            ? availableCategories
+            : availableCategories.filter { $0.lowercased().contains(trimmed) && $0.lowercased() != trimmed }
+        return Array(base.prefix(10))
+    }
+
+    private static func splitTags(_ value: String?) -> [String] {
+        (value ?? "")
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
+
+    private func saveManualCategory() async {
+        guard let appDatabase else { return }
+        do {
+            let updated = try await AppQueries.setManualCategory(
+                appDatabase: appDatabase, transactionId: transactionId, manualCategory: draftManualCategory)
+            applyUpdated(updated)
+        } catch {
+            saveErrorMessage = "Couldn't save category: \(error.localizedDescription)"
+        }
+    }
+
+    private func saveManualTags() async {
+        guard let appDatabase else { return }
+        do {
+            let updated = try await AppQueries.setManualTags(
+                appDatabase: appDatabase, transactionId: transactionId,
+                manualTags: draftManualTagList.joined(separator: ", "))
+            applyUpdated(updated)
+        } catch {
+            saveErrorMessage = "Couldn't save tags: \(error.localizedDescription)"
+        }
+    }
+
+    private func clearCategory() async {
+        guard let appDatabase else { return }
+        do {
+            let updated = try await AppQueries.clearManualCategory(
+                appDatabase: appDatabase, transactionId: transactionId)
+            applyUpdated(updated)
+        } catch {
+            saveErrorMessage = "Couldn't clear category: \(error.localizedDescription)"
+        }
+    }
+
+    private func clearTags() async {
+        guard let appDatabase else { return }
+        do {
+            let updated = try await AppQueries.clearManualTags(
+                appDatabase: appDatabase, transactionId: transactionId)
+            applyUpdated(updated)
+        } catch {
+            saveErrorMessage = "Couldn't clear tags: \(error.localizedDescription)"
+        }
+    }
+
+    /// Reflects a mutation's returned record back into the view and re-seeds
+    /// the draft fields, so the read-only rows and the edit fields stay in
+    /// sync without a full reload.
+    private func applyUpdated(_ updated: TransactionRecord) {
+        transaction = updated
+        draftManualCategory = updated.manualCategory ?? ""
+        draftManualTagList = Self.splitTags(updated.manualTags)
+        saveErrorMessage = nil
     }
 
     private var categorizationSourceLabel: String {
@@ -114,6 +304,8 @@ struct TransactionDetailView: View {
             transaction = detail.transaction
             rule = detail.matchedRule
             structuredFields = Self.parseStructuredFields(detail.transaction.descriptionStructured)
+            availableTags = (try? await AppQueries.distinctTags(appDatabase: appDatabase)) ?? []
+            availableCategories = (try? await AppQueries.distinctEffectiveCategories(appDatabase: appDatabase)) ?? []
         } catch {
             loadErrorMessage = "Couldn't load this transaction: \(error.localizedDescription)"
         }
