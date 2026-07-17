@@ -69,9 +69,19 @@ def test_trends_replaces_placeholder(client, seed):
 
 
 def test_trends_table_partial(client, seed):
-    r = client.get(f"/trends/table?{QS}")
+    r = client.get(f"/trends/table?{QS}", headers={"HX-Request": "true"})
     assert r.status_code == 200
     assert "<html" not in r.text.lower()
+    assert "groceries" in r.text
+
+
+def test_trends_table_direct_navigation_renders_full_page(client, seed):
+    # A refresh lands here because hx-push-url puts /trends/table?... in the
+    # address bar; without the HX-Request header (i.e. no htmx swap in
+    # flight) it must render the full page, not a bare table fragment.
+    r = client.get(f"/trends/table?{QS}")
+    assert r.status_code == 200
+    assert "<html" in r.text.lower()
     assert "groceries" in r.text
 
 
@@ -114,7 +124,12 @@ def test_uncategorized_click_through(client, seed):
 
 
 def test_account_filter_propagates_to_links(client, seed):
-    r = client.get(f"/trends?{QS}&account=NL02")
+    # /trends/table (not /trends) — the full page's new Categories/Exclude
+    # filter pickers legitimately list every known category regardless of
+    # the active account filter (matching Transactions' own category
+    # picker), so "groceries" appearing there isn't a leak of filtered-out
+    # rows; this asserts against the matrix rows specifically.
+    r = client.get(f"/trends/table?{QS}&account=NL02", headers={"HX-Request": "true"})
     assert "salary" in r.text
     assert "groceries" not in r.text
     expected = (
@@ -145,13 +160,13 @@ def test_negative_amounts_styled(client, seed):
 
 
 def test_headers_are_sortable_links(client, seed):
-    r = client.get(f"/trends/table?{QS}")
+    r = client.get(f"/trends/table?{QS}", headers={"HX-Request": "true"})
     assert "sortable-th" in r.text
     assert "sort=total_asc" in r.text  # default sort is category_asc; total starts asc
 
 
 def test_sort_by_total_asc_orders_rows(client, seed):
-    r = client.get(f"/trends/table?{QS}&sort=total_asc")
+    r = client.get(f"/trends/table?{QS}&sort=total_asc", headers={"HX-Request": "true"})
     body = r.text
     # totals in this window: groceries ~-70, dining -50, uncategorized -8.
     # total_asc (most negative first) => groceries, dining, uncategorized.
@@ -159,15 +174,15 @@ def test_sort_by_total_asc_orders_rows(client, seed):
 
 
 def test_sort_category_desc_orders_alphabetically_reversed(client, seed):
-    r = client.get(f"/trends/table?{QS}&sort=category_desc")
+    r = client.get(f"/trends/table?{QS}&sort=category_desc", headers={"HX-Request": "true"})
     body = r.text
     assert body.index("Uncategorized") < body.index("groceries")
 
 
 def test_sort_toggle_asc_desc_on_repeated_click(client, seed):
-    r_asc = client.get(f"/trends/table?{QS}&sort=total_asc")
+    r_asc = client.get(f"/trends/table?{QS}&sort=total_asc", headers={"HX-Request": "true"})
     assert "sort=total_desc" in r_asc.text
-    r_desc = client.get(f"/trends/table?{QS}&sort=total_desc")
+    r_desc = client.get(f"/trends/table?{QS}&sort=total_desc", headers={"HX-Request": "true"})
     assert "sort=total_asc" in r_desc.text
 
 

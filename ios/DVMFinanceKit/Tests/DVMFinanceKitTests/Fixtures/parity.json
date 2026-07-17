@@ -1,0 +1,234 @@
+{
+  "normalize_string_for_matching": [
+    {
+      "input": null,
+      "expected": ""
+    },
+    {
+      "input": "",
+      "expected": ""
+    },
+    {
+      "input": "   ",
+      "expected": ""
+    },
+    {
+      "input": "Albert Heijn 1234",
+      "expected": "albertheijn1234"
+    },
+    {
+      "input": "WERO/Payment To John",
+      "expected": "paymenttojohn"
+    },
+    {
+      "input": "WERO /Payment",
+      "expected": "payment"
+    },
+    {
+      "input": "  SEPA  Overboeking\tIBAN: NL91ABNA0417164300  ",
+      "expected": "sepaoverboekingiban:nl91abna0417164300"
+    },
+    {
+      "input": "MiXeD CaSe",
+      "expected": "mixedcase"
+    },
+    {
+      "input": "wero/lower",
+      "expected": "wero/lower"
+    },
+    {
+      "input": "Ümlaut Ströße",
+      "expected": "ümlautströße"
+    },
+    {
+      "input": "a  b\nc\td",
+      "expected": "abcd"
+    }
+  ],
+  "normalize_category": [
+    {
+      "input": null,
+      "expected": null
+    },
+    {
+      "input": "",
+      "expected": null
+    },
+    {
+      "input": "  ",
+      "expected": null
+    },
+    {
+      "input": "Groceries",
+      "expected": "groceries"
+    },
+    {
+      "input": "Food, Groceries",
+      "expected": "food, groceries"
+    },
+    {
+      "input": " FIXED-Insurance-Life ",
+      "expected": "fixed-insurance-life"
+    },
+    {
+      "input": "a,,b",
+      "expected": "a, b"
+    },
+    {
+      "input": ", ,",
+      "expected": null
+    },
+    {
+      "input": "Transfer-Wise",
+      "expected": "transfer-wise"
+    }
+  ],
+  "transaction_hash": [
+    {
+      "date": "2026-01-15",
+      "description": "Albert Heijn 1234",
+      "amount": "-12.30",
+      "account": "NL91ABNA0417164300",
+      "expected": "2763e77e5b03923df43d6edc15225dc91642fd033fb5565c29616d783d15492d"
+    },
+    {
+      "date": "2026-01-15",
+      "description": null,
+      "amount": null,
+      "account": null,
+      "expected": "dfde67335b742c60213b834cb46f82e36d9d7e017f13c4df2ce89dda8179c4a1"
+    },
+    {
+      "date": null,
+      "description": "WERO/Pay",
+      "amount": "12",
+      "account": "acct 1",
+      "expected": "c0435220abb701a1c8d6adb000dcfff3c7112cdf214690f08e95581f7ab65aff"
+    },
+    {
+      "date": "2026-02-03",
+      "description": "x",
+      "amount": "abc",
+      "account": "A",
+      "expected": "487b154e27ab838d47508f0e3051fc79961d6e5b37ade7f853c742630ef48bec"
+    },
+    {
+      "date": "2025-12-31",
+      "description": "Ümlaut",
+      "amount": "100",
+      "account": "SE1",
+      "expected": "040d0791af56634a6c9997df3dc2723f5c0f97a3468097fbf50443692d126c3a"
+    }
+  ],
+  "transaction_id": [
+    {
+      "accountNumber": "NL91ABNA0417164300",
+      "transactiondate": "2026-01-15",
+      "amount": "-12.30",
+      "description": "Albert Heijn 1234",
+      "expected": "NL91ABNA0417164300_2026-01-15_-12.30_8515822962dc15e3"
+    },
+    {
+      "accountNumber": "NL91ABNA0417164300",
+      "transactiondate": "2026-01-15",
+      "amount": "-12.30",
+      "description": "",
+      "expected": "NL91ABNA0417164300_2026-01-15_-12.30_d41d8cd98f00b204"
+    },
+    {
+      "accountNumber": "ACC",
+      "transactiondate": "2026-06-01",
+      "amount": "100.00",
+      "description": "Ümlaut Ströße",
+      "expected": "ACC_2026-06-01_100.00_81a038d46ff9a684"
+    },
+    {
+      "accountNumber": "ACC",
+      "transactiondate": "2026-06-01",
+      "amount": "100",
+      "description": "same amount different string",
+      "expected": "ACC_2026-06-01_100_4401cc0ee3b063bd"
+    },
+    {
+      "accountNumber": "paypal@x.com",
+      "paypal_transaction_id": "9AB12345CD",
+      "transactiondate": "2026-03-01",
+      "amount": "5",
+      "description": "d",
+      "expected": "paypal@x.com_9AB12345CD"
+    },
+    {
+      "accountNumber": "wiseacct",
+      "wise_transaction_id": "TRANSFER-123",
+      "transactiondate": "2026-03-01",
+      "amount": "5",
+      "description": "d",
+      "expected": "wiseacct_TRANSFER-123"
+    },
+    {
+      "accountNumber": "sebacct",
+      "seb_voucher_id": "V-77",
+      "transactiondate": "2026-03-01",
+      "amount": "5",
+      "description": "d",
+      "expected": "sebacct_V-77"
+    },
+    {
+      "accountNumber": "",
+      "transactiondate": null,
+      "amount": null,
+      "description": null,
+      "expected": "_None_None_6adf97f83acf6453"
+    }
+  ],
+  "transaction_id_float_amounts": [
+    {
+      "accountNumber": "NL91",
+      "transactiondate": "2026-01-15",
+      "amount": -12.3,
+      "description": "Albert Heijn",
+      "amount_str_python": "-12.3",
+      "expected": "NL91_2026-01-15_-12.3_e26669b355297972"
+    },
+    {
+      "accountNumber": "NL91",
+      "transactiondate": "2026-01-15",
+      "amount": 5.0,
+      "description": "five",
+      "amount_str_python": "5.0",
+      "expected": "NL91_2026-01-15_5.0_30056e1cab7a61d2"
+    },
+    {
+      "accountNumber": "NL91",
+      "transactiondate": "2026-01-15",
+      "amount": 100.0,
+      "description": "hundred",
+      "amount_str_python": "100.0",
+      "expected": "NL91_2026-01-15_100.0_34b569aa5f872cc9"
+    },
+    {
+      "accountNumber": "NL91",
+      "transactiondate": "2026-01-15",
+      "amount": -0.1,
+      "description": "tenth",
+      "amount_str_python": "-0.1",
+      "expected": "NL91_2026-01-15_-0.1_4758950de9a04905"
+    },
+    {
+      "accountNumber": "NL91",
+      "transactiondate": "2026-01-15",
+      "amount": 1234.56,
+      "description": "x",
+      "amount_str_python": "1234.56",
+      "expected": "NL91_2026-01-15_1234.56_9dd4e461268c8034"
+    },
+    {
+      "accountNumber": "NL91",
+      "transactiondate": "2026-01-15",
+      "amount": 0.07,
+      "description": "seven cents",
+      "amount_str_python": "0.07",
+      "expected": "NL91_2026-01-15_0.07_b1f978cd68958523"
+    }
+  ]
+}

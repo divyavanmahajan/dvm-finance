@@ -34,6 +34,7 @@ NAV_TABS = [
     ("/download", "Download"),
     ("/upload", "Upload"),
     ("/snapshots", "Snapshots"),
+    ("/help", "Help"),
 ]
 
 def _css_id(s: str) -> str:
@@ -118,6 +119,7 @@ API_ROUTER_MODULES = [
     "cash_flow",
     "downloads",
     "snapshots",
+    "help",
 ]
 
 

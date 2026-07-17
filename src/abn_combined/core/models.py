@@ -59,6 +59,11 @@ class Transaction(Base):
     transaction_type_code: Mapped[str | None] = mapped_column(String, nullable=True)
     transaction_reference: Mapped[str | None] = mapped_column(String, nullable=True)
     transaction_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    # Stamped on every write that changes category/tags/manual fields/source
+    # (manual set/clear, bulk-tag, rule-driven recategorization). Powers delta
+    # snapshots ("only transactions changed since <since>"). Nullable so rows
+    # predating this column read as "never touched" until first re-touched.
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
 
     __table_args__ = (Index("idx_account_date", "accountNumber", "transactiondate"),)
 
@@ -215,6 +220,22 @@ class DownloadState(Base):
     )
 
 
+class ExportState(Base):
+    """Single-row marker table tracking the last successful delta export.
+
+    Holds one row (id=1). ``last_delta_export_at`` is the ``since`` boundary
+    the delta-export UI defaults to, so a delta covers "everything changed
+    since the previous delta export" without the user having to remember or
+    re-run a full export first. The user may still override the boundary in the
+    export form.
+    """
+
+    __tablename__ = "export_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    last_delta_export_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
 class SnapshotImport(Base):
     """Report for a snapshot import (incoming-wins merge)."""
 
@@ -228,3 +249,8 @@ class SnapshotImport(Base):
     schema_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
     counts: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     overwrites: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Delta-snapshot provenance (from the imported file's header): True + the
+    # ``since`` boundary when the imported file was a partial/delta snapshot,
+    # so the import report can note "this was a delta snapshot from <date>".
+    is_delta: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    delta_since: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

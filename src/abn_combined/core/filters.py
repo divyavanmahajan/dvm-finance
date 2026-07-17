@@ -360,6 +360,24 @@ def _num(value: float) -> str:
 # ---------------------------------------------------------------------------
 
 
+def category_condition(eff_cat, cat: str):
+    """Match a category exactly or any hierarchical child (hyphen-separated).
+
+    Module-level (not nested in `build_query`) so `core/trends.py:aggregate`
+    can share the exact same subtree-match semantics when it grows the same
+    category include/exclude filters as Transactions — see
+    `ios/docs/plan.md`-style deviation note in `trends.py` for why Trends
+    ended up with its own filter fields at all.
+    """
+    if cat == UNCATEGORIZED:
+        return or_(eff_cat.is_(None), eff_cat == "")
+    c = cat.lower()
+    return or_(
+        func.lower(eff_cat) == c,
+        func.lower(eff_cat).like(f"{c}{CATEGORY_SEPARATOR}%"),
+    )
+
+
 def build_query(db: Session, f: TransactionFilter, today: date | None = None) -> Query:
     """Build the filtered (unpaginated, unsorted) transaction query."""
     query = db.query(Transaction)
@@ -388,27 +406,17 @@ def build_query(db: Session, f: TransactionFilter, today: date | None = None) ->
             or_(eff_cat.is_(None), eff_cat == "", ~eff_cat.ilike('%transfer%'))
         )
 
-    def _category_cond(cat: str):
-        """Match a category exactly or any hierarchical child (hyphen-separated)."""
-        if cat == UNCATEGORIZED:
-            return or_(eff_cat.is_(None), eff_cat == "")
-        c = cat.lower()
-        return or_(
-            func.lower(eff_cat) == c,
-            func.lower(eff_cat).like(f"{c}{CATEGORY_SEPARATOR}%"),
-        )
-
     if f.categories:
-        query = query.filter(or_(*[_category_cond(cat) for cat in f.categories]))
+        query = query.filter(or_(*[category_condition(eff_cat, cat) for cat in f.categories]))
 
     if f.exclude_categories:
         for cat in f.exclude_categories:
             if cat == UNCATEGORIZED:
-                query = query.filter(~_category_cond(cat))
+                query = query.filter(~category_condition(eff_cat, cat))
             else:
                 # NOT LIKE is NULL for uncategorized rows; keep them explicitly.
                 query = query.filter(
-                    or_(eff_cat.is_(None), eff_cat == "", ~_category_cond(cat))
+                    or_(eff_cat.is_(None), eff_cat == "", ~category_condition(eff_cat, cat))
                 )
 
     if f.tags:

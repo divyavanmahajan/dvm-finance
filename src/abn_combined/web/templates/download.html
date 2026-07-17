@@ -75,10 +75,27 @@
       </div>
       <div class="card-body">
 
-        <p class="text-muted small mb-3">
-          Start Chrome with remote debugging before clicking the button:
+        <p class="text-muted small mb-2">
+          Chrome needs remote debugging enabled before a PayPal download can connect to it.
         </p>
-        <pre class="bg-light p-2 rounded mb-3"><code>{{ chrome_launch_command }}</code></pre>
+
+        <form
+          hx-post="/api/download/paypal/launch-chrome"
+          hx-target="#paypal-chrome-status"
+          hx-swap="innerHTML"
+          hx-disabled-elt="button[type=submit]"
+          class="mb-2">
+          <input type="hidden" name="cdp_url" value="{{ default_cdp_url }}">
+          <button type="submit" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-window"></i> Launch Chrome for PayPal
+          </button>
+        </form>
+        <div id="paypal-chrome-status" class="mb-2"></div>
+
+        <details class="text-muted small mb-3">
+          <summary>Or start it manually in a terminal</summary>
+          <pre class="bg-light p-2 rounded mt-2 mb-0"><code>{{ chrome_launch_command }}</code></pre>
+        </details>
 
         <form
           hx-post="/api/download/paypal"
@@ -101,9 +118,9 @@
 
           <div class="mb-3">
             <label for="cdp-url" class="form-label">CDP URL <span class="text-muted">(optional)</span></label>
-            <input type="text" id="cdp-url" class="form-control" name="cdp_url" value="http://127.0.0.1:9222"
-                   placeholder="http://127.0.0.1:9222">
-            <small class="form-text text-muted">Default: http://127.0.0.1:9222</small>
+            <input type="text" id="cdp-url" class="form-control" name="cdp_url" value="{{ default_cdp_url }}"
+                   placeholder="{{ default_cdp_url }}">
+            <small class="form-text text-muted">Default: {{ default_cdp_url }}</small>
           </div>
 
           {% if paypal_job and not paypal_job.is_terminal() %}

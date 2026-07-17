@@ -26,6 +26,27 @@
           <button type="submit" class="btn btn-primary">Export snapshot</button>
         </form>
 
+        <hr class="my-3">
+
+        <form method="post" action="/snapshots/export-delta">
+          <p class="text-muted small mb-2">Export only transactions changed since a point in time —
+             a lightweight delta for syncing just recent edits to another device. Rules and budgets
+             are still included in full; import merges it exactly like a normal snapshot.</p>
+          <div class="mb-2">
+            <label for="delta-since" class="form-label small mb-1">Changes since</label>
+            <input type="datetime-local" id="delta-since" name="since" class="form-control form-control-sm"
+                   value="{{ last_delta_export_at.strftime('%Y-%m-%dT%H:%M') if last_delta_export_at else '' }}">
+            <div class="form-text">
+              {% if last_delta_export_at %}
+                Defaults to your last delta export ({{ last_delta_export_at.strftime('%Y-%m-%d %H:%M') }}).
+              {% else %}
+                No previous delta export — leave blank to include every changed transaction.
+              {% endif %}
+            </div>
+          </div>
+          <button type="submit" class="btn btn-outline-primary">Export changes since…</button>
+        </form>
+
         {% if exports %}
         <div class="table-responsive mt-3">
           <table class="table table-sm table-hover">
