@@ -25,6 +25,15 @@ from abn_combined.core.models import CategorizationRule, Transaction
 
 pytestmark = pytest.mark.e2e
 
+
+@pytest.fixture(scope="session")
+def browser_type_launch_args(browser_type_launch_args):
+    """Run e2e against the installed Google Chrome instead of Playwright's
+    bundled Chromium — matches the app's own CDP-attach approach and means
+    `playwright install` is never required."""
+    return {**browser_type_launch_args, "channel": "chrome"}
+
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCREENSHOT_DIR = REPO_ROOT / "docs" / "phase" / "init" / "13-e2e-and-release" / "screenshots"
 

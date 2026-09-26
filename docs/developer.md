@@ -4,7 +4,8 @@
 
 - Python 3.12+, FastAPI, SQLAlchemy 2.x, Alembic, Jinja2
 - htmx + Alpine.js (vendored, no build step), Pico.css
-- Playwright (downloads + e2e tests), platformdirs
+- Playwright (downloads + e2e tests), connects to the installed Google Chrome over CDP — no
+  bundled browser, no `playwright install`; platformdirs
 - Packaging: `src/abn_combined/` layout, hatchling, PyPI package `dvm-finance`, console script `dvm-finance`.
   The Alembic tree (`alembic.ini` + `alembic/`) is force-included in the wheel as
   `abn_combined/alembic{,.ini}` so packaged/uvx installs migrate on startup
@@ -18,7 +19,6 @@ Use the shared virtualenv:
 ```bash
 source ~/venv/bin/activate
 pip install -e ".[dev]"
-playwright install chromium
 ```
 
 ## Commands
@@ -35,7 +35,9 @@ pytest                          # unit + integration (e2e/slow deselected by def
 pytest --cov=abn_combined       # with coverage (fail_under = 80, wired in pyproject.toml)
 pytest -m e2e                   # Playwright e2e: boots real app instances on random
                                 # ports against seeded temp data dirs (tests/e2e/ +
-                                # tests/test_snapshots_e2e.py); headless Chromium
+                                # tests/test_snapshots_e2e.py); runs on the installed
+                                # Google Chrome (channel="chrome") — install Chrome,
+                                # no `playwright install` needed
 
 # Run the app (dev)
 dvm-finance --data-dir ./devdata

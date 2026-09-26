@@ -18,23 +18,6 @@ router = APIRouter()
 logger = get_logger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Playwright availability check (NFR5)
-# ---------------------------------------------------------------------------
-
-def _playwright_available() -> bool:
-    """Return True when Playwright is installed *and* Chromium browsers are present."""
-    try:
-        from playwright.sync_api import sync_playwright  # noqa: F401
-
-        with sync_playwright() as pw:
-            # executable_path raises or returns empty string when missing.
-            path = pw.chromium.executable_path
-            return bool(path)
-    except Exception:  # noqa: BLE001
-        return False
-
-
 def _templates(request: Request):
     from ..app import templates
 
@@ -97,11 +80,12 @@ def download_page(
     abn_job = registry.get("abn")
     paypal_job = registry.get("paypal")
 
-    playwright_ok = _playwright_available()
     abn_from, abn_to = _abn_default_dates(db)
     pp_from, pp_to = _paypal_default_dates(db)
 
-    from ..downloaders.paypal import CHROME_LAUNCH_COMMAND, DEFAULT_CDP_URL
+    from ..downloaders.abn import ABN_TRANSACTIONS_URL
+    from ..downloaders.browser import DEFAULT_CDP_URL, chrome_launch_command
+    from ..downloaders.paypal import PAYPAL_REPORTS_URL
 
     return _templates(request).TemplateResponse(
         request,
@@ -109,14 +93,14 @@ def download_page(
         {
             "active_path": "/download",
             "title": "Download",
-            "playwright_available": playwright_ok,
             "abn_job": abn_job,
             "paypal_job": paypal_job,
             "abn_from": abn_from,
             "abn_to": abn_to,
             "pp_from": pp_from,
             "pp_to": pp_to,
-            "chrome_launch_command": CHROME_LAUNCH_COMMAND,
+            "abn_chrome_launch_command": chrome_launch_command(ABN_TRANSACTIONS_URL),
+            "paypal_chrome_launch_command": chrome_launch_command(PAYPAL_REPORTS_URL),
             "default_cdp_url": DEFAULT_CDP_URL,
         },
     )
@@ -132,6 +116,7 @@ def start_abn_download(
     request: Request,
     from_date: Annotated[str, Form()] = "",
     to_date: Annotated[str, Form()] = "",
+    cdp_url: Annotated[str, Form()] = "",
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     """Start an ABN AMRO download job in a background thread."""
@@ -140,15 +125,14 @@ def start_abn_download(
     if registry.is_running("abn"):
         raise HTTPException(status_code=409, detail="ABN AMRO download already running.")
 
-    if not _playwright_available():
-        raise HTTPException(
-            status_code=503,
-            detail="Playwright/Chromium not available. Run: playwright install chromium",
-        )
-
     # Resolve dates (fall back to defaults if blank).
     if not from_date or not to_date:
         from_date, to_date = _abn_default_dates(db)
+
+    from ..downloaders.browser import DEFAULT_CDP_URL
+
+    if not cdp_url:
+        cdp_url = DEFAULT_CDP_URL
 
     settings = request.app.state.settings
 
@@ -159,6 +143,7 @@ def start_abn_download(
     t = threading.Thread(
         target=run_abn_job,
         args=(registry, settings, _DEFAULT_ACCOUNTS, from_date, to_date),
+        kwargs={"cdp_url": cdp_url},
         daemon=True,
         name="abn-download",
     )
@@ -168,27 +153,33 @@ def start_abn_download(
     return _status_partial(request, "abn")
 
 
-@router.post("/api/download/paypal/launch-chrome", response_class=HTMLResponse)
-def launch_chrome_for_paypal(
+@router.post("/api/download/{source}/launch-chrome", response_class=HTMLResponse)
+def launch_chrome(
+    source: str,
     request: Request,
     cdp_url: Annotated[str, Form()] = "",
 ) -> HTMLResponse:
-    """Launch real Chrome with remote debugging, so the user no longer has to
-    copy `chrome_launch_command` into a terminal by hand before starting a
-    PayPal download."""
-    from ..downloaders.paypal import DEFAULT_CDP_URL
-    from ..downloaders.paypal import launch_chrome_for_paypal as _launch
+    """Launch real Chrome with remote debugging for *source* ('abn' or
+    'paypal'), so the user no longer has to copy the launch command into a
+    terminal by hand before starting a download."""
+    from ..downloaders.abn import ABN_TRANSACTIONS_URL
+    from ..downloaders.browser import DEFAULT_CDP_URL, launch_chrome_debug
+    from ..downloaders.paypal import PAYPAL_REPORTS_URL
+
+    start_urls = {"abn": ABN_TRANSACTIONS_URL, "paypal": PAYPAL_REPORTS_URL}
+    if source not in start_urls:
+        raise HTTPException(status_code=404, detail=f"Unknown source: {source}")
 
     try:
-        _launch(cdp_url or DEFAULT_CDP_URL)
+        launch_chrome_debug(cdp_url or DEFAULT_CDP_URL, start_urls[source])
     except FileNotFoundError as exc:
-        logger.warning("paypal_chrome_launch_failed", error=str(exc))
+        logger.warning("chrome_launch_failed", source=source, error=str(exc))
         return _templates(request).TemplateResponse(
-            request, "_paypal_chrome_status.html", {"error": str(exc)}
+            request, "_chrome_status.html", {"error": str(exc), "source": source}
         )
-    logger.info("paypal_chrome_launched", cdp_url=cdp_url or DEFAULT_CDP_URL)
+    logger.info("chrome_launched", source=source, cdp_url=cdp_url or DEFAULT_CDP_URL)
     return _templates(request).TemplateResponse(
-        request, "_paypal_chrome_status.html", {"error": None}
+        request, "_chrome_status.html", {"error": None, "source": source}
     )
 
 
