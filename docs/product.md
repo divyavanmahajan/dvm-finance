@@ -18,7 +18,7 @@ Removed on purpose: graphs, LLM categorization, MCP servers, login.
 
 ## Key flows
 
-1. Download tab → authenticate in opened browser → statements imported → summary.
+1. Download tab → launch/connect to your Chrome (CDP) → authenticate → statements imported → summary.
 2. Filter Uncategorized → create rule from a transaction → preview matches → save → change report.
 3. Trends cell click → filtered transaction list for that category/period.
 4. Edit rule → preview impact → save → audit history per rule.

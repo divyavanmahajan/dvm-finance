@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 from ..core.jobs import JobRegistry, JobState
 from ..logging_config import get_logger
+from .browser import DEFAULT_CDP_URL, connect_failure_message
 
 if TYPE_CHECKING:
     from ..settings import Settings
@@ -155,11 +156,18 @@ def run_abn_job(
     from_date: str,
     to_date: str,
     from_last_download_date: bool = False,
+    cdp_url: str = DEFAULT_CDP_URL,
 ) -> None:
     """Worker function — runs in a dedicated thread.
 
     Updates registry state as the job progresses:
     pending → waiting-for-auth → downloading → importing → done/failed.
+
+    Connects to the user's real Chrome over CDP (same approach as the PayPal
+    downloader) instead of launching a Playwright-managed browser — so this
+    never needs `playwright install`, and the persistent Chrome profile keeps
+    ABN AMRO session cookies across runs. On CDP connection failure, fails
+    immediately with the exact Chrome launch command.
     """
     from playwright.sync_api import TimeoutError as PWTimeout
     from playwright.sync_api import sync_playwright
@@ -174,24 +182,47 @@ def run_abn_job(
         registry.update_state(source, JobState.FAILED, msg)
         if browser is not None:
             try:
-                browser.close()
+                browser.disconnect()
             except Exception:  # noqa: BLE001
                 pass
 
-    registry.update_state(source, JobState.WAITING_FOR_AUTH, "Waiting for ABN AMRO app authentication…")
+    registry.update_state(
+        source,
+        JobState.WAITING_FOR_AUTH,
+        f"Connecting to Chrome at {cdp_url}…",
+    )
 
     try:
         with sync_playwright() as pw:
-            browser = pw.chromium.launch(headless=False)
-            context = browser.new_context()
+            # Fail fast if CDP Chrome is not running.
+            try:
+                browser = pw.chromium.connect_over_cdp(cdp_url)
+            except Exception as exc:  # noqa: BLE001
+                _fail(connect_failure_message(cdp_url, exc, ABN_TRANSACTIONS_URL))
+                return
+
+            if not browser.contexts:
+                _fail(
+                    "Connected Chrome has no open contexts. "
+                    "Ensure Chrome was started with --remote-debugging-port=9226."
+                )
+                return
+
+            context = browser.contexts[0]
             page = context.new_page()
             page.goto(ABN_TRANSACTIONS_URL, wait_until="load")
             dismiss_cookie_banner(page)
 
+            registry.update_state(
+                source,
+                JobState.WAITING_FOR_AUTH,
+                "Waiting for ABN AMRO app authentication (check the Chrome window)…",
+            )
+
             try:
                 _wait_for_app_login_redirect(page)
             except PWTimeout:
-                _fail("Authentication timeout — browser closed. Please retry and complete login within 5 minutes.")
+                _fail("Authentication timeout. Please retry and complete login within 5 minutes.")
                 return
             except Exception as exc:  # noqa: BLE001
                 _fail(f"Authentication error: {exc}")
@@ -207,8 +238,14 @@ def run_abn_job(
                 _fail(f"Download failed: {exc}")
                 return
             finally:
+                # Close the tab we opened and disconnect — never close the
+                # user's real Chrome (browser.close() would kill it).
                 try:
-                    browser.close()
+                    page.close()
+                except Exception:  # noqa: BLE001
+                    pass
+                try:
+                    browser.disconnect()
                     browser = None
                 except Exception:  # noqa: BLE001
                     pass

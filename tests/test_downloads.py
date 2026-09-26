@@ -185,8 +185,11 @@ def test_paypal_constants() -> None:
 
 
 def test_chrome_launch_command_contains_debug_port() -> None:
-    assert "--remote-debugging-port=9226" in paypal.CHROME_LAUNCH_COMMAND
-    assert "Chrome" in paypal.CHROME_LAUNCH_COMMAND
+    from abn_combined.downloaders.browser import chrome_launch_command
+
+    command = chrome_launch_command(paypal.PAYPAL_REPORTS_URL)
+    assert "--remote-debugging-port=9226" in command
+    assert "Chrome" in command
 
 
 def test_to_paypal_datetime() -> None:
@@ -579,7 +582,7 @@ def test_run_paypal_job_cdp_unreachable_fails_with_launch_command(settings) -> N
 
 
 # ===========================================================================
-# _connect_failure_message — PayPal CDP diagnostic helper
+# connect_failure_message — shared CDP diagnostic helper (src/.../downloaders/browser.py)
 # ===========================================================================
 
 
@@ -588,11 +591,15 @@ class TestConnectFailureMessage:
 
     def test_browser_context_not_supported_with_browser_id(self, monkeypatch) -> None:
         """When something is on the port and identifies itself, name it."""
+        import abn_combined.downloaders.browser as browser_mod
+
         monkeypatch.setattr(
-            paypal, "identify_cdp_endpoint", lambda url, timeout=3.0: "SomeElectronApp/1.0"
+            browser_mod, "identify_cdp_endpoint", lambda url, timeout=3.0: "SomeElectronApp/1.0"
         )
         exc = Exception("Browser context management is not supported")
-        msg = paypal._connect_failure_message("http://127.0.0.1:9226", exc)
+        msg = browser_mod.connect_failure_message(
+            "http://127.0.0.1:9226", exc, paypal.PAYPAL_REPORTS_URL
+        )
         assert "Browser context management is not supported" not in msg or "SomeElectronApp" in msg
         assert "SomeElectronApp/1.0" in msg
         assert "9223" in msg          # suggests alternate port
@@ -607,21 +614,25 @@ class TestConnectFailureMessage:
 
     def test_browser_context_not_supported_no_browser_id(self, monkeypatch) -> None:
         """When nothing responds on the port, say 'did not identify itself'."""
-        monkeypatch.setattr(
-            paypal, "identify_cdp_endpoint", lambda url, timeout=3.0: None
-        )
+        import abn_combined.downloaders.browser as browser_mod
+
+        monkeypatch.setattr(browser_mod, "identify_cdp_endpoint", lambda url, timeout=3.0: None)
         exc = Exception("Browser context management is not supported")
-        msg = paypal._connect_failure_message("http://127.0.0.1:9222", exc)
+        msg = browser_mod.connect_failure_message(
+            "http://127.0.0.1:9222", exc, paypal.PAYPAL_REPORTS_URL
+        )
         assert "did not identify itself" in msg
         assert "9223" in msg
 
     def test_generic_failure_message(self, monkeypatch) -> None:
         """Any other exception returns the generic 'Could not connect' message."""
-        monkeypatch.setattr(
-            paypal, "identify_cdp_endpoint", lambda url, timeout=3.0: None
-        )
+        import abn_combined.downloaders.browser as browser_mod
+
+        monkeypatch.setattr(browser_mod, "identify_cdp_endpoint", lambda url, timeout=3.0: None)
         exc = ConnectionRefusedError("Connection refused")
-        msg = paypal._connect_failure_message("http://127.0.0.1:9226", exc)
+        msg = browser_mod.connect_failure_message(
+            "http://127.0.0.1:9226", exc, paypal.PAYPAL_REPORTS_URL
+        )
         assert "Could not connect to Chrome" in msg
         assert "--remote-debugging-port=9226" in msg
         assert str(exc) in msg

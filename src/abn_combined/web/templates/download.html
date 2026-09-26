@@ -16,13 +16,28 @@
       </div>
       <div class="card-body">
 
-        {% if not playwright_available %}
-        <div class="alert alert-warning" role="alert">
-          <p class="mb-2"><strong>Playwright / Chromium is not installed.</strong> The ABN AMRO flow requires a headed browser.</p>
-          <p class="mb-0">Run in your terminal:</p>
-          <pre class="mt-2 mb-0"><code>playwright install chromium</code></pre>
-        </div>
-        {% else %}
+        <p class="text-muted small mb-2">
+          Chrome needs remote debugging enabled before an ABN AMRO download can connect to it.
+        </p>
+
+        <form
+          hx-post="/api/download/abn/launch-chrome"
+          hx-target="#abn-chrome-status"
+          hx-swap="innerHTML"
+          hx-disabled-elt="button[type=submit]"
+          class="mb-2">
+          <input type="hidden" name="cdp_url" value="{{ default_cdp_url }}">
+          <button type="submit" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-window"></i> Launch Chrome for ABN AMRO
+          </button>
+        </form>
+        <div id="abn-chrome-status" class="mb-2"></div>
+
+        <details class="text-muted small mb-3">
+          <summary>Or start it manually in a terminal</summary>
+          <pre class="bg-light p-2 rounded mt-2 mb-0"><code>{{ abn_chrome_launch_command }}</code></pre>
+        </details>
+
         <form
           hx-post="/api/download/abn"
           hx-target="#abn-status"
@@ -42,8 +57,15 @@
             </div>
           </div>
 
+          <div class="mb-3">
+            <label for="abn-cdp-url" class="form-label">CDP URL <span class="text-muted">(optional)</span></label>
+            <input type="text" id="abn-cdp-url" class="form-control" name="cdp_url" value="{{ default_cdp_url }}"
+                   placeholder="{{ default_cdp_url }}">
+            <small class="form-text text-muted">Default: {{ default_cdp_url }}</small>
+          </div>
+
           <p class="text-muted small mb-3">
-            A headed Chromium window will open. Authenticate with the ABN AMRO app when prompted.
+            Connects to your Chrome via remote debugging. Approve the login in the ABN AMRO app when prompted.
           </p>
 
           {% if abn_job and not abn_job.is_terminal() %}
@@ -55,7 +77,6 @@
           <button type="submit" class="btn btn-primary">Start ABN download</button>
           {% endif %}
         </form>
-        {% endif %}
       </div>
       <div id="abn-status">
         {% if abn_job %}
@@ -94,7 +115,7 @@
 
         <details class="text-muted small mb-3">
           <summary>Or start it manually in a terminal</summary>
-          <pre class="bg-light p-2 rounded mt-2 mb-0"><code>{{ chrome_launch_command }}</code></pre>
+          <pre class="bg-light p-2 rounded mt-2 mb-0"><code>{{ paypal_chrome_launch_command }}</code></pre>
         </details>
 
         <form

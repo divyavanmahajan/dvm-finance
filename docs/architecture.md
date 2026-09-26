@@ -8,7 +8,7 @@ Single Python package `abn_combined` serving a local, single-user, server-render
 | Web framework | FastAPI + Jinja2 templates |
 | Frontend | htmx + Alpine.js (vendored), Pico.css — no build step |
 | DB | SQLite (data dir via platformdirs), SQLAlchemy 2.x, Alembic migrations |
-| Browser automation | Playwright sync API (ABN download), CDP attach (PayPal download) |
+| Browser automation | CDP attach to the user's installed Chrome (ABN + PayPal downloads) — no bundled browser |
 | Packaging | hatchling, `src/` layout, PyPI package + console script `dvm-finance`, runnable via `uvx dvm-finance`; Alembic tree bundled into the wheel (`abn_combined/alembic{,.ini}` via force-include) so packaged installs migrate on startup |
 | Auth | None (binds 127.0.0.1) |
 
@@ -21,7 +21,7 @@ CLI entry ── uvicorn ── FastAPI
    ├─ core/         rule engine + preview + change reports, dedup,
    │                snapshot export/import, legacy migration, models
    ├─ parsers/      mt940, xls, csv, paypal, wise, seb, description
-   └─ downloaders/  abn (Playwright), paypal (CDP) — background jobs
+   └─ downloaders/  abn, paypal (both CDP via browser.py) — background jobs
 ```
 
 ## Data model (delta vs abn-analyst)
