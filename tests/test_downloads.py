@@ -577,7 +577,8 @@ def test_run_paypal_job_cdp_unreachable_fails_with_launch_command(settings) -> N
     )
     job = reg.get("paypal")
     assert job.state == JobState.FAILED
-    assert "--remote-debugging-port=9226" in job.message
+    # The suggested launch command uses the port the user actually configured.
+    assert "--remote-debugging-port=59999" in job.message
     assert "Could not connect to Chrome" in job.message
 
 
@@ -602,14 +603,11 @@ class TestConnectFailureMessage:
         )
         assert "Browser context management is not supported" not in msg or "SomeElectronApp" in msg
         assert "SomeElectronApp/1.0" in msg
-        assert "9223" in msg          # suggests alternate port
+        assert "9227" in msg          # suggests alternate port (conflicted + 1)
         assert "9226" in msg          # names the conflicted port
         # The suggested *launch command* must actually use the alternate
-        # port, not just the trailing "then use http://...9223" sentence —
-        # `.replace("9222", "9223")` was a no-op against a command that
-        # contains "9226", not "9222", so the command silently still showed
-        # the conflicted port; `.replace("9226", "9223")` is the real fix.
-        assert "--remote-debugging-port=9223" in msg
+        # port, not just the trailing "then use http://...9227" sentence.
+        assert "--remote-debugging-port=9227" in msg
         assert "--remote-debugging-port=9226" not in msg
 
     def test_browser_context_not_supported_no_browser_id(self, monkeypatch) -> None:

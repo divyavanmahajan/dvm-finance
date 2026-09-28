@@ -20,13 +20,33 @@ CHROME_APP_PATH = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 CHROME_USER_DATA_DIR = "~/.chrome/debugdir"
 
 
-def chrome_launch_command(start_url: str) -> str:
+def cdp_port(cdp_url: str) -> int:
+    """The debug port a CDP URL points at (default port when unparseable)."""
+    from urllib.parse import urlparse
+
+    try:
+        port = urlparse(cdp_url).port
+    except ValueError:
+        port = None
+    return port or urlparse(DEFAULT_CDP_URL).port
+
+
+def chrome_launch_command(start_url: str, cdp_url: str = DEFAULT_CDP_URL) -> str:
     """The exact Chrome launch command shown to the user when CDP connection
-    fails, opening *start_url*."""
+    fails, opening *start_url* on the port *cdp_url* points at."""
     return (
         f"{CHROME_APP_PATH.replace(' ', '\\ ')} "
-        f"--remote-debugging-port=9226 --user-data-dir={CHROME_USER_DATA_DIR} "
+        f"--remote-debugging-port={cdp_port(cdp_url)} "
+        f"--user-data-dir={CHROME_USER_DATA_DIR} "
         f"{start_url}"
+    )
+
+
+def no_contexts_message(cdp_url: str) -> str:
+    """Failure message for a CDP browser that exposes no contexts."""
+    return (
+        "Connected Chrome has no open contexts. Ensure Chrome was started "
+        f"with --remote-debugging-port={cdp_port(cdp_url)}."
     )
 
 
@@ -44,15 +64,14 @@ def launch_chrome_debug(cdp_url: str, start_url: str) -> None:
     """
     import os
     import subprocess
-    from urllib.parse import urlparse
 
     if not os.path.exists(CHROME_APP_PATH):
         raise FileNotFoundError(
             f"Chrome not found at {CHROME_APP_PATH!r}. Run this in your terminal:\n"
-            f"{chrome_launch_command(start_url)}"
+            f"{chrome_launch_command(start_url, cdp_url)}"
         )
 
-    port = urlparse(cdp_url).port or urlparse(DEFAULT_CDP_URL).port
+    port = cdp_port(cdp_url)
     user_data_dir = os.path.expanduser(CHROME_USER_DATA_DIR)
     subprocess.Popen(
         [
@@ -82,19 +101,19 @@ def identify_cdp_endpoint(cdp_url: str, timeout: float = 3.0) -> str | None:
 def connect_failure_message(cdp_url: str, exc: Exception, start_url: str) -> str:
     """A targeted, actionable message for CDP connect failures."""
     browser = identify_cdp_endpoint(cdp_url)
-    launch_command = chrome_launch_command(start_url)
     if "Browser context management is not supported" in str(exc):
         who = f"reports itself as {browser!r}" if browser else "did not identify itself"
+        alt_url = f"http://127.0.0.1:{cdp_port(cdp_url) + 1}"
         return (
             f"Something is listening on {cdp_url} but it is not a full Chrome browser "
             f"(it {who}). Most likely another application is already using that port, "
             "so the Chrome you launched could not bind it. Either quit that application, "
             "or launch Chrome on a different port and put the matching URL in the "
             "'CDP URL' field, e.g.:\n"
-            + launch_command.replace("9226", "9223")
-            + "\nthen use http://127.0.0.1:9223"
+            + chrome_launch_command(start_url, alt_url)
+            + f"\nthen use {alt_url}"
         )
     return (
         f"Could not connect to Chrome at {cdp_url}. Please start Chrome with:\n"
-        f"{launch_command}\n\nError: {exc}"
+        f"{chrome_launch_command(start_url, cdp_url)}\n\nError: {exc}"
     )
