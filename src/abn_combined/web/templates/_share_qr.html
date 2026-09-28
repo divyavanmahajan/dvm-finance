@@ -1,0 +1,21 @@
+{#
+  QR panel for a one-shot LAN snapshot share.
+  Variables: share (SnapshotShare), qr_data_uri (str), timeout_minutes (int)
+#}
+<div class="card mt-2">
+  <div class="card-body text-center">
+    <p class="mb-2">
+      Scan with the DVM Finance app (<em>Sync from computer</em>) on the same Wi-Fi.
+    </p>
+    <img src="{{ qr_data_uri }}" alt="QR code for {{ share.url }}"
+         style="width: 240px; max-width: 100%;">
+    <p class="text-muted small mb-1 mt-2"><code>{{ share.url }}</code></p>
+    <p class="text-muted small mb-2">
+      Serving <code>{{ share.path.name }}</code> — one download,
+      expires in {{ timeout_minutes }} minutes.
+    </p>
+    <form hx-post="/snapshots/share/stop" hx-target="#share-qr" hx-swap="innerHTML">
+      <button type="submit" class="btn btn-outline-secondary btn-sm">Stop sharing</button>
+    </form>
+  </div>
+</div>

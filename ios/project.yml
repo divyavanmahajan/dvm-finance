@@ -42,6 +42,12 @@ targets:
         # Signing & Capabilities tab after `xcodegen generate` (see README).
         DEVELOPMENT_TEAM: ""
         GENERATE_INFOPLIST_FILE: YES
+        # Partial plist merged on top of the generated Info.plist — holds the
+        # QR-sync keys that have no INFOPLIST_KEY_* build setting (camera
+        # usage, local-network usage, and the NSAllowsLocalNetworking ATS
+        # exception for the plain-HTTP LAN snapshot download). See the
+        # comment inside DVMFinance/Info.plist.
+        INFOPLIST_FILE: DVMFinance/Info.plist
         INFOPLIST_KEY_CFBundleDisplayName: "DVM Finance"
         INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.finance"
         INFOPLIST_KEY_UILaunchScreen_Generation: YES

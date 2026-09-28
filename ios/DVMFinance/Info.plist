@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!--
+  Partial Info.plist for keys that have no INFOPLIST_KEY_* build-setting
+  equivalent (or belong together with one that doesn't). The rest of the
+  Info.plist is still generated (GENERATE_INFOPLIST_FILE: YES in
+  project.yml); Xcode merges this file's keys on top of the generated ones.
+  Do NOT add CFBundle* version/identity keys here — they would override the
+  MARKETING_VERSION / CURRENT_PROJECT_VERSION build settings.
+
+  All three keys serve "Sync from computer" (QR snapshot sync):
+  - NSCameraUsageDescription: scanning the QR code.
+  - NSAppTransportSecurity/NSAllowsLocalNetworking: the QR encodes a plain
+    http:// URL to a one-shot server on the user's Mac (LAN only) —
+    scoped local-networking ATS exception, NOT NSAllowsArbitraryLoads.
+  - NSLocalNetworkUsageDescription: iOS's local-network privacy prompt
+    fires on direct connections to LAN addresses.
+-->
+<dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Scan the QR code shown by DVM Finance on your computer to sync data.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>DVM Finance downloads the snapshot directly from DVM Finance on your computer over your local network.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+</dict>
+</plist>

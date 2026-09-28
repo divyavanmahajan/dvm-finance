@@ -28,6 +28,18 @@
 
         <hr class="my-3">
 
+        <form hx-post="/snapshots/share" hx-target="#share-qr" hx-swap="innerHTML"
+              hx-disabled-elt="button[type=submit]">
+          <p class="text-muted small mb-2">Send a fresh full snapshot straight to the phone:
+             a QR code appears here, served once over your Wi-Fi and gone after the download.</p>
+          <button type="submit" class="btn btn-outline-primary">
+            <i class="bi bi-qr-code"></i> Share to phone
+          </button>
+        </form>
+        <div id="share-qr"></div>
+
+        <hr class="my-3">
+
         <form method="post" action="/snapshots/export-delta">
           <p class="text-muted small mb-2">Export only transactions changed since a point in time —
              a lightweight delta for syncing just recent edits to another device. Rules and budgets
