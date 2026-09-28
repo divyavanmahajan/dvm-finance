@@ -1,4 +1,4 @@
-"""Command-line entry point for abn-combined."""
+"""Command-line entry point for dvm-finance."""
 
 from __future__ import annotations
 

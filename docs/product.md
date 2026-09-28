@@ -1,6 +1,6 @@
 # Product
 
-`abn-combined` merges abn-download (statement downloaders) and abn-analyst (categorizer/viewer) into one local web app, distributed on PyPI as `dvm-finance` and run via `uvx dvm-finance`.
+`dvm-finance` merges abn-download (statement downloaders) and abn-analyst (categorizer/viewer) into one local web app, distributed on PyPI as `dvm-finance` and run via `uvx dvm-finance`.
 
 ## Goals
 

@@ -6,7 +6,7 @@ The DDL below is a verbatim copy of the schema of the REAL
 and ``categorization_rules`` — those were appended by the old ``ensure_*``
 runtime migrations, so the column *order* differs from a fresh
 ``app/database.py`` ``create_all`` but the column *set* is identical.
-Legacy rules have no ``uuid`` column (new in abn-combined).
+Legacy rules have no ``uuid`` column (new in dvm-finance).
 """
 
 from __future__ import annotations

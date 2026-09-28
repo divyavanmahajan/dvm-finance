@@ -1,4 +1,4 @@
-"""Alembic environment for abn-combined."""
+"""Alembic environment for dvm-finance."""
 
 from __future__ import annotations
 
