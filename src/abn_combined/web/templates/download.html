@@ -25,8 +25,8 @@
           hx-target="#abn-chrome-status"
           hx-swap="innerHTML"
           hx-disabled-elt="button[type=submit]"
+          hx-include="#abn-cdp-url"
           class="mb-2">
-          <input type="hidden" name="cdp_url" value="{{ default_cdp_url }}">
           <button type="submit" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-window"></i> Launch Chrome for ABN AMRO
           </button>
@@ -46,14 +46,14 @@
 
           <div class="row g-2 mb-3">
             <div class="col-md-6">
-              <label for="abn-from" class="form-label">From (DD-MM-YYYY)</label>
+              <label for="abn-from" class="form-label">From (YYYY-MM-DD)</label>
               <input type="text" id="abn-from" class="form-control" name="from_date" value="{{ abn_from }}"
-                     pattern="\d{2}-\d{2}-\d{4}" placeholder="DD-MM-YYYY">
+                     pattern="\d{4}-\d{2}-\d{2}" placeholder="YYYY-MM-DD">
             </div>
             <div class="col-md-6">
-              <label for="abn-to" class="form-label">To (DD-MM-YYYY)</label>
+              <label for="abn-to" class="form-label">To (YYYY-MM-DD)</label>
               <input type="text" id="abn-to" class="form-control" name="to_date" value="{{ abn_to }}"
-                     pattern="\d{2}-\d{2}-\d{4}" placeholder="DD-MM-YYYY">
+                     pattern="\d{4}-\d{2}-\d{2}" placeholder="YYYY-MM-DD">
             </div>
           </div>
 
@@ -105,8 +105,8 @@
           hx-target="#paypal-chrome-status"
           hx-swap="innerHTML"
           hx-disabled-elt="button[type=submit]"
+          hx-include="#cdp-url"
           class="mb-2">
-          <input type="hidden" name="cdp_url" value="{{ default_cdp_url }}">
           <button type="submit" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-window"></i> Launch Chrome for PayPal
           </button>

@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING
 
 from ..core.jobs import JobRegistry, JobState
 from ..logging_config import get_logger
-from .browser import DEFAULT_CDP_URL, connect_failure_message
+from .browser import DEFAULT_CDP_URL, connect_failure_message, no_contexts_message
 
 if TYPE_CHECKING:
     from ..settings import Settings
@@ -357,11 +357,6 @@ def run_paypal_job(
 
     On CDP connection failure, fails immediately with the exact Chrome launch command.
     """
-    from playwright.sync_api import sync_playwright
-
-    from ..core.importer import ImportError_, import_file
-    from ..db import get_session_factory
-
     source = "paypal"
     browser = None
 
@@ -395,6 +390,13 @@ def run_paypal_job(
     )
 
     try:
+        # Imports live inside the try so a broken Playwright install fails
+        # the job instead of leaving it stuck in PENDING forever.
+        from playwright.sync_api import sync_playwright
+
+        from ..core.importer import ImportError_, import_file
+        from ..db import get_session_factory
+
         with sync_playwright() as pw:
             # Fail fast if CDP Chrome is not running.
             try:
@@ -404,10 +406,7 @@ def run_paypal_job(
                 return
 
             if not browser.contexts:
-                _fail(
-                    "Connected Chrome has no open contexts. "
-                    "Ensure Chrome was started with --remote-debugging-port=9226."
-                )
+                _fail(no_contexts_message(cdp_url))
                 return
 
             context = browser.contexts[0]

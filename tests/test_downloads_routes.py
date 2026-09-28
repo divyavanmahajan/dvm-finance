@@ -49,7 +49,7 @@ def test_download_page_renders(client) -> None:
     assert "Start ABN download" in html
     assert "Start PayPal download" in html
     assert "Launch Chrome for ABN AMRO" in html
-    # Dates prefilled (DD-MM-YYYY for ABN, YYYY-MM-DD for PayPal patterns present)
+    # Dates prefilled (YYYY-MM-DD for both ABN and PayPal)
     assert 'name="from_date"' in html
     # Chrome launch commands shown for both sources.
     assert "--remote-debugging-port=9226" in html
@@ -74,7 +74,7 @@ def test_download_page_prefills_dates_from_download_state(client, app) -> None:
 
     resp = client.get("/download")
     assert resp.status_code == 200
-    assert 'value="21-06-2026"' in resp.text
+    assert 'value="2026-06-21"' in resp.text
 
 
 def test_download_page_shows_running_job_status(client, fresh_registry) -> None:
@@ -96,15 +96,32 @@ def test_download_page_shows_running_job_status(client, fresh_registry) -> None:
 
 
 def test_start_abn_download(client, no_worker, fresh_registry) -> None:
+    import time
+
     resp = client.post(
         "/api/download/abn",
-        data={"from_date": "01-06-2026", "to_date": "30-06-2026"},
+        data={"from_date": "2026-06-01", "to_date": "2026-06-30"},
     )
     assert resp.status_code == 200
     job = fresh_registry.get("abn")
     assert job is not None
     # Status partial returned.
     assert "download-status" in resp.text
+    # The form's YYYY-MM-DD dates reach the worker as DD-MM-YYYY (ABN API format).
+    for _ in range(50):
+        if no_worker:
+            break
+        time.sleep(0.02)
+    assert no_worker and no_worker[0][1:3] == ("01-06-2026", "30-06-2026")
+
+
+def test_start_abn_download_rejects_bad_date(client, no_worker, fresh_registry) -> None:
+    resp = client.post(
+        "/api/download/abn",
+        data={"from_date": "01-06-2026", "to_date": "2026-06-30"},
+    )
+    assert resp.status_code == 400
+    assert "YYYY-MM-DD" in resp.json()["detail"]
 
 
 def test_start_abn_download_conflict_while_running(client, no_worker, fresh_registry) -> None:
@@ -126,8 +143,8 @@ def test_start_abn_passes_custom_cdp_url(client, no_worker) -> None:
     resp = client.post(
         "/api/download/abn",
         data={
-            "from_date": "01-06-2026",
-            "to_date": "30-06-2026",
+            "from_date": "2026-06-01",
+            "to_date": "2026-06-30",
             "cdp_url": "http://127.0.0.1:9333",
         },
     )

@@ -30,7 +30,7 @@ def _templates(request: Request):
 
 
 def _abn_default_dates(db: Session) -> tuple[str, str]:
-    """Return (from_date, to_date) in DD-MM-YYYY for the ABN form."""
+    """Return (from_date, to_date) in YYYY-MM-DD for the ABN form."""
     from sqlalchemy import select
 
     from ..core.models import DownloadState
@@ -42,7 +42,30 @@ def _abn_default_dates(db: Session) -> tuple[str, str]:
     )
     row = db.execute(stmt).scalar_one_or_none()
     last_end = row.last_range_end if row else None
-    return get_default_date_range(last_end)
+    from_abn, to_abn = get_default_date_range(last_end)
+    return _abn_to_iso(from_abn), _abn_to_iso(to_abn)
+
+
+def _abn_to_iso(d: str) -> str:
+    """DD-MM-YYYY (ABN API format) → YYYY-MM-DD (form format)."""
+    from datetime import datetime
+
+    return datetime.strptime(d, "%d-%m-%Y").strftime("%Y-%m-%d")
+
+
+def _iso_to_abn(d: str) -> str:
+    """YYYY-MM-DD (form format) → DD-MM-YYYY (ABN API format).
+
+    Raises HTTPException(400) on malformed input.
+    """
+    from datetime import datetime
+
+    try:
+        return datetime.strptime(d, "%Y-%m-%d").strftime("%d-%m-%Y")
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400, detail=f"Invalid date {d!r}; expected YYYY-MM-DD."
+        ) from exc
 
 
 def _paypal_default_dates(db: Session) -> tuple[str, str]:
@@ -125,9 +148,11 @@ def start_abn_download(
     if registry.is_running("abn"):
         raise HTTPException(status_code=409, detail="ABN AMRO download already running.")
 
-    # Resolve dates (fall back to defaults if blank).
+    # Resolve dates (fall back to defaults if blank), then convert the
+    # form's YYYY-MM-DD to the DD-MM-YYYY the ABN API expects.
     if not from_date or not to_date:
         from_date, to_date = _abn_default_dates(db)
+    from_date, to_date = _iso_to_abn(from_date), _iso_to_abn(to_date)
 
     from ..downloaders.browser import DEFAULT_CDP_URL
 
@@ -175,11 +200,11 @@ def launch_chrome(
     except FileNotFoundError as exc:
         logger.warning("chrome_launch_failed", source=source, error=str(exc))
         return _templates(request).TemplateResponse(
-            request, "_chrome_status.html", {"error": str(exc), "source": source}
+            request, "_chrome_status.html", {"error": str(exc)}
         )
     logger.info("chrome_launched", source=source, cdp_url=cdp_url or DEFAULT_CDP_URL)
     return _templates(request).TemplateResponse(
-        request, "_chrome_status.html", {"error": None, "source": source}
+        request, "_chrome_status.html", {"error": None}
     )
 
 
