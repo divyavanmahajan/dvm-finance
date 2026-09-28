@@ -3,7 +3,47 @@
 {% block content %}
 <div class="mb-4">
   <h1 class="h2">Download statements</h1>
-  <p class="text-muted">Trigger ABN AMRO or PayPal downloads. Jobs run in the background; status updates every 2 s.</p>
+  <p class="text-muted">Trigger ABN AMRO, PayPal, Wise or SEB downloads. Jobs run in the background; status updates every 2 s.</p>
+</div>
+
+{# ── Shared Chrome connection panel ──────────────────────────────────── #}
+<div class="card mb-3">
+  <div class="card-header bg-body-secondary">
+    <h5 class="mb-0">Chrome connection</h5>
+  </div>
+  <div class="card-body">
+    <p class="text-muted small mb-2">
+      All downloads connect to the same Chrome instance via remote debugging.
+      Launch it once, sign in to the banks you need, then start downloads below.
+    </p>
+
+    <div class="row g-3 align-items-end">
+      <div class="col-md-5">
+        <label for="cdp-url" class="form-label">CDP URL <span class="text-muted">(optional)</span></label>
+        <input type="text" id="cdp-url" class="form-control" name="cdp_url" value="{{ default_cdp_url }}"
+               placeholder="{{ default_cdp_url }}">
+        <small class="form-text text-muted">Default: {{ default_cdp_url }}</small>
+      </div>
+      <div class="col-md-7">
+        <form
+          hx-post="/api/download/launch-chrome"
+          hx-target="#chrome-status"
+          hx-swap="innerHTML"
+          hx-disabled-elt="button[type=submit]"
+          hx-include="#cdp-url"
+          class="mb-2">
+          <button type="submit" class="btn btn-outline-secondary">
+            <i class="bi bi-window"></i> Launch Chrome
+          </button>
+        </form>
+        <details class="text-muted small mb-0">
+          <summary>Or start it manually in a terminal</summary>
+          <pre class="bg-light p-2 rounded mt-2 mb-0"><code>{{ chrome_launch_command }}</code></pre>
+        </details>
+      </div>
+    </div>
+    <div id="chrome-status" class="mt-2"></div>
+  </div>
 </div>
 
 <div class="row g-3">
@@ -15,33 +55,11 @@
         <h5 class="mb-0">ABN AMRO</h5>
       </div>
       <div class="card-body">
-
-        <p class="text-muted small mb-2">
-          Chrome needs remote debugging enabled before an ABN AMRO download can connect to it.
-        </p>
-
-        <form
-          hx-post="/api/download/abn/launch-chrome"
-          hx-target="#abn-chrome-status"
-          hx-swap="innerHTML"
-          hx-disabled-elt="button[type=submit]"
-          hx-include="#abn-cdp-url"
-          class="mb-2">
-          <button type="submit" class="btn btn-outline-secondary btn-sm">
-            <i class="bi bi-window"></i> Launch Chrome for ABN AMRO
-          </button>
-        </form>
-        <div id="abn-chrome-status" class="mb-2"></div>
-
-        <details class="text-muted small mb-3">
-          <summary>Or start it manually in a terminal</summary>
-          <pre class="bg-light p-2 rounded mt-2 mb-0"><code>{{ abn_chrome_launch_command }}</code></pre>
-        </details>
-
         <form
           hx-post="/api/download/abn"
           hx-target="#abn-status"
           hx-swap="innerHTML"
+          hx-include="#cdp-url"
           hx-disabled-elt="button[type=submit]">
 
           <div class="row g-2 mb-3">
@@ -57,25 +75,14 @@
             </div>
           </div>
 
-          <div class="mb-3">
-            <label for="abn-cdp-url" class="form-label">CDP URL <span class="text-muted">(optional)</span></label>
-            <input type="text" id="abn-cdp-url" class="form-control" name="cdp_url" value="{{ default_cdp_url }}"
-                   placeholder="{{ default_cdp_url }}">
-            <small class="form-text text-muted">Default: {{ default_cdp_url }}</small>
-          </div>
-
           <p class="text-muted small mb-3">
-            Connects to your Chrome via remote debugging. Approve the login in the ABN AMRO app when prompted.
+            Approve the login in the ABN AMRO app when prompted.
           </p>
 
-          {% if abn_job and not abn_job.is_terminal() %}
-          <button type="submit" class="btn btn-primary" disabled>
-            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-            Running…
-          </button>
-          {% else %}
-          <button type="submit" class="btn btn-primary">Start ABN download</button>
-          {% endif %}
+          <div id="abn-submit">
+            {% set source = "abn" %}{% set job = abn_job %}
+            {% include "_download_submit.html" %}
+          </div>
         </form>
       </div>
       <div id="abn-status">
@@ -95,33 +102,11 @@
         <h5 class="mb-0">PayPal</h5>
       </div>
       <div class="card-body">
-
-        <p class="text-muted small mb-2">
-          Chrome needs remote debugging enabled before a PayPal download can connect to it.
-        </p>
-
-        <form
-          hx-post="/api/download/paypal/launch-chrome"
-          hx-target="#paypal-chrome-status"
-          hx-swap="innerHTML"
-          hx-disabled-elt="button[type=submit]"
-          hx-include="#cdp-url"
-          class="mb-2">
-          <button type="submit" class="btn btn-outline-secondary btn-sm">
-            <i class="bi bi-window"></i> Launch Chrome for PayPal
-          </button>
-        </form>
-        <div id="paypal-chrome-status" class="mb-2"></div>
-
-        <details class="text-muted small mb-3">
-          <summary>Or start it manually in a terminal</summary>
-          <pre class="bg-light p-2 rounded mt-2 mb-0"><code>{{ paypal_chrome_launch_command }}</code></pre>
-        </details>
-
         <form
           hx-post="/api/download/paypal"
           hx-target="#paypal-status"
           hx-swap="innerHTML"
+          hx-include="#cdp-url"
           hx-disabled-elt="button[type=submit]">
 
           <div class="row g-2 mb-3">
@@ -137,27 +122,103 @@
             </div>
           </div>
 
-          <div class="mb-3">
-            <label for="cdp-url" class="form-label">CDP URL <span class="text-muted">(optional)</span></label>
-            <input type="text" id="cdp-url" class="form-control" name="cdp_url" value="{{ default_cdp_url }}"
-                   placeholder="{{ default_cdp_url }}">
-            <small class="form-text text-muted">Default: {{ default_cdp_url }}</small>
-          </div>
+          <p class="text-muted small mb-3">
+            Sign in to PayPal in the Chrome window before starting.
+          </p>
 
-          {% if paypal_job and not paypal_job.is_terminal() %}
-          <button type="submit" class="btn btn-primary" disabled>
-            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-            Running…
-          </button>
-          {% else %}
-          <button type="submit" class="btn btn-primary">Start PayPal download</button>
-          {% endif %}
+          <div id="paypal-submit">
+            {% set source = "paypal" %}{% set job = paypal_job %}
+            {% include "_download_submit.html" %}
+          </div>
         </form>
       </div>
       <div id="paypal-status">
         {% if paypal_job %}
           {% set source = "paypal" %}
           {% set job = paypal_job %}
+          {% include "_download_status.html" %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# ── Wise card ──────────────────────────────────────────────────────── #}
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header bg-body-secondary">
+        <h5 class="mb-0">Wise</h5>
+      </div>
+      <div class="card-body">
+        <form
+          hx-post="/api/download/wise"
+          hx-target="#wise-status"
+          hx-swap="innerHTML"
+          hx-include="#cdp-url"
+          hx-disabled-elt="button[type=submit]">
+
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label for="wise-from" class="form-label">From (YYYY-MM-DD)</label>
+              <input type="text" id="wise-from" class="form-control" name="from_date" value="{{ wise_from }}"
+                     pattern="\d{4}-\d{2}-\d{2}" placeholder="YYYY-MM-DD">
+            </div>
+            <div class="col-md-6">
+              <label for="wise-to" class="form-label">To (YYYY-MM-DD)</label>
+              <input type="text" id="wise-to" class="form-control" name="to_date" value="{{ wise_to }}"
+                     pattern="\d{4}-\d{2}-\d{2}" placeholder="YYYY-MM-DD">
+            </div>
+          </div>
+
+          <p class="text-muted small mb-3">
+            Sign in to Wise in the Chrome window if prompted.
+          </p>
+
+          <div id="wise-submit">
+            {% set source = "wise" %}{% set job = wise_job %}
+            {% include "_download_submit.html" %}
+          </div>
+        </form>
+      </div>
+      <div id="wise-status">
+        {% if wise_job %}
+          {% set source = "wise" %}
+          {% set job = wise_job %}
+          {% include "_download_status.html" %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# ── SEB card ───────────────────────────────────────────────────────── #}
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header bg-body-secondary">
+        <h5 class="mb-0">SEB</h5>
+      </div>
+      <div class="card-body">
+        <form
+          hx-post="/api/download/seb"
+          hx-target="#seb-status"
+          hx-swap="innerHTML"
+          hx-include="#cdp-url"
+          hx-disabled-elt="button[type=submit]">
+
+          <p class="text-muted small mb-3">
+            Exports every account's recent history (no date range — SEB's export
+            doesn't take one; duplicates are skipped on import). Complete the
+            BankID login in the Chrome window when prompted.
+          </p>
+
+          <div id="seb-submit">
+            {% set source = "seb" %}{% set job = seb_job %}
+            {% include "_download_submit.html" %}
+          </div>
+        </form>
+      </div>
+      <div id="seb-status">
+        {% if seb_job %}
+          {% set source = "seb" %}
+          {% set job = seb_job %}
           {% include "_download_status.html" %}
         {% endif %}
       </div>

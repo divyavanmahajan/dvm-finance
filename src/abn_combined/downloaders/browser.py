@@ -31,15 +31,15 @@ def cdp_port(cdp_url: str) -> int:
     return port or urlparse(DEFAULT_CDP_URL).port
 
 
-def chrome_launch_command(start_url: str, cdp_url: str = DEFAULT_CDP_URL) -> str:
+def chrome_launch_command(start_url: str = "", cdp_url: str = DEFAULT_CDP_URL) -> str:
     """The exact Chrome launch command shown to the user when CDP connection
-    fails, opening *start_url* on the port *cdp_url* points at."""
-    return (
+    fails, on the port *cdp_url* points at, opening *start_url* if given."""
+    command = (
         f"{CHROME_APP_PATH.replace(' ', '\\ ')} "
         f"--remote-debugging-port={cdp_port(cdp_url)} "
-        f"--user-data-dir={CHROME_USER_DATA_DIR} "
-        f"{start_url}"
+        f"--user-data-dir={CHROME_USER_DATA_DIR}"
     )
+    return f"{command} {start_url}" if start_url else command
 
 
 def no_contexts_message(cdp_url: str) -> str:
@@ -50,7 +50,7 @@ def no_contexts_message(cdp_url: str) -> str:
     )
 
 
-def launch_chrome_debug(cdp_url: str, start_url: str) -> None:
+def launch_chrome_debug(cdp_url: str, start_url: str = "") -> None:
     """Launch real Chrome with remote debugging enabled, detached from this
     process — the button-driven equivalent of manually running
     `chrome_launch_command(start_url)` in a terminal.
@@ -73,13 +73,15 @@ def launch_chrome_debug(cdp_url: str, start_url: str) -> None:
 
     port = cdp_port(cdp_url)
     user_data_dir = os.path.expanduser(CHROME_USER_DATA_DIR)
+    argv = [
+        CHROME_APP_PATH,
+        f"--remote-debugging-port={port}",
+        f"--user-data-dir={user_data_dir}",
+    ]
+    if start_url:
+        argv.append(start_url)
     subprocess.Popen(
-        [
-            CHROME_APP_PATH,
-            f"--remote-debugging-port={port}",
-            f"--user-data-dir={user_data_dir}",
-            start_url,
-        ],
+        argv,
         start_new_session=True,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,

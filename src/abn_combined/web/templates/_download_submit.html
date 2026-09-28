@@ -1,0 +1,21 @@
+{#
+  Submit button for a download card — disabled with a spinner while the
+  job runs. Variables expected: source (str), job (DownloadJob | None).
+
+  Included directly by download.html (initial render) and out-of-band by
+  _download_status.html so polling re-enables the button when the job ends.
+#}
+{% set labels = {
+  "abn": "Start ABN download",
+  "paypal": "Start PayPal download",
+  "wise": "Start Wise download",
+  "seb": "Start SEB download",
+} %}
+{% if job and not job.is_terminal() %}
+<button type="submit" class="btn btn-primary" disabled>
+  <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+  Running…
+</button>
+{% else %}
+<button type="submit" class="btn btn-primary">{{ labels[source] }}</button>
+{% endif %}
