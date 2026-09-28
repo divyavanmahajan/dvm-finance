@@ -171,6 +171,15 @@ def test_get_default_date_range_with_last_end() -> None:
     assert from_str == "16-06-2026"  # day after last end
 
 
+def test_get_default_date_range_clamped_to_today() -> None:
+    """A bookmark on (or after) today must not produce an inverted range."""
+    from datetime import datetime
+
+    today = datetime.now().date()
+    from_str, to_str = abn.get_default_date_range(today)
+    assert from_str == to_str == today.strftime("%d-%m-%Y")
+
+
 # ===========================================================================
 # PayPal — ported protocol tests
 # ===========================================================================
@@ -578,6 +587,45 @@ def test_run_paypal_job_cdp_unreachable_fails_with_launch_command(settings) -> N
     job = reg.get("paypal")
     assert job.state == JobState.FAILED
     # The suggested launch command uses the port the user actually configured.
+    assert "--remote-debugging-port=59999" in job.message
+    assert "Could not connect to Chrome" in job.message
+
+
+def test_run_wise_job_cdp_unreachable_fails_with_launch_command(settings) -> None:
+    """CDP connect failure -> fail fast, message contains the exact Chrome command."""
+    from abn_combined.downloaders import wise
+
+    reg = JobRegistry()
+    reg.create("wise")
+    wise.run_wise_job(
+        reg, settings, "2026-01-01", "2026-06-30", cdp_url="http://127.0.0.1:59999"
+    )
+    job = reg.get("wise")
+    assert job.state == JobState.FAILED
+    assert "--remote-debugging-port=59999" in job.message
+    assert "Could not connect to Chrome" in job.message
+
+
+def test_run_wise_job_invalid_dates_fail(settings) -> None:
+    from abn_combined.downloaders import wise
+
+    reg = JobRegistry()
+    reg.create("wise")
+    wise.run_wise_job(reg, settings, "01-06-2026", "2026-06-30")
+    job = reg.get("wise")
+    assert job.state == JobState.FAILED
+    assert "Invalid date" in job.message
+
+
+def test_run_seb_job_cdp_unreachable_fails_with_launch_command(settings) -> None:
+    """CDP connect failure -> fail fast, message contains the exact Chrome command."""
+    from abn_combined.downloaders import seb
+
+    reg = JobRegistry()
+    reg.create("seb")
+    seb.run_seb_job(reg, settings, cdp_url="http://127.0.0.1:59999")
+    job = reg.get("seb")
+    assert job.state == JobState.FAILED
     assert "--remote-debugging-port=59999" in job.message
     assert "Could not connect to Chrome" in job.message
 

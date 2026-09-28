@@ -56,4 +56,14 @@
       <span aria-busy="true" class="htmx-indicator-inline">Waiting…</span>
     {% endif %}
   </div>
+
+  {# When polled over htmx, refresh the card's submit button out-of-band so
+     it re-enables the moment the job ends (the poll only swaps the status
+     div itself). `oob` is set only by the status route, never on full-page
+     render — a duplicate id would be emitted otherwise. #}
+  {% if oob %}
+  <div id="{{ source }}-submit" hx-swap-oob="true">
+    {% include "_download_submit.html" %}
+  </div>
+  {% endif %}
 {% endif %}

@@ -125,11 +125,13 @@ def get_default_date_range(last_range_end: date | None) -> tuple[str, str]:
     """Return (from_date, to_date) in DD-MM-YYYY format.
 
     *from_date* defaults to the day after the last successful download end, or 30 days ago.
-    *to_date* is today.
+    *to_date* is today. Never later than *to_date*: after a download that
+    already covered today, the range would otherwise invert (tomorrow → today),
+    so it is clamped to today (re-downloading today is safe — imports dedup).
     """
     today = datetime.now().date()
     if last_range_end:
-        from_dt = last_range_end + timedelta(days=1)
+        from_dt = min(last_range_end + timedelta(days=1), today)
     else:
         from_dt = today - timedelta(days=30)
     return from_dt.strftime("%d-%m-%Y"), today.strftime("%d-%m-%Y")
@@ -183,7 +185,7 @@ def run_abn_job(
                 pass
         if browser is not None:
             try:
-                browser.disconnect()
+                browser.close()
             except Exception:  # noqa: BLE001
                 pass
 
@@ -244,15 +246,16 @@ def run_abn_job(
                 _fail(f"Download failed: {exc}")
                 return
             finally:
-                # Close the tab we opened and disconnect — never close the
-                # user's real Chrome (browser.close() would kill it).
+                # Close the tab we opened, then detach. close() on a
+                # CDP-connected browser only disconnects — the user's real
+                # Chrome stays open.
                 try:
                     page.close()
                     page = None
                 except Exception:  # noqa: BLE001
                     pass
                 try:
-                    browser.disconnect()
+                    browser.close()
                     browser = None
                 except Exception:  # noqa: BLE001
                     pass

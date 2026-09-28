@@ -364,7 +364,7 @@ def run_paypal_job(
         registry.update_state(source, JobState.FAILED, msg)
         if browser is not None:
             try:
-                browser.disconnect()
+                browser.close()
             except Exception:  # noqa: BLE001
                 pass
 
@@ -490,7 +490,7 @@ def run_paypal_job(
 
             # Disconnect (user's Chrome stays open).
             try:
-                browser.disconnect()
+                browser.close()
                 browser = None
             except Exception:  # noqa: BLE001
                 pass
