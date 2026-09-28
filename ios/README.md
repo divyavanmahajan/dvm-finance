@@ -1,6 +1,6 @@
 # DVM Finance — iOS
 
-A standalone native iOS/iPadOS companion to `abn-combined` (dvm-finance):
+A standalone native iOS/iPadOS companion to `dvm-finance`:
 SwiftUI + local SQLite via GRDB, fully offline. See
 [`docs/spec.md`](docs/spec.md) for the product spec and
 [`docs/plan.md`](docs/plan.md) for the phased implementation plan.
@@ -77,9 +77,28 @@ holds only SwiftUI views and app wiring.
   exactly the transactions behind that cell.
 - **Import** — statement file import (MT940/.sta/.940, ABN CSV, PayPal,
   Wise, SEB — with dedup, automatic rule application and an audit report),
-  snapshot import (incoming-wins merge with a pre-import DB backup) and
-  snapshot export via the share sheet, plus the audit history of imports
-  and categorization changes.
+  snapshot import (incoming-wins merge with a pre-import DB backup),
+  "Sync from computer" (see below) and snapshot export via the share
+  sheet, plus the audit history of imports and categorization changes.
+
+## Sync from computer (QR)
+
+The desktop web app can offer a snapshot over a QR code: it starts an
+ephemeral one-shot HTTP server on the Mac's LAN address and shows a QR code
+containing a plain URL (`http://<mac-ip>:<port>/<token>`) that serves a
+single gzipped-JSON snapshot; the link works exactly once and expires after
+about 10 minutes. On the phone, **Import → Sync from computer** opens the
+camera, scans the QR, downloads the snapshot over the local network and
+runs the standard snapshot import (incoming-wins merge, pre-import DB
+backup, audit report), ending in the usual import summary. Both devices
+must be on the same Wi-Fi network; if the link was already used or has
+expired, the app asks you to generate a fresh QR code.
+
+Only `http`/`https` QR payloads are accepted. The app declares a
+camera-usage string, a local-network-usage string and an ATS exception
+scoped to local networking (`NSAllowsLocalNetworking`, not
+`NSAllowsArbitraryLoads`) in `DVMFinance/Info.plist`, which Xcode merges on
+top of the generated Info.plist.
 
 ## Running tests
 

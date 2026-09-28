@@ -40,6 +40,7 @@ dependencies = [
     "openpyxl",
     "xlrd",
     "markdown",
+    "segno",
 ]
 
 [project.optional-dependencies]

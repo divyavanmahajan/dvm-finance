@@ -109,6 +109,44 @@ def snapshots_export_delta(
     return FileResponse(path, filename=path.name, media_type="application/gzip")
 
 
+@router.post("/snapshots/share", response_class=HTMLResponse, include_in_schema=False)
+def snapshots_share(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
+    """Export a fresh full snapshot and serve it once on the LAN behind a QR.
+
+    The returned partial shows the QR code (scanned by the iOS app's
+    "Sync from computer" screen) plus the URL and expiry. A new share
+    replaces any previous one.
+    """
+    import segno
+
+    from ..core.share import SHARE_TIMEOUT_SECONDS, start_share
+
+    settings = _settings(request)
+    path = export_snapshot(db, settings.data_dir)
+    share = start_share(path)
+    qr_data_uri = segno.make(share.url, error="m").svg_data_uri(scale=4)
+    logger.info("snapshot_share_created", file=path.name)
+    return _templates(request).TemplateResponse(
+        request,
+        "_share_qr.html",
+        {
+            "share": share,
+            "qr_data_uri": qr_data_uri,
+            "timeout_minutes": SHARE_TIMEOUT_SECONDS // 60,
+        },
+    )
+
+
+@router.post("/snapshots/share/stop", response_class=HTMLResponse, include_in_schema=False)
+def snapshots_share_stop(request: Request) -> HTMLResponse:
+    """Stop the active share (if any) and clear the QR area."""
+    from ..core.share import stop_share
+
+    stop_share()
+    logger.info("snapshot_share_stopped")
+    return HTMLResponse("")
+
+
 @router.get("/snapshots/files/{name}", include_in_schema=False)
 def snapshots_download(request: Request, name: str):
     settings = _settings(request)

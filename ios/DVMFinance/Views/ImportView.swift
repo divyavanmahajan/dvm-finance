@@ -17,6 +17,7 @@ struct ImportView: View {
 
     @State private var showStatementImporter = false
     @State private var showSnapshotImporter = false
+    @State private var showQRSync = false
     @State private var pendingStatementURL: URL?
     @State private var showFormatDialog = false
 
@@ -45,6 +46,11 @@ struct ImportView: View {
                         showSnapshotImporter = true
                     } label: {
                         Label("Import snapshot", systemImage: "square.and.arrow.down.on.square")
+                    }
+                    Button {
+                        showQRSync = true
+                    } label: {
+                        Label("Sync from computer", systemImage: "qrcode.viewfinder")
                     }
                     Button {
                         Task { await exportSnapshot() }
@@ -129,6 +135,12 @@ struct ImportView: View {
                     }
                 }
                 Button("Cancel", role: .cancel) { pendingStatementURL = nil }
+            }
+            .sheet(isPresented: $showQRSync) {
+                // The whole scan → download → import → summary flow is
+                // self-contained in SyncFromComputerView; the import it runs
+                // is the same SnapshotImporter path as "Import snapshot".
+                SyncFromComputerView()
             }
             .sheet(item: $statementSummary) { summary in
                 StatementImportSummaryView(summary: summary)
