@@ -2,7 +2,7 @@
 
 Opens the legacy SQLite file strictly read-only (sqlite URI ``mode=ro``) and
 copies transactions, categorization rules (+ freshly generated UUIDs),
-rule conditions, and budgets into the abn-combined database. Users/auth and
+rule conditions, and budgets into the dvm-finance database. Users/auth and
 alembic bookkeeping tables are ignored. The whole run is one destination
 transaction: on any failure nothing is written. Re-runs skip rows whose ids
 already exist and count them.
@@ -286,7 +286,7 @@ def _copy_budgets(db: Session, rows: list[dict], result: TableResult) -> None:
 
 
 def migrate_legacy(legacy_path: Path | str, settings: Settings) -> MigrationSummary:
-    """Copy all legacy data into the settings-bound abn-combined database.
+    """Copy all legacy data into the settings-bound dvm-finance database.
 
     Idempotent: rows whose ids already exist are skipped and counted. The whole
     run is a single destination transaction — any failure rolls back everything.

@@ -1,4 +1,4 @@
-"""abn-combined: integrated personal-finance app."""
+"""dvm-finance: integrated personal-finance app."""
 
 try:
     from ._version import __version__
