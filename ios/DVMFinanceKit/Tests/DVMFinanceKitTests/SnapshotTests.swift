@@ -34,7 +34,7 @@ final class SnapshotTests: XCTestCase {
     }
 
     private func loadFixtureSnapshotBlob() throws -> Data {
-        let url = try XCTUnwrap(Bundle.module.url(forResource: "fixture-snapshot", withExtension: "json.gz"))
+        let url = try fixtureURL("fixture-snapshot", "json.gz")
         return try Data(contentsOf: url)
     }
 
@@ -109,7 +109,7 @@ final class SnapshotTests: XCTestCase {
     }
 
     private func loadExpectedFixture() throws -> ExpectedFixture {
-        let url = try XCTUnwrap(Bundle.module.url(forResource: "fixture-snapshot-expected", withExtension: "json"))
+        let url = try fixtureURL("fixture-snapshot-expected", "json")
         let data = try Data(contentsOf: url)
         return try JSONDecoder().decode(ExpectedFixture.self, from: data)
     }

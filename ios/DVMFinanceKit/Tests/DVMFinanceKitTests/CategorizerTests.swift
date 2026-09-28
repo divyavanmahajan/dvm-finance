@@ -99,7 +99,7 @@ final class CategorizerTests: XCTestCase {
     }
 
     private func loadFixtures() throws -> RuleParityFixtures {
-        let url = try XCTUnwrap(Bundle.module.url(forResource: "rule_parity", withExtension: "json"))
+        let url = try fixtureURL("rule_parity", "json")
         let data = try Data(contentsOf: url)
         return try JSONDecoder().decode(RuleParityFixtures.self, from: data)
     }

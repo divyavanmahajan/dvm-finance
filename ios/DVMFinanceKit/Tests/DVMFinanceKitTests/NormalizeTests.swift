@@ -37,7 +37,7 @@ final class NormalizeTests: XCTestCase {
     }
 
     private func loadFixtures() throws -> ParityFixtures {
-        let url = try XCTUnwrap(Bundle.module.url(forResource: "parity", withExtension: "json"))
+        let url = try fixtureURL("parity", "json")
         let data = try Data(contentsOf: url)
         return try JSONDecoder().decode(ParityFixtures.self, from: data)
     }
