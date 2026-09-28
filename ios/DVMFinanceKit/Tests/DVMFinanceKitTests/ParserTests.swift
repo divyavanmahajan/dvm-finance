@@ -12,9 +12,9 @@ final class ParserTests: XCTestCase {
 
     // MARK: - Fixture loading
 
-    private func fixtureURL(_ name: String, _ ext: String, file: StaticString = #filePath, line: UInt = #line) throws -> URL {
-        try XCTUnwrap(Bundle.module.url(forResource: name, withExtension: ext), "missing fixture \(name).\(ext)", file: file, line: line)
-    }
+    // Fixture lookup is provided by the shared `fixtureURL(_:_:)` helper in
+    // FixtureSupport.swift, which resolves resources under the copied
+    // `Fixtures/` subdirectory of the test bundle.
 
     private func loadExpected() throws -> [String: Any] {
         let url = try fixtureURL("parser_expected", "json")
@@ -299,11 +299,13 @@ final class ParserTests: XCTestCase {
         XCTAssertEqual(viaFormat.count, 3)
     }
 
-    // MARK: - End-to-end: parse -> dedup -> insert -> applyRules -> report
+    // MARK: - End-to-end: parse -> dedup -> insert -> recordRuleChange
     //
     // Mirrors `ios/docs/plan.md` "Phase D" acceptance: "import flow (parse
     // -> dedup -> insert -> applyRules -> report) covered by an end-to-end
-    // Kit test using an in-memory DB and a bundled rules snapshot."
+    // Kit test using an in-memory DB and a bundled rules snapshot." Here the
+    // apply + report steps are the single `recordRuleChange` call, which
+    // reapplies rules and writes the audit report/items together.
 
     func testWiseImportEndToEnd() throws {
         let url = try fixtureURL("wise_sample", "csv")
@@ -332,7 +334,12 @@ final class ParserTests: XCTestCase {
             newIDs = try Dedup.insertTransactions(db: db, transactions: new)
             XCTAssertEqual(newIDs.count, 3)
 
-            try Categorizer.applyRules(db: db, transactionIds: newIDs)
+            // `recordRuleChange` reapplies the full rule set and records the
+            // resulting changes in one step (it calls `applyRules` internally,
+            // parity with `core/categorizer.py:record_rule_change`), so we do
+            // not call `applyRules` separately first — doing so would persist
+            // the categories and leave `recordRuleChange` with nothing to
+            // record.
             try Categorizer.recordRuleChange(db: db, action: "import")
         }
 

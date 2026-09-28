@@ -166,7 +166,11 @@ final class TrendsTests: XCTestCase {
         let includedTable = try appDatabase.dbWriter.read { db in
             try TrendsBuilder.aggregate(db: db, params: included)
         }
-        XCTAssertEqual(Set(includedTable.rows.map(\.label)), ["groceries", "my-transfer-x", "transfer-wise"])
+        // Top-level rows roll up to their first hyphen segment (parity with
+        // core/trends.py): "transfer-wise" -> "transfer", "my-transfer-x" ->
+        // "my", "groceries" stays a leaf. The full category values live on
+        // each parent row's `categories`/`children`.
+        XCTAssertEqual(Set(includedTable.rows.map(\.label)), ["groceries", "my", "transfer"])
     }
 
     // MARK: - Cell -> TransactionFilter round-trip

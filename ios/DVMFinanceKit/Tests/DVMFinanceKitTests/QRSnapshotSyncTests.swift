@@ -228,14 +228,10 @@ final class QRSnapshotSyncTests: XCTestCase {
     // MARK: - Download → decode → import orchestration
 
     func testDownloadSnapshotDecodesFixtureAndImports() async throws {
-        // `.copy("Fixtures")` in Package.swift preserves the directory, so
-        // the resource lives under the "Fixtures" subdirectory; the bare
-        // lookup is kept first for tolerance of a future flattened layout.
-        let fixtureURL = try XCTUnwrap(
-            Bundle.module.url(forResource: "fixture-snapshot", withExtension: "json.gz")
-                ?? Bundle.module.url(forResource: "fixture-snapshot", withExtension: "json.gz", subdirectory: "Fixtures")
-        )
-        let blob = try Data(contentsOf: fixtureURL)
+        // Shared `fixtureURL(_:_:)` (FixtureSupport.swift) resolves the
+        // resource under the copied "Fixtures" subdirectory of the bundle.
+        let url = try fixtureURL("fixture-snapshot", "json.gz")
+        let blob = try Data(contentsOf: url)
 
         let document = try await downloader(status: 200, body: blob)
             .downloadSnapshot(from: Self.testURL)
