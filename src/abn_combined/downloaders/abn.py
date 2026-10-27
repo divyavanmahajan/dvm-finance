@@ -14,7 +14,12 @@ from typing import TYPE_CHECKING
 
 from ..core.jobs import JobRegistry, JobState
 from ..logging_config import get_logger
-from .browser import DEFAULT_CDP_URL, connect_failure_message, no_contexts_message
+from .browser import (
+    DEFAULT_CDP_URL,
+    connect_failure_message,
+    missing_playwright_message,
+    no_contexts_message,
+)
 
 if TYPE_CHECKING:
     from ..settings import Settings
@@ -306,6 +311,10 @@ def run_abn_job(
             )
 
     except Exception as exc:  # noqa: BLE001
+        if isinstance(exc, ModuleNotFoundError) and exc.name == "playwright":
+            _fail(missing_playwright_message())
+            logger.warning("abn_job_playwright_missing")
+            return
         _fail(f"Unexpected error: {exc}")
         logger.exception("abn_job_unexpected_error", error=str(exc))
 
