@@ -4,7 +4,7 @@ Single Python package `abn_combined` serving a local, single-user, server-render
 
 | Layer | Choice |
 |-------|--------|
-| Language | Python 3.12+ |
+| Language | Python 3.11+ |
 | Web framework | FastAPI + Jinja2 templates |
 | Frontend | htmx + Alpine.js (vendored), Pico.css — no build step |
 | DB | SQLite (data dir via platformdirs), SQLAlchemy 2.x, Alembic migrations |
