@@ -50,6 +50,18 @@ def no_contexts_message(cdp_url: str) -> str:
     )
 
 
+def missing_playwright_message() -> str:
+    """Actionable message for an install whose `playwright` package is absent
+    (e.g. an older `uvx dvm-finance` from before playwright became a core
+    dependency), instead of a bare ModuleNotFoundError."""
+    return (
+        "Playwright is not installed, so the downloaders cannot run. "
+        "Reinstall with it included:\n\n"
+        "    uvx --from 'dvm-finance[downloads]' dvm-finance\n\n"
+        "or, in a virtualenv: pip install playwright"
+    )
+
+
 def launch_chrome_debug(cdp_url: str, start_url: str = "") -> None:
     """Launch real Chrome with remote debugging enabled, detached from this
     process — the button-driven equivalent of manually running

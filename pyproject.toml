@@ -41,9 +41,15 @@ dependencies = [
     "xlrd",
     "markdown",
     "segno",
+    # Required by the statement downloaders, which attach to a running Chrome
+    # over CDP. A core dependency (not an extra) so plain `uvx dvm-finance`
+    # ships a working Downloads page.
+    "playwright",
 ]
 
 [project.optional-dependencies]
+# Redundant now that playwright is a core dependency; kept so
+# `dvm-finance[downloads]` still resolves for anyone using the old extra.
 downloads = [
     "playwright",
 ]
