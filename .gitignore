@@ -13,3 +13,5 @@ data/
 .chrome/
 src/abn_combined/_version.py
 protocol/
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
