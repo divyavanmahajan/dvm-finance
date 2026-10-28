@@ -44,7 +44,7 @@ Today the workflow spans two separate codebases: a CLI downloads statements and 
 
 **FR1 — Packaging & startup**
 1. Distributed as a Python package with a `pyproject.toml` and console script `abn-combined`; runnable via `uvx abn-combined` (from PyPI or a git URL).
-2. `abn-combined` starts the FastAPI server on `127.0.0.1:8000` (port configurable via `--port`/env) and prints the URL. A `--data-dir` flag / `ABN_COMBINED_DATA_DIR` env var overrides the default data directory (platform user-data dir via `platformdirs`, e.g. `~/Library/Application Support/abn-combined/`). The data dir holds the SQLite DB, downloaded statement files, and snapshot exports.
+2. `abn-combined` starts the FastAPI server on `127.0.0.1:8000` (port configurable via `--port`/env) and prints the URL. A `--data-dir` flag / `DVM_FINANCE_DATA_DIR` env var overrides the default data directory (platform user-data dir via `platformdirs`, e.g. `~/Library/Application Support/abn-combined/`). The data dir holds the SQLite DB, downloaded statement files, and snapshot exports.
 3. On first start, the database schema is created automatically (Alembic migrations run on startup).
 
 **FR2 — Transactions view (main tab)**

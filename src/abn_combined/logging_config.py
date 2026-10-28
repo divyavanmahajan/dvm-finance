@@ -1,16 +1,17 @@
 """Structured logging configuration using structlog (ported from abn-analyst)."""
 
 import logging
-import os
 import sys
 
 import structlog
+
+from .settings import LOG_ENV, read_env
 
 
 def configure_logging(environment: str | None = None) -> None:
     """Configure structured logging for the application."""
     if environment is None:
-        environment = os.getenv("ABN_COMBINED_LOG_ENV", "development")
+        environment = read_env(LOG_ENV, "development")
 
     logging.basicConfig(format="%(message)s", stream=sys.stdout, level=logging.INFO)
 
