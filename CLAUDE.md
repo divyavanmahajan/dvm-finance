@@ -34,6 +34,31 @@ ruff check .                        # lint gate
 - Every rule mutation goes through `record_rule_change` — no silent recategorization.
 - Schema changes via Alembic only. Filter state lives in the URL. No JS build step. No LLM/MCP/auth/charts/Docker.
 - **Never mention Claude, Anthropic, or model names in commit messages, PR titles, or PR descriptions.**
+- **Write all prose in ASD-STE100 Simplified Technical English** — docs, specs,
+  code comments, docstrings, commit messages, PR descriptions, and UI text. See
+  [Writing style](#writing-style-asd-ste100).
+
+## Writing style (ASD-STE100)
+
+Use ASD-STE100 Simplified Technical English for every piece of prose in this
+repository. The rules that apply most often:
+
+- Write one instruction per sentence. Keep procedural sentences to 20 words or
+  fewer and descriptive sentences to 25 words or fewer.
+- Use the active voice and name the actor: "The importer skips the duplicate",
+  not "The duplicate is skipped".
+- Use the simple present tense where possible. Do not use the present participle
+  or the gerund as a noun: "after you import the file", not "after importing the
+  file".
+- Give each word one meaning and each meaning one word. Do not use a noun as a
+  verb. Keep noun clusters to three words or fewer.
+- Keep the article: "the transaction", not "transaction".
+- Do not use a figure of speech, an idiom, slang, or an undefined abbreviation.
+- Write a warning or a caution as a command, and put it before the step it
+  applies to.
+
+Technical names stay as they are: identifiers, column names, route paths, CLI
+flags, and the SHALL/MUST keywords that the OpenSpec specs need.
 
 ## Tag-only rules (v1.1.0+)
 

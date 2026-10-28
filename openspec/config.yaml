@@ -1,32 +1,60 @@
 schema: spec-driven
 
-# Project context (optional)
-# Add only constraints that should guide OpenSpec artifacts and workflows.
-# Include constraints an agent cannot infer by reading the code.
-# Keep general project documentation and discoverable codebase facts out.
-# Example:
-#   context: |
-#     Designs and tasks must cover Windows, macOS, and Linux
-#     Write all artifacts in Spanish
+# Project context: constraints an agent cannot infer by reading the code.
+# Discoverable facts about behavior live in openspec/specs/; stack and module
+# details live in docs/architecture.md.
+context: |
+  Local, single-user finance app. Two deliverables: a Python web app
+  (openspec/specs/*) and an iOS/iPadOS companion (openspec/specs/ios-*). They
+  interoperate only through the gzipped-JSON snapshot format and must never
+  share a database file. The Python code is the source of truth for ported
+  logic; Swift mirrors its observable behavior function-for-function, and each
+  ported Swift unit names its Python origin.
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always state what is out of scope
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+  Deliberately excluded, do not propose: LLM or MCP integration, any
+  authentication or login, chart libraries, Docker, and any JavaScript build
+  step (htmx and Alpine.js stay vendored static files). If a feature seems to
+  need a bundler, simplify the feature.
 
-# Per-operation guidance (optional)
-# Add advisory guidance for how apply and archive work should be conducted.
-# This is separate from artifact rules above.
-# Example:
-#   operations:
-#     apply:
-#       guidance:
-#         - Keep test summaries concise
-#     archive:
-#       guidance:
-#         - Summarize the archive outcome before finishing
+  Port, do not rewrite: the rule engine, parsers, dedup logic and downloader
+  internals came from the predecessor apps with their tests. Never
+  reimplement matching or parsing semantics from scratch.
+
+  Non-negotiable invariants for any change:
+  - Manual categorizations are never overwritten by rule reapplication. Only
+    snapshot import may replace them, by explicit user action, with a report.
+  - Every rule create/update/delete/toggle produces a stored change report of
+    the affected transactions. No silent recategorization.
+  - Schema changes go through Alembic migrations only (GRDB migrations on
+    iOS). No runtime schema mutation.
+  - The web app binds to 127.0.0.1. Never widen the bind address silently;
+    there is no auth layer. The only network-reachable surface is the
+    ephemeral one-shot snapshot share server.
+  - Transaction ids and rule UUIDs are deterministic and identical across
+    both apps, so snapshots merge without heuristics.
+
+  Working agreements: TDD red/green — unit tests for logic, client tests for
+  routes, Playwright for flows. A change is not done until pytest and
+  ruff check pass (coverage gate 80%) and UI work is verified in a real
+  browser. The Swift build gate is xcodegen generate && xcodebuild test on a
+  Mac. Read docs/core-beliefs.md before any change. Never mention Claude,
+  Anthropic, or any AI assistant in commit messages, PR titles, or PR
+  descriptions.
+
+  Write all prose in ASD-STE100 Simplified Technical English. This applies to
+  every OpenSpec artifact: proposals, specs, designs, and tasks.
+  - Write one instruction per sentence. Keep procedural sentences to 20 words
+    or fewer and descriptive sentences to 25 words or fewer.
+  - Use the active voice. Name the actor: "The system SHALL reject the file",
+    not "The file is rejected".
+  - Use the simple present tense where possible. Do not use the present
+    participle or the gerund as a noun ("after you import the file", not
+    "after importing the file").
+  - Give each word one meaning and each meaning one word. Do not use a noun as
+    a verb. Keep noun clusters to three words or fewer.
+  - Keep the article: "the transaction", not "transaction".
+  - Do not use a figure of speech, an idiom, slang, or an abbreviation that the
+    document does not define at first use.
+  - Write a warning or a caution as a command, and put it before the step.
+  Keep the SHALL/MUST keywords that OpenSpec requires, and keep the WHEN/THEN
+  scenario structure. ASD-STE100 governs the words inside them.
