@@ -20,7 +20,6 @@ from abn_combined.core.models import Transaction
 from abn_combined.core.trends import TrendsParams, aggregate
 from abn_combined.db import get_session_factory
 
-
 # ---------------------------------------------------------------------------
 # Fixtures: common transactions for testing
 # ---------------------------------------------------------------------------

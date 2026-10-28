@@ -15,7 +15,7 @@ from datetime import date
 
 import pytest
 
-from abn_combined.core.models import CategorizationRule, RuleCondition, Transaction
+from abn_combined.core.models import CategorizationRule, Transaction
 from abn_combined.db import get_session_factory
 
 
