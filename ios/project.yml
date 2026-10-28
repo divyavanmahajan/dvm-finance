@@ -4,10 +4,11 @@ options:
   deploymentTarget:
     iOS: "17.0"
   createIntermediateGroups: true
-  # Xcode manages one auto-created scheme for the DVMFinance target when the
-  # project is first opened; that scheme's Test action picks up the local
-  # DVMFinanceKit package's test target automatically once Xcode resolves
-  # the package dependency below. See README.md "Running tests".
+  # The `schemes:` block at the end of this file declares the DVMFinance
+  # scheme, and its test action names the DVMFinanceKitTests target of the
+  # local package. An auto-created scheme does NOT pick that target up: its
+  # test action holds the UI tests only, and `xcodebuild test` then reports
+  # a pass that ran no Kit test. See README.md "Running tests".
 
 configs:
   Debug: debug
@@ -77,3 +78,28 @@ targets:
         IPHONEOS_DEPLOYMENT_TARGET: "17.0"
         TEST_TARGET_NAME: DVMFinance
         GENERATE_INFOPLIST_FILE: YES
+
+# The test action of the `DVMFinance` scheme must also run the unit tests of
+# the local `DVMFinanceKit` package. Without this block Xcode creates a
+# scheme whose test action holds the UI tests only, and
+# `xcodebuild test -scheme DVMFinance` reports a pass that never compiled or
+# ran one Kit test. See README.md "Running tests".
+schemes:
+  DVMFinance:
+    build:
+      targets:
+        DVMFinance: all
+        DVMFinanceUITests: [test]
+    test:
+      config: Debug
+      targets:
+        - DVMFinanceUITests
+        - package: DVMFinanceKit/DVMFinanceKitTests
+    run:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

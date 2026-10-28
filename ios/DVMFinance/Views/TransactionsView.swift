@@ -41,6 +41,12 @@ struct TransactionsListView: View {
     @State private var isLoadingMore = false
     @State private var loadErrorMessage: String?
     @State private var showFilterSheet = false
+    /// The create sheet for a hand-entered transaction, and the screen that
+    /// lists the flagged rows and holds the purge control. Both belong to
+    /// the capability `ios-manual-transactions`.
+    @State private var showCreateSheet = false
+    @State private var showFlaggedScreen = false
+    @State private var flaggedCount = 0
 
     init(initialFilter: TransactionFilter = TransactionFilter()) {
         self._filter = State(initialValue: initialFilter)
@@ -89,9 +95,40 @@ struct TransactionsListView: View {
                     Label("Filter", systemImage: "line.3.horizontal.decrease.circle")
                 }
             }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Button {
+                        showCreateSheet = true
+                    } label: {
+                        Label("New cash payment", systemImage: "plus")
+                    }
+                    Button {
+                        showFlaggedScreen = true
+                    } label: {
+                        Label(
+                            flaggedCount > 0 ? "Flagged (\(flaggedCount))" : "Flagged",
+                            systemImage: "trash"
+                        )
+                    }
+                } label: {
+                    Label("Add", systemImage: "plus.circle")
+                }
+            }
         }
         .sheet(isPresented: $showFilterSheet) {
             FilterSheet(filter: $filter) { draft in draft.page = 1 }
+        }
+        .sheet(isPresented: $showCreateSheet) {
+            ManualTransactionEditView(existing: nil) {
+                await reload()
+                await refreshFlaggedCount()
+            }
+        }
+        .navigationDestination(isPresented: $showFlaggedScreen) {
+            FlaggedTransactionsView {
+                await reload()
+                await refreshFlaggedCount()
+            }
         }
         .navigationDestination(for: String.self) { transactionId in
             TransactionDetailView(transactionId: transactionId)
@@ -104,6 +141,7 @@ struct TransactionsListView: View {
             try? await Task.sleep(nanoseconds: 300_000_000)
             if Task.isCancelled { return }
             await reload()
+            await refreshFlaggedCount()
         }
     }
 
@@ -189,6 +227,14 @@ struct TransactionsListView: View {
         } catch {
             loadErrorMessage = "Couldn't load transactions: \(error.localizedDescription)"
         }
+    }
+
+    /// The number of the flagged rows, for the purge control. A flagged row
+    /// appears in no list and in no total, so this count is the only place
+    /// the list screen reads one.
+    private func refreshFlaggedCount() async {
+        guard let appDatabase else { return }
+        flaggedCount = (try? await AppQueries.flaggedCount(appDatabase: appDatabase)) ?? 0
     }
 
     private func loadMore() async {

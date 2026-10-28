@@ -24,6 +24,7 @@ from ..core.categorizer import (
     rule_snapshot,
     validate_rule_regex,
 )
+from ..core.filters import live_only
 from ..core.models import (
     CategorizationRule,
     RuleChangeReport,
@@ -360,7 +361,8 @@ def _matched_counts(db: Session, exclude_transfers: bool = True) -> dict[int, in
         db: Database session
         exclude_transfers: If True (default), exclude transfer transactions from counts
     """
-    query = (
+    # `live_only` removes each flagged transaction. See `core/filters.py`.
+    query = live_only(
         db.query(Transaction.categorization_source, func.count(Transaction.id))
         .filter(Transaction.categorization_source.isnot(None))
     )

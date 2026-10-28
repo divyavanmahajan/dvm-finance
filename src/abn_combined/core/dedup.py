@@ -7,10 +7,15 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from ..constants import CASH_ACCOUNT, is_reserved_account
 from .models import Transaction
 from .utils import calculate_transaction_hash_components, normalize_category
 
 DEFAULT_CURRENCY = "EUR"
+
+
+class ReservedAccountError(ValueError):
+    """An import names the reserved pseudo account of the hand-entered rows."""
 
 
 def generate_transaction_id(trans: dict[str, Any]) -> str:
@@ -40,12 +45,34 @@ def generate_transaction_id(trans: dict[str, Any]) -> str:
     return f"{account}_{date}_{amount}_{desc_hash}"
 
 
+def reject_reserved_account(transactions: list[dict[str, Any]]) -> None:
+    """Refuse the batch if one transaction names the reserved pseudo account.
+
+    The account ``CASH`` belongs to the hand-entered transactions only. The
+    function checks the whole batch before the caller writes a row, so that a
+    refused batch writes nothing. Raise :class:`ReservedAccountError` with the
+    name of the reserved account.
+    """
+    for trans in transactions:
+        if is_reserved_account(trans.get("accountNumber")):
+            raise ReservedAccountError(
+                f"The account {CASH_ACCOUNT} is reserved for the hand-entered "
+                "transactions. An import must not write a transaction to it."
+            )
+
+
 def check_duplicates(
     db: Session, transactions: list[dict[str, Any]]
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Split incoming transactions into (new, duplicate) using deterministic ids.
 
     Duplicate = id already present in the DB, or a duplicate id within the batch.
+
+    An imported transaction never matches a hand-entered transaction. The id of a
+    hand-entered row is a UUID, and the id of an imported row holds the account,
+    the date, the amount, and a hash of the description. The two forms cannot
+    collide. The check reads each stored id, which includes the id of a flagged
+    row. A flagged id therefore stays taken, and a second row cannot claim it.
     """
     incoming_ids: dict[str, dict[str, Any]] = {}
     duplicate_transactions: list[dict[str, Any]] = []
@@ -79,6 +106,8 @@ def insert_transactions(db: Session, transactions: list[dict[str, Any]]) -> list
     are silently absorbed). Callers that need duplicate counts should call
     :func:`check_duplicates` first.
     """
+    reject_reserved_account(transactions)
+
     written: list[str] = []
     for trans in transactions:
         trans_id = generate_transaction_id(trans)

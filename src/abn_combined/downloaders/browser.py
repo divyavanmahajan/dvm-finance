@@ -34,8 +34,11 @@ def cdp_port(cdp_url: str) -> int:
 def chrome_launch_command(start_url: str = "", cdp_url: str = DEFAULT_CDP_URL) -> str:
     """The exact Chrome launch command shown to the user when CDP connection
     fails, on the port *cdp_url* points at, opening *start_url* if given."""
+    # Escaped outside the f-string: backslashes inside f-string expressions
+    # are a syntax error before Python 3.12 (PEP 701).
+    escaped_app_path = CHROME_APP_PATH.replace(" ", "\\ ")
     command = (
-        f"{CHROME_APP_PATH.replace(' ', '\\ ')} "
+        f"{escaped_app_path} "
         f"--remote-debugging-port={cdp_port(cdp_url)} "
         f"--user-data-dir={CHROME_USER_DATA_DIR}"
     )
@@ -47,6 +50,18 @@ def no_contexts_message(cdp_url: str) -> str:
     return (
         "Connected Chrome has no open contexts. Ensure Chrome was started "
         f"with --remote-debugging-port={cdp_port(cdp_url)}."
+    )
+
+
+def missing_playwright_message() -> str:
+    """Actionable message for an install whose `playwright` package is absent
+    (e.g. an older `uvx dvm-finance` from before playwright became a core
+    dependency), instead of a bare ModuleNotFoundError."""
+    return (
+        "Playwright is not installed, so the downloaders cannot run. "
+        "Reinstall with it included:\n\n"
+        "    uvx --from 'dvm-finance[downloads]' dvm-finance\n\n"
+        "or, in a virtualenv: pip install playwright"
     )
 
 

@@ -2,7 +2,7 @@
 
 ## Tech stack
 
-- Python 3.12+, FastAPI, SQLAlchemy 2.x, Alembic, Jinja2
+- Python 3.11+, FastAPI, SQLAlchemy 2.x, Alembic, Jinja2
 - htmx + Alpine.js (vendored, no build step), Pico.css
 - Playwright (downloads + e2e tests), connects to the installed Google Chrome over CDP — no
   bundled browser, no `playwright install`; platformdirs

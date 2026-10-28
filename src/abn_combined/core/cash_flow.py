@@ -19,6 +19,7 @@ from datetime import date, timedelta
 from sqlalchemy import case, func, not_, or_
 from sqlalchemy.orm import Session
 
+from .filters import live_only
 from .models import Transaction
 
 BREAKDOWNS = ("month", "week", "year")
@@ -137,7 +138,8 @@ def compute_cash_flow(db: Session, date_from: date, date_to: date,
         case((Transaction.amount < 0, -Transaction.amount), else_=0)
     )
 
-    query = (
+    # `live_only` removes each flagged transaction. See `core/filters.py`.
+    query = live_only(
         db.query(bucket.label("bucket"), income_sum.label("income"),
                  expense_sum.label("expense"))
         .filter(

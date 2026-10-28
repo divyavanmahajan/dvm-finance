@@ -107,9 +107,14 @@ public enum BudgetReport {
     ) throws -> Double {
         let eff = TransactionQuery.effectiveCategorySQL
         let c = category.trimmingCharacters(in: .whitespaces).lowercased()
+        // `TransactionQuery.liveOnlySQL` is the shared exclusion of a
+        // flagged row — `core/filters.py:live_only`, the same predicate the
+        // transactions list and the category trends compose. It also covers
+        // `averageMonthlySpend`, which sums through this function.
         var sql = """
             SELECT COALESCE(SUM(ABS(CAST(amount AS REAL))), 0) FROM transactions
-            WHERE transactiondate >= ? AND transactiondate <= ?
+            WHERE \(TransactionQuery.liveOnlySQL)
+            AND transactiondate >= ? AND transactiondate <= ?
             AND (LOWER(\(eff)) = ? OR LOWER(\(eff)) LIKE ?)
             """
         let arguments: [any DatabaseValueConvertible] = [
@@ -150,11 +155,17 @@ public enum BudgetReport {
     /// Distinct top-level (first-hyphen-segment) effective categories observed
     /// across transactions, sorted alphabetically. Port of
     /// `budget_report.py:distinct_top_level_categories`.
+    ///
+    /// This query composes `TransactionQuery.liveOnlySQL`, which
+    /// `distinct_top_level_categories` does not. See the note on the
+    /// "Filter-UI helpers" group of `TransactionQuery` for the reason: each
+    /// list of the app excludes a flagged transaction.
     public static func distinctTopLevelCategories(db: Database) throws -> [String] {
         let eff = TransactionQuery.effectiveCategorySQL
         let values = try String.fetchAll(
             db,
-            sql: "SELECT DISTINCT LOWER(\(eff)) AS c FROM transactions WHERE \(eff) IS NOT NULL AND \(eff) != ''"
+            sql: "SELECT DISTINCT LOWER(\(eff)) AS c FROM transactions "
+                + "WHERE \(TransactionQuery.liveOnlySQL) AND \(eff) IS NOT NULL AND \(eff) != ''"
         )
         var tops: Set<String> = []
         for value in values {

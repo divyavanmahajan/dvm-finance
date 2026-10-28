@@ -11,4 +11,4 @@
 7. **TDD, red/green.** Write the failing test first — unit for logic, TestClient for routes, Playwright for flows. A step is not done until `pytest` and `ruff check` pass and UI features are verified in a real browser.
 8. **Filter state lives in the URL.** All transaction filtering is expressed in the query string so trends click-through, bookmarks, and htmx partial swaps all use one mechanism.
 9. **No JS build step.** htmx + Alpine.js as vendored static files; if a feature seems to need a bundler, simplify the feature.
-10. **Deterministic identity everywhere.** Transactions keep their deterministic ids; rules carry a UUID from creation so snapshots merge across machines without heuristics.
+10. **Deterministic identity everywhere.** Transactions keep their deterministic ids; rules carry a UUID from creation so snapshots merge across machines without heuristics. A hand-entered transaction is the one exception: it carries a UUID instead, because the user can correct its amount or its description, and the row must keep its identity. Each device therefore mints its own ids for the cash rows, and a merge is a union.

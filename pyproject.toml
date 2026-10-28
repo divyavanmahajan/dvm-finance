@@ -13,13 +13,14 @@ name = "dvm-finance"
 description = "Integrated personal-finance app: download, parse, categorize, and review bank statements."
 dynamic = ["version"]
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Divya van Mahajan" }]
 keywords = ["finance", "banking", "personal-finance", "fastapi", "sqlite", "mt940", "budgeting"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: MIT License",
     "Framework :: FastAPI",
@@ -41,9 +42,15 @@ dependencies = [
     "xlrd",
     "markdown",
     "segno",
+    # Required by the statement downloaders, which attach to a running Chrome
+    # over CDP. A core dependency (not an extra) so plain `uvx dvm-finance`
+    # ships a working Downloads page.
+    "playwright",
 ]
 
 [project.optional-dependencies]
+# Redundant now that playwright is a core dependency; kept so
+# `dvm-finance[downloads]` still resolves for anyone using the old extra.
 downloads = [
     "playwright",
 ]
@@ -88,7 +95,7 @@ include = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py311"
 extend-exclude = ["alembic/versions"]
 
 [tool.ruff.lint]
