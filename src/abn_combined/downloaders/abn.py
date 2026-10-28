@@ -8,6 +8,7 @@ the import pipeline.
 from __future__ import annotations
 
 import base64
+import json
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -112,22 +113,55 @@ def extract_account_numbers(response_data: dict) -> list[str]:
     return numbers
 
 
+# The page itself makes the request for the account list. A request from the
+# Playwright request context shares the cookies, but the browser does not add
+# the `Referer`, the `Origin` and the `Sec-Fetch-*` headers to it. The gateway
+# of the bank refuses such a request with the status 403 and the code
+# ACCESS_DENIED. A `fetch` inside the page is a same-origin request, so the
+# browser adds each of those headers, and it sends the cookies.
+_ACCOUNT_LIST_JS = """
+async (url) => {
+  const response = await fetch(url, {
+    method: "GET",
+    credentials: "include",
+    headers: {
+      "accept": "application/json",
+      "accept-language": "en-GB",
+      // The single-page application sends this header. The gateway uses its
+      // presence to refuse a request from another site.
+      "x-xsrf-header": "token",
+      // The application sends this constant with the request for the
+      // overview. It holds no personal data.
+      "journey-initiator-id": "ACNBV3_IBREBUILDD_NA_NA_OVERVIEW",
+    },
+  });
+  return { status: response.status, ok: response.ok, body: await response.text() };
+}
+"""
+
+
 def fetch_account_numbers(page) -> list[str]:
     """Read the account-balances API and return the account numbers.
 
-    The function uses the request context of the authenticated page. The page
-    sends the ABN AMRO session cookies. The app does not store an account
-    number.
+    The page must already hold an authenticated session on the domain of the
+    bank. The app does not store an account number.
     """
     url = f"{ABN_ACCOUNT_BALANCES_API}?productGroups={ABN_PRODUCT_GROUPS}"
     logger.info("abn_api_get", url=ABN_ACCOUNT_BALANCES_API)
-    response = page.request.get(url, headers={"accept": "application/json"})
-    if not response.ok:
+    result = page.evaluate(_ACCOUNT_LIST_JS, url)
+    status = result.get("status")
+    if not result.get("ok"):
         raise Exception(
-            f"ABN account-balances request failed with status {response.status}: "
-            f"{response.text()}"
+            f"ABN account-balances request failed with status {status}: "
+            f"{result.get('body')}"
         )
-    numbers = extract_account_numbers(response.json())
+    try:
+        payload = json.loads(result.get("body") or "")
+    except json.JSONDecodeError as exc:
+        raise Exception(
+            f"ABN account-balances returned no JSON (status {status}): {exc}"
+        ) from exc
+    numbers = extract_account_numbers(payload)
     logger.info("abn_accounts_discovered", count=len(numbers))
     return numbers
 
