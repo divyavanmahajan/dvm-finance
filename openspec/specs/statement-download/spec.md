@@ -79,6 +79,50 @@ AMRO, PayPal, Wise, and SEB.
 - **THEN** the download page refreshes the status of that source about every 2
   seconds, until the job reaches a final state
 
+### Requirement: The account list of ABN AMRO comes from the bank
+The system SHALL hold no ABN AMRO account number. For each ABN run the system
+SHALL read the account list from the account-balances API of the bank, after the
+user authenticates the session. The system SHALL use each contract that has an
+account number, and it SHALL remove the duplicate entries that the product
+groups cause. The system SHALL record only the number of the accounts in the
+log.
+
+#### Scenario: The account list reports an account two times
+- **WHEN** the account list reports the same account for more than one product
+  group
+- **THEN** the run asks for the statement of that account one time
+
+#### Scenario: The account list reports a contract that is not an account
+- **WHEN** the account list also reports a debit card, an access agreement, or a
+  mortgage
+- **THEN** the run omits each contract that has no account number
+
+#### Scenario: The request for the account list fails
+- **WHEN** the API of the bank refuses the request for the account list
+- **THEN** the job state is failed, the message names the account list step, and
+  the run asks for no statement
+
+#### Scenario: The login holds no account
+- **WHEN** the account list reports no account
+- **THEN** the job state is failed, and the run asks for no statement
+
+### Requirement: The page of the bank makes the request for the account list
+The page SHALL make the request for the account list itself. A request from the
+automation context holds the cookies, but the browser does not add the
+`Referer`, the `Origin` and the `Sec-Fetch-*` headers to it, and the gateway of
+the bank then refuses the request. The system SHALL also refuse a response body
+that is not JSON, so that a login page cannot read as an empty account list.
+
+#### Scenario: The gateway of the bank checks the headers of the browser
+- **WHEN** the run asks for the account list
+- **THEN** the browser makes a same-origin request, so it adds each header that
+  the gateway needs, and the gateway accepts the request
+
+#### Scenario: The response holds no JSON
+- **WHEN** the API of the bank answers with a page instead of JSON
+- **THEN** the job fails with a message that names the body, and the run does
+  not report an empty account list
+
 ### Requirement: Automatic import of a downloaded statement
 The system SHALL send each downloaded file through the normal import pipeline.
 The duplicate removal and the rule application therefore work exactly as for a
