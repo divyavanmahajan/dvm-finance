@@ -1,5 +1,29 @@
 # Spec Delta
 
+## MODIFIED Requirements
+
+### Requirement: The user can stop the command from opening a browser
+The command SHALL accept the option `--no-browser`, and it SHALL then open no
+browser. The environment variable `DVM_FINANCE_NO_BROWSER` SHALL have the same
+effect, for a start without a command line. The old name of that variable still
+works, as the requirements for the old names describe. The option and the
+variable SHALL change nothing else.
+
+#### Scenario: The user gives the option
+- **WHEN** the user starts the application with `--no-browser`
+- **THEN** the command opens no browser, and the server starts as usual
+
+#### Scenario: The environment holds the variable
+- **WHEN** the environment holds `DVM_FINANCE_NO_BROWSER` with a value that is
+  not empty
+- **THEN** the command opens no browser, and the server starts as usual
+
+#### Scenario: The environment holds the old name of the variable
+- **WHEN** the environment holds `ABN_COMBINED_NO_BROWSER` with a value that is
+  not empty
+- **THEN** the command opens no browser, and it writes the warning about the
+  old name
+
 ## ADDED Requirements
 
 ### Requirement: The prefix of each environment variable
