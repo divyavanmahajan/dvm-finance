@@ -36,7 +36,7 @@
   </div>
   {% endif %}
 
-  <form id="rule-form" method="post"
+  <form id="rule-form" class="rule-form" method="post"
         action="{% if vm.id %}/rules/{{ vm.id }}{% else %}/rules{% endif %}"
         hx-post="{% if vm.id %}/rules/{{ vm.id }}{% else %}/rules{% endif %}"
         hx-target="body" hx-swap="outerHTML"
@@ -266,7 +266,7 @@
 
     <div class="rule-form-actions">
       <div class="d-flex align-items-center gap-2">
-        <button type="button" class="btn btn-outline-primary"
+        <button type="button" id="preview-btn" class="btn btn-outline-primary"
                 hx-post="/rules/preview" hx-target="#preview-panel" hx-swap="innerHTML"
                 hx-include="#rule-form"
                 hx-on::after-swap="document.getElementById('preview-panel').scrollIntoView({behavior:'smooth'})">

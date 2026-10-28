@@ -80,13 +80,15 @@ def test_flow_b_create_rule_from_uncategorized(live_app, page):
 
     # Preview the draft — nothing saved yet.
     page.click("#preview-btn")
-    page.wait_for_selector("#preview-panel article.rule-preview")
+    page.wait_for_selector("#preview-panel .rule-preview")
     assert "Matched: 1" in page.locator("#preview-panel").inner_text()
     page.screenshot(path=str(SCREENSHOT_DIR / "flow-b-preview.png"), full_page=True)
 
     # Save → redirect to the rules list.
     page.click("form.rule-form button[type=submit]")
-    page.wait_for_url("**/rules")
+    # The form posts with htmx and swaps the body, so the browser URL does not
+    # change. The success banner of the rules page is what the user sees.
+    page.wait_for_selector("#rule-save-alert")
 
     # The transaction is now categorized by the new rule.
     db = live_app.session()
@@ -165,14 +167,16 @@ def test_flow_d_edit_rule_preview_diff_save_history(live_app, page):
     # Change the category and preview the diff (gains/losses/changes for an edit).
     page.fill("input[name=category]", "entertainment")
     page.click("#preview-btn")
-    page.wait_for_selector("#preview-panel article.rule-preview")
+    page.wait_for_selector("#preview-panel .rule-preview")
     preview = page.locator("#preview-panel").inner_text()
     assert "Would change: 2" in preview
     page.screenshot(path=str(SCREENSHOT_DIR / "flow-d-preview-diff.png"), full_page=True)
 
     # Save → redirect to the rules list.
     page.click("form.rule-form button[type=submit]")
-    page.wait_for_url("**/rules")
+    # The form posts with htmx and swaps the body, so the browser URL does not
+    # change. The success banner of the rules page is what the user sees.
+    page.wait_for_selector("#rule-save-alert")
 
     # The update is recorded in History.
     page.goto(live_app.url(f"/rules/{rule_id}/history"))
