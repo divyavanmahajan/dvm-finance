@@ -22,6 +22,15 @@
     <dt>Transaction id</dt><dd><code>{{ t.id }}</code></dd>
   </dl>
 
+  {% if t.is_manual %}
+  {# A hand-entered row is the one kind of row that the user can change. #}
+  <p class="mb-2">
+    <span class="badge text-bg-secondary">Cash payment</span>
+    You typed this transaction.
+    <a class="btn btn-sm btn-outline-primary ms-2" href="/manual/{{ t.id }}/edit">Change or remove it</a>
+  </p>
+  {% endif %}
+
   {% if structured %}
   <details open>
     <summary>Structured description fields</summary>

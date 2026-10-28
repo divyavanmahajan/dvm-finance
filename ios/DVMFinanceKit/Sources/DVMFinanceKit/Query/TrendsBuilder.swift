@@ -261,7 +261,15 @@ public enum TrendsBuilder {
             : "strftime('%Y-%m', transactiondate)"
         let effCatExpr = "LOWER(COALESCE(NULLIF(manual_category, ''), category))"
 
-        var conditions = ["transactiondate >= ?", "transactiondate <= ?"]
+        // The shared exclusion of a flagged row —
+        // `core/filters.py:live_only`, the same predicate the transactions
+        // list and the budget actuals compose. A flagged row contributes
+        // nothing to a cell or to a total.
+        var conditions = [
+            TransactionQuery.liveOnlySQL,
+            "transactiondate >= ?",
+            "transactiondate <= ?",
+        ]
         var arguments: [(any DatabaseValueConvertible)?] = [
             DatabaseDateFormat.dateOnly.string(from: windowFrom),
             DatabaseDateFormat.dateOnly.string(from: windowTo),

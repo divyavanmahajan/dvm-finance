@@ -22,6 +22,9 @@ from sqlalchemy import (
     Text,
     func,
 )
+from sqlalchemy import (
+    false as sa_false,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -64,6 +67,15 @@ class Transaction(Base):
     # snapshots ("only transactions changed since <since>"). Nullable so rows
     # predating this column read as "never touched" until first re-touched.
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    # True for a transaction that the user typed by hand. Only such a row
+    # accepts an edit and a removal flag; its id is a UUID, not content-derived.
+    is_manual: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=sa_false()
+    )
+    # Set when the user flags a hand-entered row for removal. NULL means live.
+    # A flagged row stays in the table, travels in a snapshot, and keeps its id;
+    # only an explicit purge deletes it.
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
 
     __table_args__ = (Index("idx_account_date", "accountNumber", "transactiondate"),)
 

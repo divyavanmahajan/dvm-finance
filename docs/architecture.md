@@ -17,9 +17,10 @@ CLI entry ── uvicorn ── FastAPI
    │
    ├─ web/          Jinja2 pages + htmx partials
    ├─ api/          transactions, rules, tags, budgets, cash_flow, trends,
-   │                upload, downloads, snapshots, migration
+   │                upload, downloads, snapshots, migration, manual
    ├─ core/         rule engine + preview + change reports, dedup,
-   │                snapshot export/import, legacy migration, models
+   │                snapshot export/import, legacy migration, models,
+   │                manual_txn (hand-entered transactions)
    ├─ parsers/      mt940, xls, csv, paypal, wise, seb, description
    └─ downloaders/  abn, paypal (both CDP via browser.py) — background jobs
 ```
@@ -27,6 +28,13 @@ CLI entry ── uvicorn ── FastAPI
 ## Data model (delta vs abn-analyst)
 
 Ported unchanged: `transactions`, `categorization_rules` (+ new `uuid` column), `rule_conditions`, `budgets`.
+
+New columns on `transactions` (migration
+`alembic/versions/b3c1f0a27d44_add_manual_transaction_columns.py`):
+- `is_manual` — `Boolean`, not null, server default false. True marks a
+  hand-entered transaction. Each row that an import wrote reads as false.
+- `deleted_at` — `DateTime`, nullable, indexed. A value marks a removal flag and
+  records its time. `NULL` means live.
 
 New tables:
 - `rule_change_reports` — id, created_at, rule_id/uuid, action (create/update/delete/toggle/recategorize/import), rule snapshot before/after (JSON)
@@ -40,6 +48,9 @@ Dropped: users/auth tables, LLM/vector artifacts.
 
 - Effective category = `manual_category or category`; same for tags. Rule reapplication never overwrites manual values.
 - Transaction id: deterministic `account + date + amount + description_hash` (PayPal: `account + paypal_transaction_id`).
+  A hand-entered transaction (`is_manual` true) is the one exception: its id is a
+  UUID, because a content-derived id cannot survive an edit. See
+  [Hand-entered transactions](#hand-entered-transactions-cash-is_manual-deleted_at).
 - Rule matching normalization: lowercase, strip spaces, drop `WERO/` prefix (ported `normalize_string_for_matching`).
 - All schema changes via Alembic.
 - Snapshot merge: insert-or-overwrite (incoming wins), never deletes local rows; whole import is one transaction with a pre-import DB backup.
@@ -99,6 +110,131 @@ Transfer categories are identified by the `is_transfer_category()` helper in
 UI toggles on Transactions, Trends, and Cash Flow pages allow users to toggle the setting
 per-session (state lives in URL query params per Golden Principle 8). Rules preview also
 has a toggle to test rule matches with/without transfers included.
+
+## Hand-entered transactions (`CASH`, `is_manual`, `deleted_at`)
+
+A hand-entered transaction records a payment that no statement reports, for
+example a cash payment. `core/manual_txn.py` holds the rules and
+`api/manual.py` holds the pages. `app.py` registers the router through
+`API_ROUTER_MODULES` and adds the nav tab `("/manual", "Cash")`.
+
+### The UUID identity and the two columns
+
+An imported id holds the account, the date, the amount, and a hash of the
+description. An edit of any of those values therefore produces a different row.
+`core/manual_txn.py:create_manual_transaction` gives a hand-entered row a
+`uuid.uuid4()` id instead, so `edit_manual_transaction` keeps the id and only
+changes the values. The function recomputes `transaction_hash` and stamps
+`updated_at`, so a delta snapshot carries the new values.
+
+The UUID also makes the phone a first-class writer. Both devices create rows in
+the same `CASH` account, each device mints its own ids, and the snapshot merge is
+a union. No column records the device.
+
+`is_manual` answers "which rows accept an edit and a flag". The pseudo account
+cannot answer it, because a hand-entered correction may later belong in a real
+bank account. `core/manual_txn.py:_get_manual_row` and
+`api/manual.py:_get_manual_or_refuse` both read the column and refuse an
+imported row with `ManualTransactionError` or HTTP 400.
+
+Do not confuse the column `Transaction.is_manual` with the helper
+`core/filters.py:is_manual(txn)`. The helper reports a **manually categorized**
+transaction (`categorization_source == "manual"` or a `manual_category`). The
+column reports a **hand-entered** transaction.
+
+### The reserved pseudo account
+
+`constants.CASH_ACCOUNT` is `"CASH"`, and `constants.is_reserved_account`
+compares an account against it. `core/dedup.py:reject_reserved_account` raises
+`ReservedAccountError` for a batch that holds a row for this account, and
+`core/dedup.py:insert_transactions` calls it on every insert.
+`core/importer.py` catches the error and reports the reserved account to the
+user. The pseudo account stays fixed; the app offers no second pseudo account
+and no user-named one.
+
+The snapshot merge (`core/snapshots.py:_merge_transactions`) does not call
+`reject_reserved_account`. It writes a `CASH` row like any other row, because
+this is the path that shares the cash rows between the two devices.
+
+### The flag, and the one shared exclusion predicate
+
+`flag_manual_transaction` writes `deleted_at` and `restore_manual_transaction`
+clears it. Neither deletes a row. A timestamp answers "since when" at the same
+cost as a boolean, and it allows a later purge by age without a second
+migration.
+
+The transfer exclusion above binds the same set of readers with a separate SQL
+clause in each one, and those clauses have already drifted in form. A reader that
+misses such a clause does not fail loudly; it returns a total that still holds a
+removed row. This exclusion therefore has one predicate:
+
+```python
+def live_only(query: Query) -> Query:      # core/filters.py
+    return query.filter(Transaction.deleted_at.is_(None))
+```
+
+Seven readers compose it:
+
+| Reader | Surface |
+|--------|---------|
+| `core/filters.py:build_query` | transactions list and its summary |
+| `core/trends.py:aggregate` | category trends |
+| `core/cash_flow.py:compute_cash_flow` | cash flow |
+| `core/budget_report.py:compute_actual` | budget actuals |
+| `api/tags.py:collect_tags` | tag usage counts |
+| `api/rules.py:_matched_counts` | match count of each rule |
+| `core/categorizer.py:preview_rule` | rule preview |
+
+Two surfaces do **not** compose it, on purpose:
+
+- The snapshot export query in `core/snapshots.py` keeps a flagged row, so the
+  flag reaches each other machine.
+- The id set in `core/dedup.py:check_duplicates` keeps the id of a flagged row,
+  so no second row claims it.
+
+A test walks the seven readers and asserts that each one hides a flagged row.
+The test is the control, because the failure is silent.
+
+### The flag crosses a snapshot
+
+The snapshot format and its `schema_version` of 1 do not change. The export
+already writes every column of `transactions`, so `is_manual` and `deleted_at`
+travel with it. `core/snapshots.py` lists `deleted_at` in
+`_TXN_DATETIME_COLUMNS`, so the import parses it back to a `datetime`. The
+import rule is unchanged: incoming wins per present row.
+
+This gives one useful property. A machine purges a row, a second machine still
+holds the row with its flag, and the next snapshot returns the row to the first
+machine. The row returns flagged, so it stays out of each list and each total.
+The purge needs no tombstone.
+
+A flag and a restore on two machines resolve by the order of the imports. The
+merge replaces the local values and does not compare `updated_at`. This is an
+accepted limitation.
+
+An older application that reads a newer snapshot ignores the two fields, and it
+therefore shows a flagged row.
+
+### The purge
+
+`core/manual_txn.py:purge_flagged_transactions` is the one function that deletes
+a transaction row.
+
+Caution: ask the user to confirm the purge before you call this function. The
+app cannot undo it.
+
+1. The function calls `core/snapshots.py:_backup_db`, the same helper as the
+   snapshot import, and copies the SQLite file to a timestamped backup beside
+   it.
+2. It deletes each row with a value in `deleted_at`, and no other row.
+3. It returns the number of the deleted rows.
+
+`api/manual.py:manual_purge` is the only caller. It refuses the request until the
+form field `confirm` holds one of `CONFIRM_VALUES`, and it then reads the
+database path from `request.app.state.settings.db_path`.
+
+A rollback of the Alembic migration drops the two columns. A rollback after a
+purge cannot return the purged rows; only the backup of the purge holds them.
 
 ## Category hierarchy convention
 

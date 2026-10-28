@@ -107,17 +107,21 @@ run its test suite:
 
 ```bash
 xcodebuild test -scheme DVMFinance \
-  -destination 'platform=iOS Simulator,name=iPhone 15'
+  -destination 'platform=iOS Simulator,name=iPhone 17'
 ```
 
-— or, in Xcode, open the scheme picker and select the `DVMFinanceKit`
-package scheme (Xcode creates one automatically once the local package
-dependency is resolved), then `Cmd-U`.
+Name a simulator that this Mac holds. `xcrun simctl list devices available`
+prints the list.
 
-There is no separate unit-test Xcode target in `project.yml` for the Kit —
-the package's own `DVMFinanceKitTests` target (declared in
-`DVMFinanceKit/Package.swift`) is the single source of truth for its tests,
-reached through Xcode's native Swift package test integration either way.
+— or, in Xcode, select the `DVMFinance` scheme and press `Cmd-U`.
+
+There is no separate unit-test Xcode target in `project.yml` for the Kit.
+The package's own `DVMFinanceKitTests` target (declared in
+`DVMFinanceKit/Package.swift`) is the single source of truth for its tests.
+The `schemes:` block of `project.yml` names that target in the test action
+of the `DVMFinance` scheme, so the command above compiles and runs it. Do
+not remove that block: without it the test action holds the UI tests only,
+and the command reports a pass that ran no Kit test.
 
 No Swift toolchain exists in the Linux container this project was
 scaffolded in, so `xcodegen generate && xcodebuild test` on a Mac is the

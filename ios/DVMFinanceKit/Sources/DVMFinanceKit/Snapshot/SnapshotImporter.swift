@@ -188,6 +188,13 @@ public enum SnapshotImporter {
             if let source = data.categorizationSource, let mappedId = ruleIdMap[source] {
                 data.categorizationSource = String(mappedId)
             }
+            // A snapshot that an older version wrote holds no `is_manual`
+            // key, and `SnapshotTransaction.isManual` reads it as `nil`. The
+            // local row always holds `false` for such a row, so the
+            // comparison below must read the missing value as `false` too.
+            // Without this step a re-import of an older file reports each
+            // row as updated instead of unchanged.
+            data.isManual = data.isManual ?? false
 
             guard let local = try TransactionRecord.fetchOne(db, key: data.id) else {
                 let newRecord = try SnapshotCodec.makeTransactionRecord(data)

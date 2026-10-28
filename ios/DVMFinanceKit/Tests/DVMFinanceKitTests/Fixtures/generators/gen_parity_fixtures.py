@@ -6,12 +6,12 @@ import json
 from datetime import date
 from decimal import Decimal
 
+from abn_combined.core.dedup import generate_transaction_id
 from abn_combined.core.utils import (
     calculate_transaction_hash_components,
     normalize_category,
     normalize_string_for_matching,
 )
-from abn_combined.core.dedup import generate_transaction_id
 
 out = {}
 

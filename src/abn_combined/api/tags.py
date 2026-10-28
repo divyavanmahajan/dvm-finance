@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from ..constants import is_transfer_category
+from ..core.filters import live_only
 from ..core.models import Transaction
 from ..core.renames import delete_tag, rename_tag
 from ..db import get_db
@@ -36,8 +36,11 @@ def collect_tags(db: Session, exclude_transfers: bool = True) -> list[dict]:
         db: Database session
         exclude_transfers: If True (default), exclude transfer transactions
     """
-    query = db.query(Transaction).filter(
-        (Transaction.tags.isnot(None)) | (Transaction.manual_tags.isnot(None))
+    # `live_only` removes each flagged transaction. See `core/filters.py`.
+    query = live_only(
+        db.query(Transaction).filter(
+            (Transaction.tags.isnot(None)) | (Transaction.manual_tags.isnot(None))
+        )
     )
     # Exclude transfers by default
     if exclude_transfers:
