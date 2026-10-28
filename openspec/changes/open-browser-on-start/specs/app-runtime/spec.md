@@ -5,8 +5,8 @@
 ### Requirement: The command opens the browser at the address of the app
 The command SHALL open the default browser of the user at the address of the
 application, one time for each run of the server. The command SHALL open the
-browser only after the server accepts a connection, so that the browser does not
-reach a closed port.
+browser only after this application answers at the address, so that the browser
+reaches neither a closed port nor another program that holds the port.
 
 #### Scenario: The user starts the server
 - **WHEN** the user starts the application with no option that stops it
@@ -14,13 +14,18 @@ reach a closed port.
   application, after the server accepts a connection
 
 #### Scenario: The server needs time to start
-- **WHEN** the server needs some seconds before it accepts a connection
-- **THEN** the command waits for the connection, and the browser therefore
-  reaches a server that answers
+- **WHEN** the server needs some seconds before it answers
+- **THEN** the command waits for the answer, and the browser therefore reaches
+  a server that answers
 
-#### Scenario: The server never accepts a connection
-- **WHEN** the server does not accept a connection before the time limit
+#### Scenario: The server never answers
+- **WHEN** this application does not answer before the time limit
 - **THEN** the command opens no browser, and the server keeps its own behavior
+
+#### Scenario: Another program answers at the address
+- **WHEN** another program holds the port and answers a request
+- **THEN** the command opens no browser, because the answer does not identify
+  this application
 
 ### Requirement: The address for the browser is an address a browser can open
 The command SHALL open the loopback address when the bind host is `0.0.0.0`,
@@ -37,7 +42,7 @@ otherwise open the bind host. The command SHALL use the port of the server.
 
 ### Requirement: The user can stop the command from opening a browser
 The command SHALL accept the option `--no-browser`, and it SHALL then open no
-browser. The environment variable `DVM_FINANCE_NO_BROWSER` SHALL have the same
+browser. The environment variable `ABN_COMBINED_NO_BROWSER` SHALL have the same
 effect, for a start without a command line. The option and the variable SHALL
 change nothing else.
 
@@ -46,7 +51,7 @@ change nothing else.
 - **THEN** the command opens no browser, and the server starts as usual
 
 #### Scenario: The environment holds the variable
-- **WHEN** the environment holds `DVM_FINANCE_NO_BROWSER` with a value that is
+- **WHEN** the environment holds `ABN_COMBINED_NO_BROWSER` with a value that is
   not empty
 - **THEN** the command opens no browser, and the server starts as usual
 

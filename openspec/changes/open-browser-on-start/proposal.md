@@ -15,7 +15,7 @@ web application with one user, so the browser is always the next step.
 - The command opens no browser when the server does not start, for example when
   another program holds the port.
 - A new option `--no-browser` stops the command from opening a browser. The
-  environment variable `DVM_FINANCE_NO_BROWSER` has the same effect, for a
+  environment variable `ABN_COMBINED_NO_BROWSER` has the same effect, for a
   service that starts the app without a command line.
 - The command opens the address `127.0.0.1` when the bind host is `0.0.0.0`,
   because `0.0.0.0` is not an address that a browser can open.
