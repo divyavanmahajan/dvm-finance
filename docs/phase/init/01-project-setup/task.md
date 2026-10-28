@@ -11,7 +11,7 @@ None.
 
 ## Tasks
 1. Create `pyproject.toml` (hatchling, `src/abn_combined/` layout, Python 3.12+): deps `fastapi`, `uvicorn`, `jinja2`, `sqlalchemy>=2`, `alembic`, `platformdirs`, `python-multipart`; extras `dev` = `pytest`, `pytest-cov`, `httpx`, `ruff`, `playwright`, `pytest-playwright`.
-2. Console script `abn-combined` → CLI (argparse or typer-free stdlib): flags `--port` (8000), `--host` (127.0.0.1), `--data-dir`; env `ABN_COMBINED_DATA_DIR`; subcommand structure ready for `migrate-legacy` (stub). Default data dir via `platformdirs.user_data_dir("abn-combined")`.
+2. Console script `abn-combined` → CLI (argparse or typer-free stdlib): flags `--port` (8000), `--host` (127.0.0.1), `--data-dir`; env `DVM_FINANCE_DATA_DIR`; subcommand structure ready for `migrate-legacy` (stub). Default data dir via `platformdirs.user_data_dir("abn-combined")`.
 3. App factory `create_app(settings)` returning FastAPI with Jinja2 templates, static mount, and a health route. Startup fails with a clear message if the data dir is not writable; clear message if the port is busy (spec Edge Cases).
 4. Port the structured-logging setup from abn-analyst (`get_logger(__name__)` pattern).
 5. Vendor static assets: htmx, Alpine.js, Pico.css + one empty `app.css`. Base template `base.html` with nav tabs: Transactions, Trends, Rules, Tags, Budgets, Cash Flow, Download, Upload, Snapshots (placeholder pages render).

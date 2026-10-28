@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from collections.abc import Callable, Sequence
 
-from .settings import DATA_DIR_ENV, NO_BROWSER_ENV, Settings
+from .settings import DATA_DIR_ENV, NO_BROWSER_ENV, Settings, read_env
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -112,7 +111,7 @@ def _browser_is_wanted(no_browser_flag: bool) -> bool:
     """
     if no_browser_flag:
         return False
-    return not os.getenv(NO_BROWSER_ENV)
+    return not read_env(NO_BROWSER_ENV)
 
 
 def _run_migrate_legacy(legacy_db: str, settings: Settings) -> int:
