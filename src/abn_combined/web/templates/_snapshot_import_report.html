@@ -2,7 +2,7 @@
    `imported_id` (highlight the just-completed import). #}
 
 <!-- Import report card wrapper -->
-<div id="import-{{ imp.id }}" class="card shadow-sm mb-3 {% if imp.id == imported_id %}border-success border-2{% endif %}">
+<div id="import-{{ imp.id }}" class="card shadow-sm mb-3 snapshot-report {% if imp.id == imported_id %}just-imported border-success border-2{% endif %}">
   <!-- Card header with action badge, import ID, timestamp, source -->
   <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
     <div class="d-flex align-items-center gap-2">

@@ -61,7 +61,7 @@
 
         {% if exports %}
         <div class="table-responsive mt-3">
-          <table class="table table-sm table-hover">
+          <table class="table table-sm table-hover snapshot-exports">
             <thead class="table-light">
               <tr>
                 <th>File</th>
@@ -104,7 +104,8 @@
            overwritten with the snapshot's values (including manual categorizations); everything
            overwritten is listed in the import report. Local-only records are kept.</p>
 
-        <form method="post" action="/snapshots/import" enctype="multipart/form-data">
+        <form method="post" action="/snapshots/import" enctype="multipart/form-data"
+              class="snapshot-import-form">
           <div class="mb-3">
             <label for="snapshot-file" class="form-label">Snapshot file</label>
             <input type="file" id="snapshot-file" class="form-control" name="file"
