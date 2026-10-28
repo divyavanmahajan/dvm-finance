@@ -41,10 +41,18 @@ form is a thread that sleeps one second and then opens the browser. That form is
 wrong on a slow start: the browser then shows a connection error, and the user
 believes the application is broken.
 
-The thread instead opens a socket to the host and the port in a loop, with a
-short pause between two tries and a limit of about ten seconds. It opens the
-browser after the first connection succeeds. It writes a message and stops after
-the limit.
+The thread instead asks the health endpoint of the application in a loop, with
+a short pause between two tries and a limit of about ten seconds. It opens the
+browser after this application answers. It writes a message and stops after the
+limit.
+
+The first form of this decision opened a socket to the host and the port, and
+it opened the browser after the connection succeeded. That form is wrong when
+another program already holds the port: the socket then connects to the other
+program, and the browser opens a page of that program. The requirement for an
+occupied port says that the command opens no browser. The health endpoint
+answers with the data directory of the server, so the answer identifies this
+application and not another program on the same port.
 
 **Decision**: one daemon thread, started immediately before `uvicorn.run`, that
 waits for a connection and then opens the browser. A daemon thread does not hold
@@ -66,10 +74,12 @@ bind address in silence, so this case is rare. It still needs the rule, because
 
 ### The option and the variable both stop the open
 
-`--no-browser` serves the command line. `DVM_FINANCE_NO_BROWSER` serves a start
+`--no-browser` serves the command line. `ABN_COMBINED_NO_BROWSER` serves a start
 with no command line, for example from a service file or a container. The
-variable follows the name of the existing data-directory variable, so the two
-read as one family.
+variable uses the prefix of the existing data-directory variable
+`ABN_COMBINED_DATA_DIR`, so the two read as one family. The command and the
+package carry the name `dvm-finance`, but no environment variable does, and a
+second prefix would make the set harder to learn.
 
 **Decision**: the command opens no browser when the option is present, or when
 the variable holds a value that is not empty.

@@ -39,8 +39,11 @@ pytest -m e2e                   # Playwright e2e: boots real app instances on ra
                                 # Google Chrome (channel="chrome") — install Chrome,
                                 # no `playwright install` needed
 
-# Run the app (dev)
+# Run the app (dev). The command opens the browser at the app.
 dvm-finance --data-dir ./devdata
+
+# Run the app without a browser window.
+dvm-finance --data-dir ./devdata --no-browser
 ```
 
 ## E2E harness
@@ -56,4 +59,10 @@ download flows are covered by mocked tests only and re-verified manually.
 ## Env vars / flags
 
 - `ABN_COMBINED_DATA_DIR` / `--data-dir` — data directory (DB, downloads, snapshots)
-- `--port` (default 8000), `--host` (default 127.0.0.1)
+- `ABN_COMBINED_NO_BROWSER` / `--no-browser` — do not open the browser at startup.
+  Set the variable to any value that is not empty. The command otherwise waits
+  for its own `/health` endpoint to answer, and then opens the default browser.
+  The wait identifies the server by its data directory, so another program on the
+  port never gets a browser window. The `migrate-legacy` subcommand opens none.
+- `--port` (default 8000), `--host` (default 127.0.0.1). The command opens
+  `127.0.0.1` when the host is `0.0.0.0`, which a browser cannot open.
