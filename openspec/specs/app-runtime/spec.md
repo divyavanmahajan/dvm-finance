@@ -133,3 +133,142 @@ inside 10 seconds across 50,000 transactions.
 #### Scenario: Recategorize-all runs at scale
 - **WHEN** recategorize-all runs against 50,000 transactions
 - **THEN** it ends and stores its report inside 10 seconds
+
+### Requirement: The command opens the browser at the address of the app
+The command SHALL open the default browser of the user at the address of the
+application, one time for each run of the server. The command SHALL open the
+browser only after this application answers at the address, so that the browser
+reaches neither a closed port nor another program that holds the port.
+
+#### Scenario: The user starts the server
+- **WHEN** the user starts the application with no option that stops it
+- **THEN** the command opens the default browser at the address of the
+  application, after the server accepts a connection
+
+#### Scenario: The server needs time to start
+- **WHEN** the server needs some seconds before it answers
+- **THEN** the command waits for the answer, and the browser therefore reaches
+  a server that answers
+
+#### Scenario: The server never answers
+- **WHEN** this application does not answer before the time limit
+- **THEN** the command opens no browser, and the server keeps its own behavior
+
+#### Scenario: Another program answers at the address
+- **WHEN** another program holds the port and answers a request
+- **THEN** the command opens no browser, because the answer does not identify
+  this application
+
+### Requirement: The address for the browser is an address a browser can open
+The command SHALL open the loopback address when the bind host is `0.0.0.0`,
+because `0.0.0.0` is not an address that a browser can open. The command SHALL
+otherwise open the bind host. The command SHALL use the port of the server.
+
+#### Scenario: The application binds to each interface
+- **WHEN** the user starts the application with the host `0.0.0.0`
+- **THEN** the command opens the address `127.0.0.1` with the port of the server
+
+#### Scenario: The application binds to the loopback address
+- **WHEN** the user starts the application with the default host
+- **THEN** the command opens that host with the port of the server
+
+### Requirement: The user can stop the command from opening a browser
+
+The command SHALL accept the option `--no-browser`, and it SHALL then open no
+browser. The environment variable `DVM_FINANCE_NO_BROWSER` SHALL have the same
+effect, for a start without a command line. The old name of that variable still
+works, as the requirements for the old names describe. The option and the
+variable SHALL change nothing else.
+
+#### Scenario: The user gives the option
+- **WHEN** the user starts the application with `--no-browser`
+- **THEN** the command opens no browser, and the server starts as usual
+
+#### Scenario: The environment holds the variable
+- **WHEN** the environment holds `DVM_FINANCE_NO_BROWSER` with a value that is
+  not empty
+- **THEN** the command opens no browser, and the server starts as usual
+
+#### Scenario: The environment holds the old name of the variable
+- **WHEN** the environment holds `ABN_COMBINED_NO_BROWSER` with a value that is
+  not empty
+- **THEN** the command opens no browser, and it writes the warning about the
+  old name
+
+### Requirement: A browser failure does not stop the server
+The command SHALL write a message when it cannot open a browser, for example on
+a machine with no graphical session. The server SHALL continue to run, and the
+exit status SHALL NOT change.
+
+#### Scenario: The machine has no browser
+- **WHEN** the command cannot open a browser
+- **THEN** the message names the address, so that the user can open it by hand
+- **AND** the server continues to serve
+
+### Requirement: The command opens no browser without a server
+The command SHALL open no browser for a run that does not serve the application.
+The subcommand `migrate-legacy` therefore opens no browser. A start that fails,
+for example on an occupied port or an unwritable data directory, SHALL also open
+no browser.
+
+#### Scenario: The user runs the legacy migration
+- **WHEN** the user runs the subcommand `migrate-legacy`
+- **THEN** the command opens no browser
+
+#### Scenario: Another program holds the port
+- **WHEN** the port is already in use
+- **THEN** the command opens no browser, and it keeps the message and the
+  non-zero exit status for an occupied port
+
+### Requirement: The prefix of each environment variable
+Each environment variable of the application SHALL use the prefix
+`DVM_FINANCE_`, which is the name of the package and of the command. The
+variables are `DVM_FINANCE_DATA_DIR` for the data directory,
+`DVM_FINANCE_LOG_ENV` for the logging environment, and `DVM_FINANCE_NO_BROWSER`
+for the browser at the start.
+
+#### Scenario: The user sets the data directory
+- **WHEN** the user sets `DVM_FINANCE_DATA_DIR` and gives no option
+- **THEN** the application uses that directory
+
+#### Scenario: The user sets the logging environment
+- **WHEN** the user sets `DVM_FINANCE_LOG_ENV` to `production`
+- **THEN** the application writes its log in the production form
+
+#### Scenario: The user stops the browser
+- **WHEN** the user sets `DVM_FINANCE_NO_BROWSER` to a value that is not empty
+- **THEN** the command opens no browser
+
+### Requirement: The application still reads the old name
+The application SHALL also read the name with the prefix `ABN_COMBINED_`, which
+the rename of the project left behind. The new name SHALL win when both names
+hold a value. A later major version removes the old name, and this behavior is
+therefore temporary.
+
+#### Scenario: Only the old name holds a value
+- **WHEN** the environment holds `ABN_COMBINED_DATA_DIR` and not the new name
+- **THEN** the application uses that directory, exactly as before the rename
+
+#### Scenario: Both names hold a value
+- **WHEN** the environment holds both names with different values
+- **THEN** the application uses the value of the new name
+
+### Requirement: The application warns about an old name
+The application SHALL write one warning for each old name from which it reads a
+value. The warning SHALL name the old name and the new name. The application
+SHALL write no warning when the environment holds the new name only, and none
+when it holds neither name.
+
+#### Scenario: The user starts the application with an old name
+- **WHEN** the application reads a value from `ABN_COMBINED_DATA_DIR`
+- **THEN** the application writes a warning that names
+  `ABN_COMBINED_DATA_DIR` and `DVM_FINANCE_DATA_DIR`
+
+#### Scenario: The user starts the application with the new name
+- **WHEN** the environment holds the new name only
+- **THEN** the application writes no warning about a name
+
+#### Scenario: The environment holds both names
+- **WHEN** the environment holds both names
+- **THEN** the application writes the warning, because the old name is still
+  set and the user must remove it

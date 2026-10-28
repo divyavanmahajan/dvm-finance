@@ -58,11 +58,18 @@ download flows are covered by mocked tests only and re-verified manually.
 
 ## Env vars / flags
 
-- `ABN_COMBINED_DATA_DIR` / `--data-dir` — data directory (DB, downloads, snapshots)
-- `ABN_COMBINED_NO_BROWSER` / `--no-browser` — do not open the browser at startup.
+- `DVM_FINANCE_DATA_DIR` / `--data-dir` — data directory (DB, downloads, snapshots)
+- `DVM_FINANCE_LOG_ENV` — `production` selects the production log form; the
+  default is `development`
+- `DVM_FINANCE_NO_BROWSER` / `--no-browser` — do not open the browser at startup.
   Set the variable to any value that is not empty. The command otherwise waits
   for its own `/health` endpoint to answer, and then opens the default browser.
   The wait identifies the server by its data directory, so another program on the
   port never gets a browser window. The `migrate-legacy` subcommand opens none.
 - `--port` (default 8000), `--host` (default 127.0.0.1). The command opens
   `127.0.0.1` when the host is `0.0.0.0`, which a browser cannot open.
+
+Each variable carried the prefix `ABN_COMBINED_` before, which the earlier name
+of the project left behind. The application still reads the old name of each
+variable, and it writes a warning that names both. A later major version reads
+the old names no more. The pairs live in `settings.py:LEGACY_ENV_NAMES`.

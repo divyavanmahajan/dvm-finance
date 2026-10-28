@@ -14,7 +14,7 @@
 - **Cash transactions** on the **Cash** tab (`/manual`): record a payment that no statement reports. The app holds each hand-entered transaction in the reserved pseudo account `CASH`.
 - **The browser opens at the start.** The command `dvm-finance` waits for the
   app to answer, and then it opens the default browser at the address. Pass
-  `--no-browser`, or set `ABN_COMBINED_NO_BROWSER`, to stop it.
+  `--no-browser`, or set `DVM_FINANCE_NO_BROWSER`, to stop it.
 - In-app **Help** page (`/help`) rendering the Markdown user guide plus an iOS companion-app section.
 - **iOS/iPadOS companion app** (`ios/`): review transactions, trends and budgets on the go and sync via snapshots. See [`ios/README.md`](../ios/README.md).
 
