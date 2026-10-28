@@ -110,28 +110,44 @@ def test_extract_account_numbers_empty_response() -> None:
 
 def test_fetch_account_numbers_requests_the_product_groups() -> None:
     page = Mock()
-    response = Mock()
-    response.ok = True
-    response.status = 200
-    response.json.return_value = BALANCES_RESPONSE
-    page.request.get.return_value = response
+    page.evaluate.return_value = {
+        "ok": True,
+        "status": 200,
+        "body": json.dumps(BALANCES_RESPONSE),
+    }
 
     assert abn.fetch_account_numbers(page) == ["100000001", "100000002"]
 
-    url = page.request.get.call_args[0][0]
+    script, url = page.evaluate.call_args[0]
     assert url.startswith(abn.ABN_ACCOUNT_BALANCES_API)
     assert f"productGroups={abn.ABN_PRODUCT_GROUPS}" in url
+    # The page itself must make the request, so the browser adds the
+    # `Referer`, the `Origin` and the `Sec-Fetch-*` headers.
+    assert "fetch(" in script
+    assert '"x-xsrf-header": "token"' in script
+    assert 'credentials: "include"' in script
+    page.request.get.assert_not_called()
 
 
 def test_fetch_account_numbers_error_handling() -> None:
+    """The gateway answers 403 when the request misses a browser header."""
     page = Mock()
-    response = Mock()
-    response.ok = False
-    response.status = 403
-    response.text.return_value = "Forbidden"
-    page.request.get.return_value = response
+    page.evaluate.return_value = {
+        "ok": False,
+        "status": 403,
+        "body": '{"errors": [{"code": "ACCESS_DENIED"}]}',
+    }
 
     with pytest.raises(Exception, match="status 403"):
+        abn.fetch_account_numbers(page)
+
+
+def test_fetch_account_numbers_rejects_a_body_that_is_not_json() -> None:
+    """A login page in place of the JSON must not read as an empty account list."""
+    page = Mock()
+    page.evaluate.return_value = {"ok": True, "status": 200, "body": "<html>login</html>"}
+
+    with pytest.raises(Exception, match="no JSON"):
         abn.fetch_account_numbers(page)
 
 
