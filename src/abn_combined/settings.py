@@ -10,6 +10,7 @@ from platformdirs import user_data_dir
 
 APP_NAME = "abn-combined"
 DATA_DIR_ENV = "ABN_COMBINED_DATA_DIR"
+NO_BROWSER_ENV = "ABN_COMBINED_NO_BROWSER"
 DEFAULT_CURRENCY = "EUR"
 
 
@@ -47,6 +48,16 @@ class Settings:
     @property
     def db_path(self) -> Path:
         return self.data_dir / "abn_combined.db"
+
+    @property
+    def browser_url(self) -> str:
+        """Return the address that a browser can open.
+
+        The host `0.0.0.0` means each interface. It is not an address that a
+        browser can open, so the property gives the loopback address for it.
+        """
+        host = "127.0.0.1" if self.host == "0.0.0.0" else self.host  # noqa: S104
+        return f"http://{host}:{self.port}"
 
     @property
     def database_url(self) -> str:
