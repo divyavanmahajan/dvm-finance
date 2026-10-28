@@ -8,8 +8,7 @@ system SHALL join the account with the transaction identifier of the provider,
 when one exists. The preferred order is the PayPal transaction id, the Wise
 transaction id, and then the SEB voucher number. The system SHALL otherwise join
 the account, the transaction date, the amount, and the first 16 hexadecimal
-characters of the MD5 hash of the description. A hand-entered transaction is the
-one exception, and the requirement below holds its rule.
+characters of the MD5 hash of the description.
 
 #### Scenario: The transaction has a provider identifier
 - **WHEN** a PayPal transaction holds its own transaction id
