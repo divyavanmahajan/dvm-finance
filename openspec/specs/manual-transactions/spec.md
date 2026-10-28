@@ -77,6 +77,11 @@ delta snapshot holds the new values.
 - **WHEN** the user requests the edit form for an imported transaction
 - **THEN** the system refuses the request
 
+#### Scenario: The user reaches the edit form from the transaction
+- **WHEN** the user opens the detail view of a hand-entered transaction
+- **THEN** the detail view marks the row as a cash payment, and it offers a
+  link to the edit form
+
 ### Requirement: A flag replaces the deletion
 The system SHALL let the user flag a hand-entered transaction for removal, and
 SHALL let the user remove that flag again. A flag SHALL record the time of the
