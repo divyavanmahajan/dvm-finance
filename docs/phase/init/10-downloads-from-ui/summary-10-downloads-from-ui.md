@@ -50,7 +50,8 @@ pipeline (FR7, NFR5).
   "JobState.FAILED".
 - Route handlers import the worker functions at request time so tests can monkeypatch
   `run_abn_job`/`run_paypal_job` without launching browsers.
-- ABN default accounts kept from the source script (`_DEFAULT_ACCOUNTS`).
+- The ABN job reads the accounts from the ABN AMRO account-balances API.
+  The app keeps no default account number.
 
 ## Deviations
 - Real ABN AMRO and PayPal end-to-end flows are NOT verified — they require live bank

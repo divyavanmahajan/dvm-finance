@@ -41,7 +41,7 @@
     </td>
 
     <!-- Category (inline edit) -->
-    <td>
+    <td class="cat">
       <span x-show="!editcat">
         {% if row.effective_category %}
           <span class="badge text-bg-primary">{{ row.effective_category }}</span>
@@ -114,7 +114,7 @@
 
     <!-- Create rule -->
     <td class="text-end">
-      <a class="link" href="/rules/new?from_transaction={{ t.id }}"
+      <a class="link create-rule" href="/rules/new?from_transaction={{ t.id }}"
          title="Create rule from this transaction"><i class="bi bi-plus-circle"></i></a>
     </td>
   </tr>

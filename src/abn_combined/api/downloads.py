@@ -171,13 +171,15 @@ def start_abn_download(
 
     settings = request.app.state.settings
 
-    from ..downloaders.abn import _DEFAULT_ACCOUNTS, run_abn_job
+    from ..downloaders.abn import run_abn_job
 
     registry.create("abn")
 
+    # The accounts are None. The job reads them from the ABN AMRO
+    # account-balances API after the user authenticates the session.
     t = threading.Thread(
         target=run_abn_job,
-        args=(registry, settings, _DEFAULT_ACCOUNTS, from_date, to_date),
+        args=(registry, settings, None, from_date, to_date),
         kwargs={"cdp_url": cdp_url},
         daemon=True,
         name="abn-download",

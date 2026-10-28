@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Edit the cash transaction — Your Finance{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-2">Edit the cash transaction</h1>
+    <p class="text-muted small mb-0">
+      The transaction keeps its id after the edit.
+    </p>
+  </div>
+  <div>
+    <a href="/manual" class="btn btn-outline-secondary">Add a cash transaction</a>
+  </div>
+</div>
+
+{% if request.query_params.get('saved') %}
+<div class="alert alert-success" role="status">
+  The system saved the cash transaction.
+</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-danger" role="alert">
+  {{ error }} The system changed no value.
+</div>
+{% endif %}
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="post" action="/manual/{{ txn.id }}/update" class="row g-3 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label" for="manual-edit-date">Date</label>
+        <input type="date" class="form-control" id="manual-edit-date" name="transactiondate"
+               value="{{ form.transactiondate }}" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" for="manual-edit-amount">Amount €</label>
+        <input type="number" class="form-control" id="manual-edit-amount" name="amount"
+               step="0.01" value="{{ form.amount }}" required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="manual-edit-description">Description</label>
+        <input type="text" class="form-control" id="manual-edit-description" name="description"
+               value="{{ form.description }}" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="manual-edit-category">Category</label>
+        <input type="text" class="form-control" id="manual-edit-category" name="category"
+               value="{{ form.category }}" list="known-categories">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="manual-edit-tags">Tags</label>
+        <input type="text" class="form-control" id="manual-edit-tags" name="tags"
+               value="{{ form.tags }}">
+        <small class="text-muted">Put a comma between two tags.</small>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary">Save the transaction</button>
+        <a href="/transactions" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm mt-3">
+  <div class="card-body">
+    <h2 class="h6">Remove the transaction</h2>
+    <p class="text-muted small mb-2">
+      The flag keeps the row in the database.
+      The system hides a flagged row in each list and in each total.
+    </p>
+    {% if txn.deleted_at %}
+    <form method="post" action="/manual/{{ txn.id }}/restore">
+      <input type="hidden" name="next" value="/manual/{{ txn.id }}/edit">
+      <button type="submit" class="btn btn-outline-success">Restore the transaction</button>
+    </form>
+    {% else %}
+    <form method="post" action="/manual/{{ txn.id }}/flag">
+      <input type="hidden" name="next" value="/manual/{{ txn.id }}/edit">
+      <button type="submit" class="btn btn-outline-danger">Flag the transaction</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<datalist id="known-categories">
+  {% for c in categories %}<option value="{{ c }}"></option>{% endfor %}
+</datalist>
+{% endblock %}

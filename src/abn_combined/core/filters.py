@@ -17,7 +17,6 @@ from urllib.parse import parse_qsl, urlencode
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Query, Session
 
-from ..constants import is_transfer_category
 from .models import Transaction
 from .utils import CATEGORY_SEPARATOR
 
@@ -360,6 +359,28 @@ def _num(value: float) -> str:
 # ---------------------------------------------------------------------------
 
 
+def live_only(query: Query) -> Query:
+    """Remove each flagged transaction from a transaction query.
+
+    A flagged transaction has a value in ``deleted_at``. The user flagged the
+    row for removal, and only a purge deletes it. This is the one shared
+    predicate for the seven readers that must hide such a row. They are the
+    transactions list, the category trends, the cash flow, the budget actuals,
+    the tag usage counts, the match count of each rule, and the rule preview.
+
+    Two surfaces must not use this predicate. A snapshot export keeps a flagged
+    row, so that the flag reaches each other machine. The duplicate check keeps
+    the id of a flagged row, so that no second row claims it.
+
+    Args:
+        query: A query against the transactions table.
+
+    Returns:
+        The query with the exclusion of each flagged row.
+    """
+    return query.filter(Transaction.deleted_at.is_(None))
+
+
 def category_condition(eff_cat, cat: str):
     """Match a category exactly or any hierarchical child (hyphen-separated).
 
@@ -380,7 +401,7 @@ def category_condition(eff_cat, cat: str):
 
 def build_query(db: Session, f: TransactionFilter, today: date | None = None) -> Query:
     """Build the filtered (unpaginated, unsorted) transaction query."""
-    query = db.query(Transaction)
+    query = live_only(db.query(Transaction))
     eff_cat = _effective_category_expr()
     eff_tags = _effective_tags_expr()
 

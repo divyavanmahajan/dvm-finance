@@ -6,7 +6,10 @@ from decimal import Decimal
 from pathlib import Path
 
 from abn_combined.parsers import (
-    parse_mt940_file, parse_paypal_file, parse_seb_file, parse_wise_file,
+    parse_mt940_file,
+    parse_paypal_file,
+    parse_seb_file,
+    parse_wise_file,
 )
 
 FIX = Path("/home/user/dvm-finance/tests/fixtures")

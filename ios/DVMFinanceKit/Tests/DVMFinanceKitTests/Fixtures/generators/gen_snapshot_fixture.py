@@ -1,19 +1,23 @@
 """Generate a snapshot fixture with the real Python exporter, plus the
 expected import counts when importing it into a half-overlapping DB."""
-import json
 import gzip
+import json
 import shutil
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from abn_combined.core.models import (
-    Base, Budget, CategorizationRule, RuleCondition, Transaction,
-)
 from abn_combined.core.categorizer import record_rule_change, rule_snapshot
-from abn_combined.core.snapshots import export_snapshot, import_snapshot
+from abn_combined.core.models import (
+    Base,
+    Budget,
+    CategorizationRule,
+    RuleCondition,
+    Transaction,
+)
+from abn_combined.core.snapshots import export_snapshot, import_snapshot, read_snapshot
 
 work = Path("snapfix")
 if work.exists():
@@ -86,7 +90,6 @@ dst.add(CategorizationRule(id=7, uuid="11111111-1111-1111-1111-111111111111",
                            is_active=False, is_tag_only=False))
 dst.commit()
 
-from abn_combined.core.snapshots import read_snapshot
 snapshot_doc = read_snapshot(snap_path.read_bytes())
 report = import_snapshot(dst, snapshot_doc, work / "dst" / "abn_combined.db")
 print(json.dumps({"counts": report.counts, "overwrites": report.overwrites},

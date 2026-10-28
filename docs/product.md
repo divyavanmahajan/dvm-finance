@@ -11,6 +11,7 @@
 - Budgets per category on **Monthly** and **Yearly** tabs, with budget-vs-actual and one-click "seed from average" (annualized on the Yearly tab).
 - Share data with one other person via export/import snapshots (incoming wins).
 - One-time migration from the legacy `abn_analyst.db`.
+- **Cash transactions** on the **Cash** tab (`/manual`): record a payment that no statement reports. The app holds each hand-entered transaction in the reserved pseudo account `CASH`.
 - In-app **Help** page (`/help`) rendering the Markdown user guide plus an iOS companion-app section.
 - **iOS/iPadOS companion app** (`ios/`): review transactions, trends and budgets on the go and sync via snapshots. See [`ios/README.md`](../ios/README.md).
 
@@ -23,6 +24,8 @@ Removed on purpose: graphs, LLM categorization, MCP servers, login.
 3. Trends cell click → filtered transaction list for that category/period.
 4. Edit rule → preview impact → save → audit history per rule.
 5. Export snapshot → partner imports → incoming-wins merge report.
+6. Cash tab → add a cash transaction → the row appears in the transactions list and in the cash flow.
+7. Cash tab → **The flagged transactions** → restore a row, or confirm the purge.
 
 ## Tag-only rules (v1.1.0+)
 
@@ -68,3 +71,87 @@ category, e.g.:
 Tag-only rules go through the same preview-before-save and
 `record_rule_change` audit trail as category rules — no silent
 recategorization, per the project's hard rules.
+
+## Cash transactions
+
+A statement reports no cash payment. The **Cash** tab (`GET /manual`) gives the
+user a form that records such a payment. The app writes each hand-entered
+transaction to one reserved pseudo account with the identifier `CASH`. The
+account shows beside the bank accounts in the account filter of the transactions
+list (`api/transactions.py:_known_accounts`), after the first hand-entered row
+exists. That query reads each distinct account and no flag, so the account stays
+in the list while a flagged cash row stays in the table.
+
+No parser and no downloader writes a transaction to the account `CASH`. The
+import pipeline refuses a batch that holds a transaction for this account, and it
+reports the reserved account (`core/dedup.py:reject_reserved_account`). A
+snapshot import writes to the account, because this is how the two devices share
+the cash rows. The merge applies no reserved-account check of its own.
+
+### Fund the pseudo account with a transfer category
+
+Give the bank withdrawal that funds the cash account a transfer category. The
+withdrawal counts as spending in the bank account if you do not. The app then
+counts the same money a second time: once in the bank account and once in the
+cash rows. The create form repeats this instruction, because nothing reports the
+error later.
+
+### Add a cash transaction
+
+1. Open the **Cash** tab.
+2. Type the date, the amount, and the description. All three are required.
+3. Write a payment as a negative amount.
+4. Type an optional category and optional tags.
+5. Select **Add the transaction**. The form posts to `POST /manual/create`.
+
+The app refuses a form without a date, without a description, without an amount,
+or with an amount of zero. The app names the reason and writes nothing.
+
+The app stores the typed category in `manual_category` and the typed tags in
+`manual_tags`. A rule reapplication therefore never replaces them, per the
+project rule on manual edits. A tag-only rule still adds a tag to a cash
+transaction, exactly as it does to an imported transaction.
+
+### Change a cash transaction
+
+Open `GET /manual/{txn_id}/edit` to change the date, the amount, the
+description, the category, or the tags. The form posts to
+`POST /manual/{txn_id}/update`. The transaction keeps its id after each edit, so
+the next delta snapshot carries the new values to the other device.
+
+The app refuses the edit form and the update for an imported transaction. Only a
+hand-entered transaction accepts an edit.
+
+### Flag a cash transaction, and restore it
+
+A removal is a flag. `POST /manual/{txn_id}/flag` records the time of the flag
+and keeps the row in the database. `POST /manual/{txn_id}/restore` removes the
+flag again. The app refuses both routes for an imported transaction.
+
+A flagged transaction leaves the transactions list, the category trends, the
+cash flow, the budget actuals, the tag counts, the rule match counts, and the
+rule preview. A restored transaction returns to each of them.
+
+A snapshot export keeps a flagged transaction and the time of its flag, so the
+flag reaches the other device. The other device therefore hides the same row.
+
+### Purge the flagged transactions
+
+`GET /manual/flagged` lists each flagged transaction. The user opens the page
+from the **The flagged transactions** button on the Cash tab. The page shows the
+restore control of each row and the control of the purge.
+
+Caution: check each flagged row on this page before you start the purge. The
+purge deletes the rows, and the app cannot undo it.
+
+1. Read each row in the list.
+2. Select the confirmation checkbox. The purge deletes nothing without it.
+3. Select **Purge now**. The form posts to `POST /manual/purge`.
+
+The purge copies the database to a timestamped backup beside it before it deletes
+a row. It deletes each flagged transaction, it deletes no other row, and it
+reports the number of the deleted rows.
+
+A purged row can come back from the other device. The row comes back with its
+flag, so it stays out of each list and out of each total. The user purges it
+again on the device that still holds it.

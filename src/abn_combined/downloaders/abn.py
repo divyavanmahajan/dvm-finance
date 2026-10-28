@@ -14,7 +14,12 @@ from typing import TYPE_CHECKING
 
 from ..core.jobs import JobRegistry, JobState
 from ..logging_config import get_logger
-from .browser import DEFAULT_CDP_URL, connect_failure_message, no_contexts_message
+from .browser import (
+    DEFAULT_CDP_URL,
+    connect_failure_message,
+    missing_playwright_message,
+    no_contexts_message,
+)
 
 if TYPE_CHECKING:
     from ..settings import Settings
@@ -29,6 +34,22 @@ ABN_TRANSACTIONS_URL = (
     "https://www.abnamro.nl/my-abnamro/payments/download-overviews/#/transactions"
 )
 ABN_GENERATIONS_API = "https://www.abnamro.nl/mutationreporting/generations/v1"
+ABN_ACCOUNT_BALANCES_API = (
+    "https://www.abnamro.nl/my-abnamro/apis/account-balances/v3/"
+)
+
+# The product groups for the account-balances API. These groups come verbatim
+# from the request that the ABN AMRO web app makes. The same account can occur
+# in more than one group. The caller removes the duplicates.
+ABN_PRODUCT_GROUPS = (
+    "PAYMENT_ACCOUNTS,SAVINGS_ACCOUNTS,INVESTMENTS,CREDITS_ACBS,"
+    "CREDITS_BSK_INTERBANK,CREDITS_MAHUKO_REVOLVING,FISCAL_CAPITAL_SOLUTIONS,"
+    "FISCAL_CAPITAL_SOLUTIONS_PRODUCTS,INSURANCES,DEPOSITS,CONSUMER_LOANS,"
+    "SETTLEMENTACCOUNTS_FOR_SAVINGS,CREDIT_CARDS_CORPORATE,CREDIT_CARDS_RETAIL,"
+    "GUARANTEES,INSURANCES_INDEMNITY,INSURANCES_LIFE,MORTGAGE,OTHER_SERVICES,"
+    "PAYMENT_PACKAGES,PAYMENT_SERVICES,VARIABLE_SAVINGS_TOR_BONUS,"
+    "VARIABLE_SAVINGS_TOR_FLAT"
+)
 
 _AUTH_TIMEOUT_MS = 5 * 60 * 1_000  # 5 minutes
 
@@ -61,6 +82,54 @@ def _wait_for_app_login_redirect(
         return
     page.wait_for_url(target_url, timeout=timeout_ms)
     logger.info("abn_authenticated")
+
+
+def extract_account_numbers(response_data: dict) -> list[str]:
+    """Get the account numbers for the generations API from a balances response.
+
+    The account-balances response has one entry for each contract. The same
+    account occurs one time for each of its product groups. Other contracts,
+    such as a debit card or an access agreement, have no ``accountNumber``.
+    An entry is an account only if it has an ``accountNumber``. The
+    ``contractNumber`` of the entry is the account number with a zero prefix,
+    for example ``"0123456789"`` for the account number ``"123456789"``.
+
+    The function returns the numbers in first-seen order. It removes the
+    duplicates.
+    """
+    numbers: list[str] = []
+    seen: set[str] = set()
+    for item in response_data.get("contractList", []):
+        contract = (item or {}).get("contract") or {}
+        if not contract.get("accountNumber"):
+            continue
+        contract_number = str(contract.get("contractNumber") or "").strip()
+        number = contract_number.lstrip("0")
+        if not number or number in seen:
+            continue
+        seen.add(number)
+        numbers.append(number)
+    return numbers
+
+
+def fetch_account_numbers(page) -> list[str]:
+    """Read the account-balances API and return the account numbers.
+
+    The function uses the request context of the authenticated page. The page
+    sends the ABN AMRO session cookies. The app does not store an account
+    number.
+    """
+    url = f"{ABN_ACCOUNT_BALANCES_API}?productGroups={ABN_PRODUCT_GROUPS}"
+    logger.info("abn_api_get", url=ABN_ACCOUNT_BALANCES_API)
+    response = page.request.get(url, headers={"accept": "application/json"})
+    if not response.ok:
+        raise Exception(
+            f"ABN account-balances request failed with status {response.status}: "
+            f"{response.text()}"
+        )
+    numbers = extract_account_numbers(response.json())
+    logger.info("abn_accounts_discovered", count=len(numbers))
+    return numbers
 
 
 def download_transactions(
@@ -141,20 +210,11 @@ def get_default_date_range(last_range_end: date | None) -> tuple[str, str]:
 # Job runner (executed in a worker thread)
 # ---------------------------------------------------------------------------
 
-_DEFAULT_ACCOUNTS = [
-    "252265866",
-    "247141720",
-    "891814388",
-    "254181937",
-    "247141712",
-    "252265831",
-]
-
 
 def run_abn_job(
     registry: JobRegistry,
     settings: Settings,
-    account_numbers: list[str],
+    account_numbers: list[str] | None,
     from_date: str,
     to_date: str,
     from_last_download_date: bool = False,
@@ -164,6 +224,10 @@ def run_abn_job(
 
     Updates registry state as the job progresses:
     pending → waiting-for-auth → downloading → importing → done/failed.
+
+    If *account_numbers* is ``None`` or empty, the job reads the accounts from
+    the ABN AMRO account-balances API after the user authenticates the session.
+    The app does not store an account number.
 
     Connects to the user's real Chrome over CDP (same approach as the PayPal
     downloader) instead of launching a Playwright-managed browser — so this
@@ -236,7 +300,30 @@ def run_abn_job(
                 _fail(f"Authentication error: {exc}")
                 return
 
-            registry.update_state(source, JobState.DOWNLOADING, "Downloading MT940 files from ABN AMRO…")
+            if not account_numbers:
+                registry.update_state(
+                    source,
+                    JobState.DOWNLOADING,
+                    "Listing ABN AMRO accounts…",
+                )
+                try:
+                    account_numbers = fetch_account_numbers(page)
+                except Exception as exc:  # noqa: BLE001
+                    _fail(f"Could not list ABN AMRO accounts: {exc}")
+                    return
+                if not account_numbers:
+                    _fail(
+                        "The app found no ABN AMRO accounts for this login. "
+                        "There is nothing to download."
+                    )
+                    return
+
+            registry.update_state(
+                source,
+                JobState.DOWNLOADING,
+                f"Found {len(account_numbers)} account(s); "
+                "downloading MT940 files from ABN AMRO…",
+            )
 
             try:
                 response_data = download_transactions(
@@ -306,6 +393,10 @@ def run_abn_job(
             )
 
     except Exception as exc:  # noqa: BLE001
+        if isinstance(exc, ModuleNotFoundError) and exc.name == "playwright":
+            _fail(missing_playwright_message())
+            logger.warning("abn_job_playwright_missing")
+            return
         _fail(f"Unexpected error: {exc}")
         logger.exception("abn_job_unexpected_error", error=str(exc))
 

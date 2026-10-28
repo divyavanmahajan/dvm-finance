@@ -64,6 +64,29 @@ public enum TransactionQuery {
     static let sortCategorySQL = "COALESCE(manual_category, category)"
     static let sortTagsSQL = "COALESCE(manual_tags, tags)"
 
+    // MARK: - The shared live-only predicate
+
+    /// Port of `core/filters.py:live_only`, as the SQL text each reader
+    /// composes into its own `WHERE` clause.
+    ///
+    /// A flagged transaction holds a value in `deleted_at`. The user flagged
+    /// the row for removal, and only a purge deletes it. This is the one
+    /// shared predicate for the three readers of the app that must hide such
+    /// a row. They are the transactions list (`whereClause` below, which also
+    /// serves `count` and `sum`), the category trends
+    /// (`TrendsBuilder.aggregate`), and the budget actuals
+    /// (`BudgetReport.computeActual`). One predicate, composed three times,
+    /// prevents the drift that the duplicated transfer-exclusion clauses
+    /// show.
+    ///
+    /// Three surfaces must not compose this predicate. A snapshot export
+    /// (`SnapshotCodec.build`) keeps a flagged row, so that the flag reaches
+    /// each other machine. The duplicate check (`Dedup.checkDuplicates`)
+    /// keeps the id of a flagged row, so that no second row claims it. The
+    /// detail screen reads one row by its id, because the user restores a
+    /// flagged row there.
+    public static let liveOnlySQL = "deleted_at IS NULL"
+
     // MARK: - WHERE clause (port of build_query)
 
     /// Builds the `WHERE` predicate (no leading `WHERE` keyword) and its
@@ -73,7 +96,10 @@ public enum TransactionQuery {
         _ filter: TransactionFilter,
         today: Date
     ) -> (sql: String, arguments: [(any DatabaseValueConvertible)?]) {
-        var conditions: [String] = []
+        // The shared exclusion of a flagged row — `core/filters.py:live_only`
+        // composed into `build_query`. First condition, so that each
+        // following condition reads unchanged against its Python original.
+        var conditions: [String] = [liveOnlySQL]
         var arguments: [(any DatabaseValueConvertible)?] = []
 
         if let q = filter.q, !q.isEmpty {
@@ -281,6 +307,15 @@ public enum TransactionQuery {
     }
 
     // MARK: - Filter-UI helpers
+    //
+    // Each query in this group composes `liveOnlySQL`. This is a deviation
+    // from `core/filters.py:live_only`, which binds seven readers and no
+    // value-list helper. The reason is the rule of the capability
+    // `ios-manual-transactions`: each list of the app excludes a flagged
+    // transaction. A category, an account, a source file, or a tag that only
+    // a flagged row holds is therefore no longer an option in the filter
+    // sheet. The desktop filter pages read the same values from their own
+    // routes, which the Python change does not touch.
 
     /// Distinct effective categories present in the data, for the filter
     /// sheet's category pickers. Sorted case-insensitively. Never includes
@@ -291,7 +326,8 @@ public enum TransactionQuery {
             db,
             sql: """
                 SELECT DISTINCT \(effectiveCategorySQL) AS cat FROM transactions
-                WHERE \(effectiveCategorySQL) IS NOT NULL AND \(effectiveCategorySQL) != ''
+                WHERE \(liveOnlySQL)
+                AND \(effectiveCategorySQL) IS NOT NULL AND \(effectiveCategorySQL) != ''
                 ORDER BY cat COLLATE NOCASE
                 """
         )
@@ -302,7 +338,8 @@ public enum TransactionQuery {
     public static func distinctAccounts(db: Database) throws -> [String] {
         try String.fetchAll(
             db,
-            sql: "SELECT DISTINCT accountNumber FROM transactions ORDER BY accountNumber"
+            sql: "SELECT DISTINCT accountNumber FROM transactions "
+                + "WHERE \(liveOnlySQL) ORDER BY accountNumber"
         )
     }
 
@@ -312,7 +349,8 @@ public enum TransactionQuery {
             db,
             sql: """
                 SELECT DISTINCT source_file FROM transactions
-                WHERE source_file IS NOT NULL AND source_file != ''
+                WHERE \(liveOnlySQL)
+                AND source_file IS NOT NULL AND source_file != ''
                 ORDER BY source_file
                 """
         )
@@ -330,7 +368,8 @@ public enum TransactionQuery {
             db,
             sql: """
                 SELECT DISTINCT \(effectiveTagsSQL) AS t FROM transactions
-                WHERE \(effectiveTagsSQL) IS NOT NULL AND \(effectiveTagsSQL) != ''
+                WHERE \(liveOnlySQL)
+                AND \(effectiveTagsSQL) IS NOT NULL AND \(effectiveTagsSQL) != ''
                 """
         )
         var seen: Set<String> = []

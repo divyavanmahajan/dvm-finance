@@ -16,7 +16,12 @@ from ..parsers import (
     parse_wise_file,
 )
 from .categorizer import apply_rules
-from .dedup import check_duplicates, insert_transactions
+from .dedup import (
+    ReservedAccountError,
+    check_duplicates,
+    insert_transactions,
+    reject_reserved_account,
+)
 from .models import Transaction
 
 # Explicit format overrides (auto = detect by extension via parse_statement_file).
@@ -93,6 +98,13 @@ def import_file(
             f"No transactions found in '{original_name}'. "
             "Check the file format or choose an explicit format."
         )
+
+    # The account CASH holds the hand-entered rows only. Refuse the whole file
+    # before the first write, so that a refused file writes no row.
+    try:
+        reject_reserved_account(transactions)
+    except ReservedAccountError as exc:
+        raise ImportError_(f"Could not import '{original_name}': {exc}") from exc
 
     # Keep the user-facing source file name stable (not the stored uuid-prefixed name).
     for trans in transactions:

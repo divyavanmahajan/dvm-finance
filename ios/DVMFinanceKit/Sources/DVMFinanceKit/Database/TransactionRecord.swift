@@ -64,6 +64,32 @@ public struct TransactionRecord: Codable, Equatable, FetchableRecord, Persistabl
     /// `Date`, and `TransactionMutations.timestampNow()` to produce the
     /// stamp string.
     public var updatedAt: String?
+    /// `true` for a transaction that the user typed by hand. Port of
+    /// `core/models.py: Transaction.is_manual`.
+    ///
+    /// Only a hand-entered row accepts an edit and a removal flag, and such a
+    /// row carries a UUID id instead of the content-derived id of
+    /// `TransactionID.generateTransactionID`. Do not confuse this field with
+    /// `TransactionQuery.isManual(_:)`, which is the port of
+    /// `core/filters.py:is_manual` and reports a *manually categorized* row.
+    /// The two are independent: an imported row accepts a manual category,
+    /// and a hand-entered row keeps its hand-entered identity whatever its
+    /// category is.
+    public var isManual: Bool
+    /// The time of the removal flag, or `nil` for a live row. Port of
+    /// `core/models.py: Transaction.deleted_at`.
+    ///
+    /// A flagged row stays in the table. It travels in a snapshot with its
+    /// flag, and only an explicit purge deletes it. Each list and each
+    /// aggregation hides such a row through one shared predicate,
+    /// `TransactionQuery.liveOnlySQL`.
+    ///
+    /// Stored as an ISO-8601 second-precision string (`yyyy-MM-dd'T'HH:mm:ss`,
+    /// UTC — `DatabaseDateFormat.dateTime`), **not** a `Date`, for the same
+    /// reason as `updatedAt` above: the record-wide
+    /// `databaseDateDecodingStrategy` is pinned to date-only. Use
+    /// `deletedAtDate` for a parsed `Date`.
+    public var deletedAt: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -88,6 +114,8 @@ public struct TransactionRecord: Codable, Equatable, FetchableRecord, Persistabl
         case transactionReference = "transaction_reference"
         case transactionHash = "transaction_hash"
         case updatedAt = "updated_at"
+        case isManual = "is_manual"
+        case deletedAt = "deleted_at"
     }
 
     public init(
@@ -112,7 +140,9 @@ public struct TransactionRecord: Codable, Equatable, FetchableRecord, Persistabl
         transactionTypeCode: String? = nil,
         transactionReference: String? = nil,
         transactionHash: String? = nil,
-        updatedAt: String? = nil
+        updatedAt: String? = nil,
+        isManual: Bool = false,
+        deletedAt: String? = nil
     ) {
         self.id = id
         self.accountNumber = accountNumber
@@ -136,6 +166,8 @@ public struct TransactionRecord: Codable, Equatable, FetchableRecord, Persistabl
         self.transactionReference = transactionReference
         self.transactionHash = transactionHash
         self.updatedAt = updatedAt
+        self.isManual = isManual
+        self.deletedAt = deletedAt
     }
 
     public static var databaseDateDecodingStrategy: DatabaseDateDecodingStrategy {
@@ -160,4 +192,15 @@ public struct TransactionRecord: Codable, Equatable, FetchableRecord, Persistabl
     public var updatedAtDate: Date? {
         updatedAt.flatMap(SnapshotCodec.parseDateTime)
     }
+
+    /// `deletedAt` parsed to a `Date`, or `nil` for a live row. Tolerates a
+    /// microseconds-suffixed value, so a desktop-exported `deleted_at`
+    /// (SQLAlchemy `DateTime` can carry microseconds) also parses.
+    public var deletedAtDate: Date? {
+        deletedAt.flatMap(SnapshotCodec.parseDateTime)
+    }
+
+    /// `true` when the user flagged this row for removal. The row stays in
+    /// the database until a purge deletes it.
+    public var isFlagged: Bool { deletedAt != nil }
 }

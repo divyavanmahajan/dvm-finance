@@ -228,6 +228,34 @@ public struct AppDatabase {
             }
         }
 
+        // MARK: v3 — hand-entered transactions and the removal flag
+        //
+        // Mirrors desktop Alembic revision
+        // `b3c1f0a27d44_add_manual_transaction_columns`. Append-only (never
+        // edit v1 or v2). `is_manual` marks a row that the user typed by
+        // hand; only such a row accepts an edit and a removal flag, and its
+        // id is a UUID instead of the content-derived id of
+        // `TransactionID.generateTransactionID`. `deleted_at` holds the time
+        // of the removal flag; `NULL` means live. A flagged row stays in the
+        // table, it travels in a snapshot with its flag, and only an
+        // explicit purge deletes it.
+        //
+        // Each row that an earlier version of the app wrote reads as
+        // imported (`is_manual` false, from the column default) and live
+        // (`deleted_at` NULL). The migration therefore needs no data step.
+        migrator.registerMigration("v3") { db in
+            try db.alter(table: "transactions") { t in
+                t.add(column: "is_manual", .boolean).notNull().defaults(to: false).indexed()
+                // `.text` affinity and a raw ISO-8601 string, exactly like
+                // `updated_at` in v2. `TransactionRecord.deletedAt` is a
+                // `String?` for the reason that field's doc comment gives:
+                // GRDB's record-wide `databaseDateDecodingStrategy` is
+                // already pinned to date-only (`yyyy-MM-dd`), so a
+                // `Date`-typed datetime column loses its time part.
+                t.add(column: "deleted_at", .text).indexed()
+            }
+        }
+
         return migrator
     }
 }
