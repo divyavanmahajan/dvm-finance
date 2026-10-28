@@ -15,6 +15,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from .filters import live_only
 from .models import (
     CategorizationRule,
     RuleChangeItem,
@@ -453,7 +454,8 @@ def preview_rule(
             if t.categorization_source == old_source
         }
 
-    for txn in db.query(Transaction).all():
+    # `live_only` removes each flagged transaction. See `core/filters.py`.
+    for txn in live_only(db.query(Transaction)).all():
         if _is_manual(txn):
             continue
         # Skip transfers unless include_transfers is True

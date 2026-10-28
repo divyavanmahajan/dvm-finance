@@ -482,6 +482,25 @@ final class SnapshotTests: XCTestCase {
             )
             try txn.insert(db)
 
+            // A hand-entered row that the user flagged for removal. A
+            // snapshot export is one of the two surfaces that still read a
+            // flagged row, so the file must hold it with the time of its
+            // flag (capability `manual-transactions`, "Two surfaces still
+            // read a flagged transaction").
+            var flaggedTxn = TransactionRecord(
+                id: "6f1c3f2e-0c3f-4a26-9f0f-1f4f7b1f0a11",
+                accountNumber: "CASH",
+                transactiondate: try self.dateOnly("2026-01-02"),
+                amount: Decimal(string: "-20.00")!,
+                description: "Market",
+                manualCategory: "groceries",
+                categorizationSource: "manual",
+                updatedAt: "2026-01-03T09:00:00",
+                isManual: true,
+                deletedAt: "2026-01-03T09:00:00"
+            )
+            try flaggedTxn.insert(db)
+
             var budget = BudgetRecord(category: "dining", amount: Decimal(string: "150")!, period: "monthly")
             try budget.insert(db)
 
@@ -507,8 +526,20 @@ final class SnapshotTests: XCTestCase {
         // "yyyy-MM-dd'T'HH:mm:ss" — no timezone suffix, no fractional seconds.
         XCTAssertTrue(document.header.exportedAt.range(of: #"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$"#, options: .regularExpression) != nil)
 
-        XCTAssertEqual(document.transactions.count, 1)
-        XCTAssertEqual(document.transactions.first?.amount, "12.30", "2-decimal-place padding on export")
+        XCTAssertEqual(document.transactions.count, 2)
+        // The export orders by `id asc`, so address each row by its id.
+        let exportedImported = try XCTUnwrap(
+            document.transactions.first { $0.id == "acct_2026-01-01_12.3_abc" })
+        XCTAssertEqual(exportedImported.amount, "12.30", "2-decimal-place padding on export")
+        XCTAssertEqual(exportedImported.isManual, false, "the imported row reads as imported")
+        XCTAssertNil(exportedImported.deletedAt, "the imported row reads as live")
+
+        // The flagged row travels with its flag.
+        let exportedFlagged = try XCTUnwrap(
+            document.transactions.first { $0.id == "6f1c3f2e-0c3f-4a26-9f0f-1f4f7b1f0a11" })
+        XCTAssertEqual(exportedFlagged.isManual, true)
+        XCTAssertEqual(exportedFlagged.deletedAt, "2026-01-03T09:00:00")
+        XCTAssertEqual(exportedFlagged.accountNumber, "CASH")
         XCTAssertEqual(document.rules.count, 1)
         XCTAssertEqual(document.rules.first?.conditions.count, 1)
         XCTAssertEqual(document.budgets.count, 1)
@@ -525,10 +556,77 @@ final class SnapshotTests: XCTestCase {
         )
         let countsData = try XCTUnwrap(importRecord.counts?.data(using: .utf8))
         let counts = try JSONDecoder().decode(ExpectedCounts.self, from: countsData)
-        XCTAssertEqual(counts.transactions, ExpectedCounter(inserted: 1, updated: 0, unchanged: 0))
+        XCTAssertEqual(counts.transactions, ExpectedCounter(inserted: 2, updated: 0, unchanged: 0))
+
+        // The import keeps the flag of the incoming row, and the row stays
+        // out of each list and each total.
+        let importedFlagged = try destinationDatabase.dbWriter.read { db in
+            try XCTUnwrap(
+                try TransactionRecord.fetchOne(db, key: "6f1c3f2e-0c3f-4a26-9f0f-1f4f7b1f0a11"))
+        }
+        XCTAssertTrue(importedFlagged.isManual)
+        XCTAssertEqual(importedFlagged.deletedAt, "2026-01-03T09:00:00")
+        XCTAssertTrue(importedFlagged.isFlagged)
+        var wideFilter = TransactionFilter()
+        wideFilter.dateFrom = try dateOnly("2020-01-01")
+        wideFilter.dateTo = try dateOnly("2030-01-01")
+        let visible = try destinationDatabase.dbWriter.read { db in
+            try TransactionQuery.paginate(db: db, filter: wideFilter, today: try self.dateOnly("2026-06-01"))
+        }
+        XCTAssertEqual(visible.total, 1, "the flagged row appears in no list")
         XCTAssertEqual(counts.rules, ExpectedCounter(inserted: 1, updated: 0, unchanged: 0))
         XCTAssertEqual(counts.budgets, ExpectedCounter(inserted: 1, updated: 0, unchanged: 0))
         XCTAssertEqual(counts.ruleChangeReports, ExpectedCounter(inserted: 1, updated: 0, unchanged: 0))
+    }
+
+    /// A flag that reaches a second machine must land on a row that machine
+    /// already holds live. The merge compares the two snapshot shapes, so
+    /// `is_manual`/`deleted_at` must take part in that comparison; otherwise
+    /// the incoming row reads as unchanged and the flag never arrives.
+    /// Scenario "The flag reaches the computer"
+    /// (`openspec/.../ios-manual-transactions`).
+    func testImportAppliesAFlagToARowTheTargetHoldsLive() throws {
+        let appDatabase = try AppDatabase.inMemory()
+        let liveRow = TransactionRecord(
+            id: "6f1c3f2e-0c3f-4a26-9f0f-1f4f7b1f0a11",
+            accountNumber: "CASH",
+            transactiondate: try dateOnly("2026-01-02"),
+            amount: Decimal(string: "-20.00")!,
+            description: "Market",
+            manualCategory: "groceries",
+            categorizationSource: "manual",
+            updatedAt: "2026-01-02T08:00:00",
+            isManual: true,
+            deletedAt: nil
+        )
+        try appDatabase.dbWriter.write { db in try liveRow.insert(db) }
+
+        var incoming = SnapshotCodec.makeSnapshotTransaction(liveRow)
+        incoming.deletedAt = "2026-01-03T09:00:00"
+        incoming.updatedAt = "2026-01-03T09:00:00"
+        let document = SnapshotDocument(
+            header: SnapshotHeader(
+                schemaVersion: 1, exportedAt: "2026-01-03T09:00:00", machineId: "desktop"),
+            transactions: [incoming],
+            rules: [],
+            budgets: [],
+            ruleChangeReports: []
+        )
+
+        let importRecord = try SnapshotImporter.importSnapshot(
+            appDatabase: appDatabase,
+            document: document,
+            databaseURL: try makeTempDirectory().appendingPathComponent("absent.sqlite")
+        )
+        let countsData = try XCTUnwrap(importRecord.counts?.data(using: .utf8))
+        let counts = try JSONDecoder().decode(ExpectedCounts.self, from: countsData)
+        XCTAssertEqual(counts.transactions, ExpectedCounter(inserted: 0, updated: 1, unchanged: 0))
+
+        let merged = try appDatabase.dbWriter.read { db in
+            try XCTUnwrap(try TransactionRecord.fetchOne(db, key: liveRow.id))
+        }
+        XCTAssertEqual(merged.deletedAt, "2026-01-03T09:00:00", "the flag reaches the second machine")
+        XCTAssertTrue(merged.isFlagged)
     }
 
     func testMachineIdPersistsAcrossExports() throws {

@@ -34,6 +34,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from ..constants import CASH_ACCOUNT, is_reserved_account
 from ..logging_config import get_logger
 from .categorizer import rule_snapshot
 from .models import (
@@ -81,7 +82,7 @@ def get_machine_id(data_dir: Path) -> str:
 
 _TXN_COLUMNS = [c.name for c in Transaction.__table__.columns]
 _TXN_DATE_COLUMNS = {"transactiondate", "valuedate"}
-_TXN_DATETIME_COLUMNS = {"updated_at"}
+_TXN_DATETIME_COLUMNS = {"updated_at", "deleted_at"}
 _TXN_NUMERIC_COLUMNS = {"startsaldo", "endsaldo", "amount"}
 
 
@@ -283,7 +284,31 @@ def read_snapshot(blob: bytes) -> dict[str, Any]:
     for key in _ENTITY_KEYS:
         if not isinstance(payload.get(key), list):
             raise SnapshotError(f"Not a valid snapshot file (missing '{key}').")
+    _validate_reserved_account(payload["transactions"])
     return payload
+
+
+def _validate_reserved_account(transactions: list[Any]) -> None:
+    """Refuse a snapshot that holds a row of the pseudo account from an import.
+
+    A snapshot carries the hand-entered rows between the devices, so a row of
+    the account ``CASH`` is correct when the row is hand-entered. A row of that
+    account from an import is not correct, because only the user writes to the
+    pseudo account. The function refuses the complete file, because the import
+    validates the file before it makes a change.
+    """
+    for data in transactions:
+        if not isinstance(data, dict):
+            continue
+        if not is_reserved_account(data.get("accountNumber")):
+            continue
+        if not data.get("is_manual"):
+            raise SnapshotError(
+                f"Not a valid snapshot file: the transaction {data.get('id')!r} "
+                f"belongs to the reserved account {CASH_ACCOUNT}, but it is not "
+                "hand-entered. Only a hand-entered transaction belongs to that "
+                "account."
+            )
 
 
 # ---------------------------------------------------------------------------

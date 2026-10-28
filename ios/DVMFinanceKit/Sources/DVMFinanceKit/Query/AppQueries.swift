@@ -204,6 +204,90 @@ public enum AppQueries {
         }
     }
 
+    // MARK: - Hand-entered transactions
+
+    /// Creates one hand-entered transaction in the account `CASH`. Wraps
+    /// `ManualTransactions.create`.
+    @discardableResult
+    public static func createManualTransaction(
+        appDatabase: AppDatabase,
+        input: ManualTransactions.Input
+    ) async throws -> TransactionRecord {
+        try await appDatabase.dbWriter.write { db in
+            try ManualTransactions.create(db: db, input: input)
+        }
+    }
+
+    /// Changes a hand-entered transaction. Wraps `ManualTransactions.edit`,
+    /// which keeps the id and refuses an imported row.
+    @discardableResult
+    public static func editManualTransaction(
+        appDatabase: AppDatabase,
+        transactionId: String,
+        input: ManualTransactions.Input
+    ) async throws -> TransactionRecord {
+        try await appDatabase.dbWriter.write { db in
+            try ManualTransactions.edit(db: db, transactionId: transactionId, input: input)
+        }
+    }
+
+    /// Flags a hand-entered transaction for removal. Wraps
+    /// `ManualTransactions.flag`, which refuses an imported row.
+    @discardableResult
+    public static func flagTransaction(
+        appDatabase: AppDatabase,
+        transactionId: String
+    ) async throws -> TransactionRecord {
+        try await appDatabase.dbWriter.write { db in
+            try ManualTransactions.flag(db: db, transactionId: transactionId)
+        }
+    }
+
+    /// Removes the flag from a hand-entered transaction. Wraps
+    /// `ManualTransactions.restore`.
+    @discardableResult
+    public static func restoreTransaction(
+        appDatabase: AppDatabase,
+        transactionId: String
+    ) async throws -> TransactionRecord {
+        try await appDatabase.dbWriter.write { db in
+            try ManualTransactions.restore(db: db, transactionId: transactionId)
+        }
+    }
+
+    /// Each flagged transaction, for the list the user reads before the
+    /// purge. Wraps `ManualTransactions.flaggedTransactions`.
+    public static func flaggedTransactions(appDatabase: AppDatabase) async throws -> [TransactionRecord] {
+        try await appDatabase.dbWriter.read { db in
+            try ManualTransactions.flaggedTransactions(db: db)
+        }
+    }
+
+    /// The number of the flagged transactions. Wraps
+    /// `ManualTransactions.flaggedCount`.
+    public static func flaggedCount(appDatabase: AppDatabase) async throws -> Int {
+        try await appDatabase.dbWriter.read { db in
+            try ManualTransactions.flaggedCount(db: db)
+        }
+    }
+
+    /// Deletes each flagged transaction, after a backup of the database
+    /// file. Wraps `ManualTransactions.purgeFlagged`. The caller asks the
+    /// user to confirm first, because the app cannot undo the purge.
+    ///
+    /// The work runs on a background task. The backup copies the whole
+    /// database file, so a call on the main thread stops the user interface
+    /// for the time of the copy.
+    @discardableResult
+    public static func purgeFlaggedTransactions(
+        appDatabase: AppDatabase,
+        databaseURL: URL
+    ) async throws -> ManualTransactions.PurgeResult {
+        try await Task.detached(priority: .userInitiated) {
+            try ManualTransactions.purgeFlagged(appDatabase: appDatabase, databaseURL: databaseURL)
+        }.value
+    }
+
     // MARK: - Budgets
 
     /// The budget-vs-actual report for the given period filter and reference

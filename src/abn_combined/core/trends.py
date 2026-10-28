@@ -31,6 +31,7 @@ from .filters import (
     _parse_date,
     _parse_float,
     category_condition,
+    live_only,
     resolve_preset_range,
 )
 from .models import Transaction
@@ -317,7 +318,8 @@ def aggregate(db: Session, params: TrendsParams, today: date | None = None) -> T
         func.coalesce(func.nullif(Transaction.manual_category, ""), Transaction.category)
     )
 
-    query = (
+    # `live_only` removes each flagged transaction. See `core/filters.py`.
+    query = live_only(
         db.query(period_expr, eff_cat, func.sum(Transaction.amount))
         .filter(Transaction.transactiondate >= window_from)
         .filter(Transaction.transactiondate <= window_to)

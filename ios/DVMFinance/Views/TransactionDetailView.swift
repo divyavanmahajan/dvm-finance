@@ -28,6 +28,12 @@ struct TransactionDetailView: View {
     @State private var availableCategories: [String] = []
     @State private var saveErrorMessage: String?
 
+    /// The edit sheet of a hand-entered transaction, and the flag control.
+    /// Both belong to the capability `ios-manual-transactions`, and both
+    /// accept a hand-entered row only: the app offers an imported row the
+    /// category and the tag functions only.
+    @State private var showManualEditSheet = false
+
     var body: some View {
         Group {
             if let transaction {
@@ -74,6 +80,10 @@ struct TransactionDetailView: View {
                         if let saveErrorMessage {
                             Text(saveErrorMessage).foregroundStyle(.red).font(.subheadline)
                         }
+                    }
+
+                    if transaction.isManual {
+                        handEnteredSection(transaction)
                     }
 
                     Section("Source") {
@@ -126,7 +136,63 @@ struct TransactionDetailView: View {
                 }
             }
         }
+        .sheet(isPresented: $showManualEditSheet) {
+            ManualTransactionEditView(existing: transaction) {
+                await load()
+            }
+        }
         .task { await load() }
+    }
+
+    /// The functions that a hand-entered transaction accepts: the edit of
+    /// each typed value, the flag for removal, and the restore. The row keeps
+    /// its id through each one, and the app deletes no row here. Only the
+    /// purge deletes a flagged row.
+    @ViewBuilder
+    private func handEnteredSection(_ transaction: TransactionRecord) -> some View {
+        Section {
+            labeledRow("Account", ManualTransactions.cashAccount)
+            if let flaggedAt = transaction.deletedAtDate {
+                labeledRow("Flagged for removal", DisplayFormat.mediumDate.string(from: flaggedAt))
+                Button("Restore") { Task { await restoreRow() } }
+            } else {
+                Button("Edit transaction") { showManualEditSheet = true }
+                Button("Flag for removal", role: .destructive) { Task { await flagRow() } }
+            }
+        } header: {
+            Text("Cash payment")
+        } footer: {
+            Text(transaction.isFlagged
+                ? "This transaction appears in no list and in no total. "
+                    + "The purge deletes it."
+                : "You typed this transaction. "
+                    + "A flag hides it from each list and each total. "
+                    + "Only the purge deletes it.")
+        }
+    }
+
+    private func flagRow() async {
+        guard let appDatabase else { return }
+        do {
+            let updated = try await AppQueries.flagTransaction(
+                appDatabase: appDatabase, transactionId: transactionId)
+            transaction = updated
+            saveErrorMessage = nil
+        } catch {
+            saveErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func restoreRow() async {
+        guard let appDatabase else { return }
+        do {
+            let updated = try await AppQueries.restoreTransaction(
+                appDatabase: appDatabase, transactionId: transactionId)
+            transaction = updated
+            saveErrorMessage = nil
+        } catch {
+            saveErrorMessage = error.localizedDescription
+        }
     }
 
     /// Editable manual category/tags plus a per-field "clear (restore rule)"

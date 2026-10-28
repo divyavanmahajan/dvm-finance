@@ -107,6 +107,25 @@ public struct SnapshotTransaction: Codable, Equatable {
     /// ordering, so no normalization is applied here. Port of the
     /// `updated_at` key `core/snapshots.py:_txn_dict` now emits.
     public var updatedAt: String?
+    /// `true` for a hand-entered transaction. Port of the `is_manual` key
+    /// `core/snapshots.py:_txn_dict` emits.
+    ///
+    /// Declared `Bool?`, not `Bool`, although the column is `NOT NULL`: a
+    /// snapshot that an older version of either application wrote holds no
+    /// `is_manual` key at all. The synthesized decoder calls
+    /// `decodeIfPresent` for an `Optional`, so such a file still reads;
+    /// `SnapshotCodec.makeTransactionRecord` then maps a missing value to
+    /// `false`, which is the correct reading of an older snapshot: each of
+    /// its rows is an imported row. A non-optional `Bool` here would instead
+    /// fail the decode of the whole document.
+    public var isManual: Bool?
+    /// The time of the removal flag of the row, or `nil` for a live row.
+    /// Port of the `deleted_at` key `core/snapshots.py:_txn_dict` emits.
+    ///
+    /// A snapshot export always holds this value. It is one of the two
+    /// surfaces that still read a flagged transaction, so that the flag
+    /// reaches each other machine.
+    public var deletedAt: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -131,6 +150,8 @@ public struct SnapshotTransaction: Codable, Equatable {
         case transactionReference = "transaction_reference"
         case transactionHash = "transaction_hash"
         case updatedAt = "updated_at"
+        case isManual = "is_manual"
+        case deletedAt = "deleted_at"
     }
 }
 
@@ -389,7 +410,9 @@ public enum SnapshotCodec {
             transactionTypeCode: record.transactionTypeCode,
             transactionReference: record.transactionReference,
             transactionHash: record.transactionHash,
-            updatedAt: record.updatedAt
+            updatedAt: record.updatedAt,
+            isManual: record.isManual,
+            deletedAt: record.deletedAt
         )
     }
 
@@ -430,7 +453,12 @@ public enum SnapshotCodec {
             transactionTypeCode: snapshot.transactionTypeCode,
             transactionReference: snapshot.transactionReference,
             transactionHash: snapshot.transactionHash,
-            updatedAt: snapshot.updatedAt
+            updatedAt: snapshot.updatedAt,
+            // A snapshot of an older version holds no `is_manual` key. Such
+            // a row is an imported row, so the missing value reads as
+            // `false`.
+            isManual: snapshot.isManual ?? false,
+            deletedAt: snapshot.deletedAt
         )
     }
 
@@ -575,6 +603,8 @@ public enum SnapshotCodec {
             "transaction_reference": .from(snapshot.transactionReference),
             "transaction_hash": .from(snapshot.transactionHash),
             "updated_at": .from(snapshot.updatedAt),
+            "is_manual": .bool(snapshot.isManual ?? false),
+            "deleted_at": .from(snapshot.deletedAt),
         ]
     }
 

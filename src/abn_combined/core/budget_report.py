@@ -14,7 +14,7 @@ from decimal import Decimal
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from ..constants import is_transfer_category
+from .filters import live_only
 from .models import Budget, Transaction
 from .utils import CATEGORY_SEPARATOR
 
@@ -56,13 +56,18 @@ def compute_actual(db: Session, category: str, period_start: date,
     """
     eff = _effective_category_expr()
     c = category.strip().lower()
-    query = db.query(func.sum(func.abs(Transaction.amount))).filter(
-        Transaction.transactiondate >= period_start,
-        Transaction.transactiondate <= period_end,
-        or_(
-            func.lower(eff) == c,
-            func.lower(eff).like(f"{c}{CATEGORY_SEPARATOR}%"),
-        ),
+    # `live_only` removes each flagged transaction. See `core/filters.py`.
+    # `average_monthly_spend` and `budget_vs_actual_table` both call this
+    # function, so each budget actual inherits the exclusion.
+    query = live_only(
+        db.query(func.sum(func.abs(Transaction.amount))).filter(
+            Transaction.transactiondate >= period_start,
+            Transaction.transactiondate <= period_end,
+            or_(
+                func.lower(eff) == c,
+                func.lower(eff).like(f"{c}{CATEGORY_SEPARATOR}%"),
+            ),
+        )
     )
     # Exclude transfers by default (unless exclude_transfers is False)
     if exclude_transfers:

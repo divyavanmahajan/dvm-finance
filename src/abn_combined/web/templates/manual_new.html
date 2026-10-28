@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Add a cash transaction — Your Finance{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-2">Add a cash transaction</h1>
+    <p class="text-muted small mb-0">
+      The system puts the transaction in the pseudo account CASH.
+    </p>
+  </div>
+  <div>
+    <a href="/manual/flagged" class="btn btn-outline-secondary">The flagged transactions</a>
+  </div>
+</div>
+
+{% if created %}
+<div class="alert alert-success" role="status">
+  The system created the cash transaction.
+</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-danger" role="alert">
+  {{ error }} The system wrote no transaction.
+</div>
+{% endif %}
+
+<div class="alert alert-info">
+  <p class="mb-1">
+    <strong>Fund the pseudo account with a transfer category.</strong>
+  </p>
+  <p class="mb-0">
+    Give the bank withdrawal that funds this account a transfer category.
+    The withdrawal counts as spending in the bank account if you do not.
+    The system then counts the same money a second time.
+  </p>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="post" action="/manual/create" class="row g-3 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label" for="manual-date">Date</label>
+        <input type="date" class="form-control" id="manual-date" name="transactiondate"
+               value="{{ form.transactiondate or today }}" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" for="manual-amount">Amount €</label>
+        <input type="number" class="form-control" id="manual-amount" name="amount"
+               step="0.01" value="{{ form.amount or '' }}" required>
+        <small class="text-muted">Write a payment as a negative amount.</small>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="manual-description">Description</label>
+        <input type="text" class="form-control" id="manual-description" name="description"
+               value="{{ form.description or '' }}" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="manual-category">Category</label>
+        <input type="text" class="form-control" id="manual-category" name="category"
+               value="{{ form.category or '' }}" list="known-categories">
+        <small class="text-muted">The category is optional.</small>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="manual-tags">Tags</label>
+        <input type="text" class="form-control" id="manual-tags" name="tags"
+               value="{{ form.tags or '' }}">
+        <small class="text-muted">Put a comma between two tags.</small>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary">Add the transaction</button>
+        <a href="/transactions" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<datalist id="known-categories">
+  {% for c in categories %}<option value="{{ c }}"></option>{% endfor %}
+</datalist>
+{% endblock %}

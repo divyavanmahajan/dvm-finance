@@ -6,10 +6,12 @@ from datetime import date
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from abn_combined.core.models import (
-    Base, CategorizationRule, RuleCondition, Transaction,
-)
 from abn_combined.core.categorizer import _apply_rule_to_transaction, apply_rules
+from abn_combined.core.models import (
+    Base,
+    CategorizationRule,
+    Transaction,
+)
 
 
 class DraftCond:
@@ -74,7 +76,7 @@ RULES = [
 matrix = []
 for name, rule in RULES:
     row = {"rule": name, "matches": []}
-    for i, t in enumerate(TXNS):
+    for t in TXNS:
         row["matches"].append(bool(_apply_rule_to_transaction(rule, t)))
     matrix.append(row)
 
