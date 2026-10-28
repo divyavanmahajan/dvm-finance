@@ -32,6 +32,109 @@ def test_abn_generations_api_constant() -> None:
     assert abn.ABN_GENERATIONS_API == "https://www.abnamro.nl/mutationreporting/generations/v1"
 
 
+def test_abn_account_balances_api_constant() -> None:
+    assert (
+        abn.ABN_ACCOUNT_BALANCES_API
+        == "https://www.abnamro.nl/my-abnamro/apis/account-balances/v3/"
+    )
+    assert "PAYMENT_ACCOUNTS" in abn.ABN_PRODUCT_GROUPS
+    assert "SAVINGS_ACCOUNTS" in abn.ABN_PRODUCT_GROUPS
+
+
+def _account(number: str, product_group: str) -> dict:
+    """Build one synthetic account entry of the account-balances response."""
+    return {
+        "contract": {
+            "accountNumber": f"NL01ABNA{number}",
+            "resourceType": "Account",
+            "id": f"5_{number}",
+            "contractNumber": number,
+            "status": "STATUS_ACTIVE",
+            "isBlocked": False,
+            "balance": {"currencyCode": "EUR", "amount": 1.23},
+            "product": {"name": "Priverekening", "productGroup": product_group},
+            "customer": {"shortName": "TEST USER"},
+        }
+    }
+
+
+# A synthetic response with the shape of the real one: each account occurs in
+# more than one product group, and other contracts have no account number.
+BALANCES_RESPONSE = {
+    "contractList": [
+        _account("0100000001", "PAYMENT_ACCOUNTS"),
+        _account("0100000002", "SAVINGS_ACCOUNTS"),
+        _account("0100000001", "SETTLEMENTACCOUNTS_FOR_SAVINGS"),
+        _account("0100000002", "VARIABLE_SAVINGS_TOR_BONUS"),
+        _account("0100000001", "CREDITS_ACBS"),
+        {
+            "contract": {
+                "resourceType": "Contract",
+                "id": "112_000000000001",
+                "contractNumber": "000000000001",
+                "product": {"name": "Betaalpas", "productGroup": "PAYMENT_SERVICES"},
+            }
+        },
+        {
+            "contract": {
+                "resourceType": "Contract",
+                "id": "15_0800000000",
+                "contractNumber": "0800000000",
+                "balance": {"currencyCode": "EUR", "amount": 1000.0},
+                "product": {"name": "ABN AMRO Hypotheek", "productGroup": "MORTGAGE"},
+            }
+        },
+    ]
+}
+
+
+def test_extract_account_numbers_dedupes_and_strips_zero_prefix() -> None:
+    assert abn.extract_account_numbers(BALANCES_RESPONSE) == [
+        "100000001",
+        "100000002",
+    ]
+
+
+def test_extract_account_numbers_skips_contracts_without_account_number() -> None:
+    """A debit card and a mortgage have no account number. Skip both."""
+    only_contracts = {
+        "contractList": BALANCES_RESPONSE["contractList"][-2:],
+    }
+    assert abn.extract_account_numbers(only_contracts) == []
+
+
+def test_extract_account_numbers_empty_response() -> None:
+    assert abn.extract_account_numbers({}) == []
+    assert abn.extract_account_numbers({"contractList": []}) == []
+
+
+def test_fetch_account_numbers_requests_the_product_groups() -> None:
+    page = Mock()
+    response = Mock()
+    response.ok = True
+    response.status = 200
+    response.json.return_value = BALANCES_RESPONSE
+    page.request.get.return_value = response
+
+    assert abn.fetch_account_numbers(page) == ["100000001", "100000002"]
+
+    url = page.request.get.call_args[0][0]
+    assert url.startswith(abn.ABN_ACCOUNT_BALANCES_API)
+    assert f"productGroups={abn.ABN_PRODUCT_GROUPS}" in url
+
+
+def test_fetch_account_numbers_error_handling() -> None:
+    page = Mock()
+    response = Mock()
+    response.ok = False
+    response.status = 403
+    response.text.return_value = "Forbidden"
+    page.request.get.return_value = response
+
+    with pytest.raises(Exception, match="status 403"):
+        abn.fetch_account_numbers(page)
+
+
 def test_download_transactions_payload_structure() -> None:
     """Ported: payload structure of the generations POST."""
     mock_page = Mock()
