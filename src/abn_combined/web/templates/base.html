@@ -45,13 +45,14 @@
         <ul class="navbar-nav nav-underline flex-grow-1">
           {% for path, label in nav_tabs %}
           <li class="nav-item">
-            <a class="nav-link {% if path == active_path %}active{% endif %}" href="{{ path }}" {% if path == active_path %}aria-current="page"{% endif %}>
+            <a class="nav-link text-nowrap {% if path == active_path %}active{% endif %}" href="{{ path }}" {% if path == active_path %}aria-current="page"{% endif %}>
               {% if label == 'Transactions' %}<i class="bi bi-list-check"></i>
               {% elif label == 'Trends' %}<i class="bi bi-graph-up"></i>
               {% elif label == 'Rules' %}<i class="bi bi-sliders"></i>
               {% elif label == 'Tags' %}<i class="bi bi-tags"></i>
               {% elif label == 'Budgets' %}<i class="bi bi-piggy-bank"></i>
               {% elif label == 'Cash Flow' %}<i class="bi bi-cash-flow"></i>
+              {% elif label == 'Cash' %}<i class="bi bi-wallet2"></i>
               {% endif %}
               {{ label }}
             </a>

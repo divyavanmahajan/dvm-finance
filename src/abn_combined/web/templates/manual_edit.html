@@ -27,34 +27,43 @@
 
 <div class="card shadow-sm">
   <div class="card-body">
-    <form method="post" action="/manual/{{ txn.id }}/update" class="row g-3 align-items-end">
-      <div class="col-md-3">
-        <label class="form-label" for="manual-edit-date">Date</label>
-        <input type="date" class="form-control" id="manual-edit-date" name="transactiondate"
-               value="{{ form.transactiondate }}" required>
+    <form method="post" action="/manual/{{ txn.id }}/update">
+      <div class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label" for="manual-edit-date">Date</label>
+          <input type="date" class="form-control" id="manual-edit-date" name="transactiondate"
+                 value="{{ form.transactiondate }}" required>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label" for="manual-edit-amount">Amount &euro;</label>
+          <input type="number" class="form-control" id="manual-edit-amount" name="amount"
+                 step="0.01" value="{{ form.amount }}" required>
+          <div class="form-text">Write a payment as a negative amount.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="manual-edit-description">Description</label>
+          <input type="text" class="form-control" id="manual-edit-description" name="description"
+                 value="{{ form.description }}" required>
+          <div class="form-text">For example, the name of the shop.</div>
+        </div>
       </div>
-      <div class="col-md-2">
-        <label class="form-label" for="manual-edit-amount">Amount €</label>
-        <input type="number" class="form-control" id="manual-edit-amount" name="amount"
-               step="0.01" value="{{ form.amount }}" required>
+
+      <div class="row g-3 mt-0">
+        <div class="col-md-6">
+          <label class="form-label" for="manual-edit-category">Category</label>
+          <input type="text" class="form-control" id="manual-edit-category" name="category"
+                 value="{{ form.category }}" list="known-categories">
+          <div class="form-text">The category is optional. A rule never replaces it.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="manual-edit-tags">Tags</label>
+          <input type="text" class="form-control" id="manual-edit-tags" name="tags"
+                 value="{{ form.tags }}">
+          <div class="form-text">The tags are optional. Put a comma between two tags.</div>
+        </div>
       </div>
-      <div class="col-md-4">
-        <label class="form-label" for="manual-edit-description">Description</label>
-        <input type="text" class="form-control" id="manual-edit-description" name="description"
-               value="{{ form.description }}" required>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label" for="manual-edit-category">Category</label>
-        <input type="text" class="form-control" id="manual-edit-category" name="category"
-               value="{{ form.category }}" list="known-categories">
-      </div>
-      <div class="col-md-4">
-        <label class="form-label" for="manual-edit-tags">Tags</label>
-        <input type="text" class="form-control" id="manual-edit-tags" name="tags"
-               value="{{ form.tags }}">
-        <small class="text-muted">Put a comma between two tags.</small>
-      </div>
-      <div class="col-auto">
+
+      <div class="d-flex gap-2 mt-4">
         <button type="submit" class="btn btn-primary">Save the transaction</button>
         <a href="/transactions" class="btn btn-outline-secondary">Cancel</a>
       </div>

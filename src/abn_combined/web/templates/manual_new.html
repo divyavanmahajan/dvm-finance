@@ -38,36 +38,43 @@
 
 <div class="card shadow-sm">
   <div class="card-body">
-    <form method="post" action="/manual/create" class="row g-3 align-items-end">
-      <div class="col-md-3">
-        <label class="form-label" for="manual-date">Date</label>
-        <input type="date" class="form-control" id="manual-date" name="transactiondate"
-               value="{{ form.transactiondate or today }}" required>
+    <form method="post" action="/manual/create">
+      <div class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label" for="manual-date">Date</label>
+          <input type="date" class="form-control" id="manual-date" name="transactiondate"
+                 value="{{ form.transactiondate or today }}" required>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label" for="manual-amount">Amount &euro;</label>
+          <input type="number" class="form-control" id="manual-amount" name="amount"
+                 step="0.01" value="{{ form.amount or '' }}" required>
+          <div class="form-text">Write a payment as a negative amount.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="manual-description">Description</label>
+          <input type="text" class="form-control" id="manual-description" name="description"
+                 value="{{ form.description or '' }}" required>
+          <div class="form-text">For example, the name of the shop.</div>
+        </div>
       </div>
-      <div class="col-md-2">
-        <label class="form-label" for="manual-amount">Amount €</label>
-        <input type="number" class="form-control" id="manual-amount" name="amount"
-               step="0.01" value="{{ form.amount or '' }}" required>
-        <small class="text-muted">Write a payment as a negative amount.</small>
+
+      <div class="row g-3 mt-0">
+        <div class="col-md-6">
+          <label class="form-label" for="manual-category">Category</label>
+          <input type="text" class="form-control" id="manual-category" name="category"
+                 value="{{ form.category or '' }}" list="known-categories">
+          <div class="form-text">The category is optional. A rule never replaces it.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="manual-tags">Tags</label>
+          <input type="text" class="form-control" id="manual-tags" name="tags"
+                 value="{{ form.tags or '' }}">
+          <div class="form-text">The tags are optional. Put a comma between two tags.</div>
+        </div>
       </div>
-      <div class="col-md-4">
-        <label class="form-label" for="manual-description">Description</label>
-        <input type="text" class="form-control" id="manual-description" name="description"
-               value="{{ form.description or '' }}" required>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label" for="manual-category">Category</label>
-        <input type="text" class="form-control" id="manual-category" name="category"
-               value="{{ form.category or '' }}" list="known-categories">
-        <small class="text-muted">The category is optional.</small>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label" for="manual-tags">Tags</label>
-        <input type="text" class="form-control" id="manual-tags" name="tags"
-               value="{{ form.tags or '' }}">
-        <small class="text-muted">Put a comma between two tags.</small>
-      </div>
-      <div class="col-auto">
+
+      <div class="d-flex gap-2 mt-4">
         <button type="submit" class="btn btn-primary">Add the transaction</button>
         <a href="/transactions" class="btn btn-outline-secondary">Cancel</a>
       </div>

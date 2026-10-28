@@ -30,10 +30,10 @@ NAV_TABS = [
     ("/rules", "Rules"),
     ("/tags", "Tags"),
     ("/budgets", "Budgets"),
-    ("/manual", "Cash"),
     ("/cash-flow", "Cash Flow"),
     ("/download", "Download"),
     ("/upload", "Upload"),
+    ("/manual", "Cash"),
     ("/snapshots", "Snapshots"),
     ("/help", "Help"),
 ]
