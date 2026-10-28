@@ -69,14 +69,24 @@ status and the data directory in use.
 
 ### Requirement: Navigation tabs
 The application SHALL show a fixed set of navigation tabs. They are
-Transactions, Trends, Rules, Tags, Budgets, Cash Flow, Download, Upload,
-Snapshots, and Help. The application SHALL mark the current tab as active. For a
-tab with no implementation, the application SHALL render a placeholder, and the
-page SHALL NOT fail.
+Transactions, Trends, Rules, Tags, Budgets, Cash Flow, Download, Upload, Cash,
+Snapshots, and Help. The application SHALL mark the current tab as active, and
+it SHALL keep each label on one line. For a tab with no implementation, the
+application SHALL render a placeholder, and the page SHALL NOT fail.
 
 #### Scenario: A page renders
 - **WHEN** any page renders
 - **THEN** the navigation marks the tab of that page as active
+
+#### Scenario: The user opens the Cash tab
+- **WHEN** the user opens the Cash tab
+- **THEN** the application shows the form that adds a hand-entered transaction
+
+#### Scenario: The order of the tabs keeps the two similar names apart
+- **WHEN** the navigation renders
+- **THEN** the Cash tab stands beside Download and Upload, which are the other
+  tabs for the entry of data, and not beside Cash Flow, which has a similar
+  name and another purpose
 
 ### Requirement: Clear message for an occupied port
 For an occupied port, the application SHALL report that, suggest another port,
