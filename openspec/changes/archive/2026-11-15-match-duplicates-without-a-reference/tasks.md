@@ -48,13 +48,13 @@
 
 ## 5. The iOS port
 
-- [ ] 5.1 Port the second key to `Dedup.swift`, and the discovery and the
+- [x] 5.1 Port the second key to `Dedup.swift`, and the discovery and the
   refusal to `Merge.swift`. Verify with `xcodebuild test` on a Mac.
-- [ ] 5.2 Verify with a test that Swift refuses the same cluster as Python.
+- [x] 5.2 Verify with a test that Swift refuses the same cluster as Python.
 
 ## 6. The documentation and the integration check
 
 - [x] 6.1 Document the second key and the rule of the statement file in
   `docs/architecture.md` and `docs/product.md`.
-- [ ] 6.2 Run `pytest` and `ruff check .`, and verify that both pass with the
+- [x] 6.2 Run `pytest` and `ruff check .`, and verify that both pass with the
   coverage gate of 80 percent.

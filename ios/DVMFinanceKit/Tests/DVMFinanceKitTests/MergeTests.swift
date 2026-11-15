@@ -838,4 +838,105 @@ extension MergeTests {
         XCTAssertEqual(result.refused.count, 1)
         XCTAssertEqual(result.refused[0].matchedBy, "counterparty")
     }
+
+    // MARK: - The clusters that Python refuses (tests/test_merge_counterparty.py)
+
+    private static let payPalIBAN = "LU89563814393733142M"
+
+    /// A transfer with a counterparty IBAN, a remittance text, and no usable
+    /// reference. Mirrors `_add` in `tests/test_merge_counterparty.py`.
+    private func insertCounterparty(
+        _ id: String,
+        iban: String = "NL92ABNA8756430569",
+        remittance: String? = nil,
+        amount: Double = -1000.00,
+        when: DateComponents = DateComponents(year: 2025, month: 11, day: 10),
+        sourceFile: String
+    ) throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        var structured: [String: String] = [
+            "format": "sepa", "sepa_type": "OVERBOEKING",
+            "transaction_type": "SEPA Transfer", "iban": iban,
+            "end_to_end_reference": "NOTPROVIDED",
+        ]
+        if let remittance { structured["remittance_info"] = remittance }
+        let json = String(
+            data: try JSONSerialization.data(withJSONObject: structured, options: [.sortedKeys]),
+            encoding: .utf8
+        )
+        let record = TransactionRecord(
+            id: id,
+            accountNumber: MergeTests.account,
+            transactiondate: calendar.date(from: when)!,
+            amount: Decimal(amount),
+            description: "SEPA OVERBOEKING \(iban) \(remittance ?? "")",
+            descriptionStructured: json,
+            currency: "EUR",
+            sourceFile: sourceFile
+        )
+        try appDatabase.dbWriter.write { db in try record.insert(db) }
+    }
+
+    /// `test_the_merge_refuses_a_cluster_of_one_file`: three payments of one
+    /// day to one PayPal IBAN differ only in the remittance text, so each one
+    /// is a group of one row, and nothing is merged or refused.
+    func testThePayPalClusterMakesNoGroup() throws {
+        for (index, text) in ["1881164974955/PAYPAL", "3404065959685/PAYPAL",
+                              "7624611028858/PAYPAL"].enumerated() {
+            try insertCounterparty(
+                "pp\(index)", iban: MergeTests.payPalIBAN, remittance: text,
+                amount: -149.00, when: DateComponents(year: 2025, month: 4, day: 29),
+                sourceFile: "MT940251116145104.STA"
+            )
+        }
+
+        let result = try preview()
+
+        XCTAssertTrue(result.groups.isEmpty)
+        XCTAssertTrue(result.refused.isEmpty)
+    }
+
+    /// `test_the_four_row_cluster_refuses`: each of two files gives two rows.
+    func testTheFourRowClusterRefuses() throws {
+        for (index, file) in ["a.STA", "a.STA", "b.STA", "b.STA"].enumerated() {
+            try insertCounterparty(
+                "row\(index)", amount: -530.00,
+                when: DateComponents(year: 2026, month: 9, day: 7), sourceFile: file
+            )
+        }
+
+        let result = try preview()
+
+        XCTAssertTrue(result.groups.isEmpty)
+        XCTAssertEqual(result.refused.count, 1)
+        XCTAssertEqual(result.refused[0].reason, Merge.oneStatementFile)
+        XCTAssertEqual(result.refused[0].rowIDs, ["row0", "row1", "row2", "row3"])
+    }
+
+    /// `test_a_refused_cluster_changes_no_row`.
+    func testARefusedClusterChangesNoRow() throws {
+        try insertCounterparty("aaa", sourceFile: "a.STA")
+        try insertCounterparty("bbb", sourceFile: "a.STA")
+
+        _ = try merge()
+
+        for id in ["aaa", "bbb"] {
+            let row = try fetch(id)
+            XCTAssertNil(row?.deletedAt)
+            XCTAssertNil(row?.mergedInto)
+        }
+    }
+
+    /// `test_the_group_names_the_counterparty`.
+    func testTheGroupNamesTheCounterparty() throws {
+        try insertCounterparty("aaa", remittance: "SAVINGS", sourceFile: "a.STA")
+        try insertCounterparty("bbb", remittance: "SAVINGS", sourceFile: "b.STA")
+
+        let result = try preview()
+
+        XCTAssertEqual(result.groups.count, 1)
+        XCTAssertEqual(result.groups[0].matchedBy, "counterparty")
+        XCTAssertEqual(result.groups[0].reference, "NL92ABNA8756430569 / SAVINGS")
+    }
 }

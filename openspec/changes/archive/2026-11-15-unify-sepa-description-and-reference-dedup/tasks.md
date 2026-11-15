@@ -179,19 +179,19 @@
 
 ## 11. The integration check
 
-- [ ] 11.1 Import a statement in the tagged form and then the same payment in the
+- [x] 11.1 Import a statement in the tagged form and then the same payment in the
   labelled form through the web interface. Verify in a real browser that the
   import report counts one duplicate, and that the transaction list holds one
   row.
-- [ ] 11.2 Open the preview of the merge in a real browser on a database that
+- [x] 11.2 Open the preview of the merge in a real browser on a database that
   holds a duplicate pair. Confirm the merge, and verify that the transactions
   list holds one row and that the report names the pair.
-  NOT DONE: the Chrome extension is not connected in this environment. The
-  whole flow ran instead against a live server on port 8777 over HTTP, on a
-  database seeded with one payment in both description forms: the preview named
-  the group, the unconfirmed merge returned 400 and changed nothing, the
-  confirmed merge redirected with `merged=1`, the transactions list went from
-  two LEBARA rows to one, the flagged list stayed empty, a confirmed purge kept
-  the merged row, and the undo restored it.
+  Done in headless Chromium (Playwright), because the Chrome extension is not
+  connected. Two made-up statements held one payment in the tagged form and in
+  the labelled form: the second import counted one duplicate, and the list held
+  one row. A database seeded with a duplicate pair showed the group in the
+  preview. The unconfirmed merge changed nothing. The confirmed merge folded
+  one row, the list went from two rows to one, and the report named the row
+  that stayed and the flagged row.
 - [x] 11.3 Run `pytest` and `ruff check .`, and verify that both pass with the
   coverage gate of 80 percent.
