@@ -3,9 +3,27 @@
   <ul>
     <li><strong>{{ summary.new }}</strong> new transactions</li>
     <li><strong>{{ summary.duplicates }}</strong> duplicates skipped</li>
+    {% if summary.corrected %}
+    <li><strong>{{ summary.corrected }}</strong> amounts corrected</li>
+    {% endif %}
     <li><strong>{{ summary.categorized }}</strong> categorized by rules</li>
     <li><strong>{{ summary.uncategorized }}</strong> uncategorized</li>
   </ul>
+  {% if summary.corrections %}
+  <p>The file gives these stored transactions a different amount. The import replaced the stored amount.</p>
+  <table class="upload-corrections">
+    <thead><tr><th>Transaction</th><th>Old amount</th><th>New amount</th></tr></thead>
+    <tbody>
+      {% for c in summary.corrections %}
+      <tr>
+        <td><code>{{ c.id }}</code></td>
+        <td>{{ '%.2f' | format(c.old_amount) }}</td>
+        <td>{{ '%.2f' | format(c.new_amount) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
   {% if summary.new > 0 %}
   <a href="/transactions?source_file={{ summary.source_file | urlencode }}" role="button">
     View the new transactions

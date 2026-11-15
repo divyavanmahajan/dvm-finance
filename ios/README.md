@@ -100,6 +100,24 @@ scoped to local networking (`NSAllowsLocalNetworking`, not
 `NSAllowsArbitraryLoads`) in `DVMFinance/Info.plist`, which Xcode merges on
 top of the generated Info.plist.
 
+## The one-time passes after the migrations
+
+`AppEnvironment.init` calls `Restructure.runOnce` after `AppDatabase.live`. The
+two passes are the port of `core/restructure.py`:
+
+- `rewriteSEPAStructuredDescriptions` reparses each stored SEPA structured
+  description with the present parser.
+- `migrateRuleFieldTargets` renames the field target of each rule that names a
+  renamed structured key.
+
+The rules read the stored structured description, and not the raw text. A row or
+a rule that this app wrote before the canonical SEPA keys therefore needs the
+rewrite, because this app imports a statement and applies the rules on its own.
+
+Both passes are self-limiting and idempotent. The desktop app runs the same two
+passes at startup. Either app may run first, and a snapshot carries the result
+either way.
+
 ## Running tests
 
 `DVMFinanceKit` is UI-free and covered by `XCTest`. Two equivalent ways to

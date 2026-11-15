@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block title %}The duplicate transactions — Your Finance{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-2">The duplicate transactions</h1>
+    <p class="text-muted small mb-0">
+      The bank writes one SEPA payment in two description forms.
+      The two forms give two different transaction ids.
+      The system joins them by the end-to-end reference. A transfer between two
+      of your own accounts carries no reference, so the system joins those by
+      the counterparty and the amount instead.
+    </p>
+  </div>
+</div>
+
+{% if merged %}
+<div class="alert alert-success" role="status">
+  The merge folded {{ merged }} transaction{{ 's' if merged != '1' else '' }}.
+</div>
+{% endif %}
+
+{% if restored %}
+<div class="alert alert-success" role="status">
+  The undo restored {{ restored }} transaction{{ 's' if restored != '1' else '' }}.
+</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-danger" role="alert">{{ error }}</div>
+{% endif %}
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <h2 class="h6">The groups that the system merges</h2>
+    {% if groups %}
+    <p class="text-muted small">
+      The system keeps the row with the lowest id, and it flags each other row.
+      The choice is the same on each machine, so a snapshot merges without a
+      heuristic.
+    </p>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead>
+          <tr>
+            <th scope="col">Account</th>
+            <th scope="col">Matched by</th>
+            <th scope="col">Key</th>
+            <th scope="col">The row that stays</th>
+            <th scope="col">The rows that the merge flags</th>
+            <th scope="col">The carried category</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for group in groups %}
+          <tr>
+            <td>{{ group.account }}</td>
+            <td>
+              {% if group.matched_by == 'reference' %}
+              <span class="badge text-bg-secondary">the reference</span>
+              {% else %}
+              <span class="badge text-bg-info">the counterparty</span>
+              {% endif %}
+            </td>
+            <td><code class="small">{{ group.reference }}</code></td>
+            <td>
+              {% set keeper = rows.get(group.survivor_id) %}
+              {% if keeper %}
+              {{ keeper.transactiondate }} · {{ keeper.amount }}<br>
+              <span class="text-muted small">{{ keeper.description | truncate(60) }}</span>
+              {% else %}<code>{{ group.survivor_id }}</code>{% endif %}
+            </td>
+            <td>
+              {% for row_id in group.merged_ids %}
+              {% set other = rows.get(row_id) %}
+              {% if other %}
+              <div>
+                {{ other.transactiondate }} · {{ other.amount }}
+                <span class="text-muted small">{{ other.description | truncate(50) }}</span>
+              </div>
+              {% else %}<div><code>{{ row_id }}</code></div>{% endif %}
+              {% endfor %}
+            </td>
+            <td>{{ group.carried_category or '' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="alert alert-warning" role="alert">
+      <p class="mb-1"><strong>Caution: the merge changes each total.</strong></p>
+      <p class="mb-0">
+        Check each group above before you start the merge.
+        The merge deletes no row, so you can undo it.
+      </p>
+    </div>
+    <form method="post" action="/merge/run">
+      <div class="form-check mb-2">
+        <input class="form-check-input" type="checkbox" value="yes" id="merge-confirm" name="confirm">
+        <label class="form-check-label" for="merge-confirm">
+          I checked each group. Merge {{ row_count }}
+          transaction{{ 's' if row_count != 1 else '' }}.
+        </label>
+      </div>
+      <button type="submit" class="btn btn-primary">Merge now</button>
+    </form>
+    {% else %}
+    <p class="text-muted mb-0">The database holds no duplicate payment.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% if refused %}
+<div class="card shadow-sm mb-3 border-warning">
+  <div class="card-body">
+    <h2 class="h6 text-warning-emphasis">The groups that the system refuses</h2>
+    <p class="text-muted small">
+      The system does not fold a group below. Each one holds two different
+      manual categories, or one statement file gives more than one of its rows.
+      A group of the second kind holds a repeated payment, and not two forms of
+      one payment.
+    </p>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead>
+          <tr>
+            <th scope="col">Account</th>
+            <th scope="col">Matched by</th>
+            <th scope="col">Key</th>
+            <th scope="col">The rows</th>
+            <th scope="col">Why the system refuses it</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for group in refused %}
+          <tr>
+            <td>{{ group.account }}</td>
+            <td>
+              {% if group.matched_by == 'reference' %}
+              <span class="badge text-bg-secondary">the reference</span>
+              {% else %}
+              <span class="badge text-bg-info">the counterparty</span>
+              {% endif %}
+            </td>
+            <td><code class="small">{{ group.reference }}</code></td>
+            <td>
+              {% for row_id in group.row_ids %}
+              {% set row = rows.get(row_id) %}
+              <div>
+                {% if row %}{{ row.transactiondate }} · {{ row.amount }} ·
+                {{ row.manual_category or '' }}{% else %}<code>{{ row_id }}</code>{% endif %}
+              </div>
+              {% endfor %}
+            </td>
+            <td class="small">
+              {{ group.reason }}
+              {% if group.manual_categories %}
+              <div class="text-muted">{{ group.manual_categories | join(', ') }}</div>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if last_report %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h2 class="h6">The last merge</h2>
+    <p class="text-muted small mb-2">
+      {{ last_report.created_at.strftime('%Y-%m-%d %H:%M') }} ·
+      {{ last_report.summary.groups }} group{{ 's' if last_report.summary.groups != 1 else '' }} ·
+      {{ last_report.summary.rows }} row{{ 's' if last_report.summary.rows != 1 else '' }} ·
+      {{ last_report.summary.refused }} refused
+    </p>
+    {% if last_report.groups %}
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr>
+          <th scope="col">The row that stayed</th>
+          <th scope="col">The rows that the merge flagged</th>
+          <th scope="col">The carried category</th>
+          <th scope="col"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for group in last_report.groups %}
+        <tr>
+          <td><code>{{ group.survivor_id }}</code></td>
+          <td>
+            {% for row_id in group.merged_ids %}<div><code>{{ row_id }}</code></div>{% endfor %}
+          </td>
+          <td>{{ group.carried_category or '' }}</td>
+          <td class="text-end">
+            <form method="post" action="/merge/{{ group.survivor_id }}/undo">
+              <button type="submit" class="btn btn-sm btn-outline-secondary">Undo</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

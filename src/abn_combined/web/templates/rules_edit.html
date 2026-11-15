@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block title %}{{ title }} - Your Finance{% endblock %}
 {% block content %}
-<link rel="stylesheet" href="/static/rules.css">
-<script src="/static/js/rules.js"></script>
+<link rel="stylesheet" href="{{ static_url('rules.css') }}">
+<script src="{{ static_url('js/rules.js') }}"></script>
 
 <div class="d-flex align-items-center justify-content-between mb-3">
     <div>
@@ -40,127 +40,15 @@
         action="{% if vm.id %}/rules/{{ vm.id }}{% else %}/rules{% endif %}"
         hx-post="{% if vm.id %}/rules/{{ vm.id }}{% else %}/rules{% endif %}"
         hx-target="body" hx-swap="outerHTML"
-        x-data='ruleEditor({{ vm.conditions | tojson }}, {{ vm.is_tag_only | tojson }})'>
+        x-data='ruleEditor({{ vm.is_tag_only | tojson }})'>
 
     {% if vm.id %}<input type="hidden" name="rule_id" value="{{ vm.id }}">{% endif %}
 
     <div class="row g-3">
-      <div class="col-lg-7">
-        <div class="card shadow-sm h-100">
-          <div class="card-header d-flex align-items-center gap-2">
-            <i class="bi bi-crosshair"></i>
-            <span class="fw-semibold">Match</span>
-            <small class="text-muted">which transactions this rule targets</small>
-          </div>
-          <div class="card-body">
-            <div class="row g-3">
-              <div class="col-md-5">
-                <label class="form-label" for="field">Field</label>
-                <input type="text" id="field" name="field_target" class="form-control"
-                       list="field-suggestions" value="{{ vm.field_target or 'description' }}" required>
-                <datalist id="field-suggestions">
-                  {% for f in field_suggestions %}<option value="{{ f }}"></option>{% endfor %}
-                </datalist>
-              </div>
-              <div class="col-md-3">
-                <label class="form-label" for="pattern">Pattern</label>
-                <select id="pattern" name="match_pattern" class="form-select" required>
-                  {% for p in patterns %}
-                  <option value="{{ p }}" {% if vm.match_pattern == p %}selected{% endif %}>{{ p }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div class="col-md-4">
-                <label for="rule_type" class="form-label">Type</label>
-                <select class="form-select" id="rule_type" name="rule_type" required>
-                  {% for rt in rule_types %}
-                  <option value="{{ rt }}" {% if vm.rule_type == rt %}selected{% endif %}>
-                    {{ rt | replace('_', ' ') | title }}
-                  </option>
-                  {% endfor %}
-                </select>
-              </div>
-            </div>
-
-            <div class="row g-3 mt-0">
-              <div class="col-12">
-                <label class="form-label" for="value">Match value</label>
-                <input type="text" id="value" name="match_value" class="form-control"
-                       value="{{ vm.match_value }}" placeholder="text or regex pattern" required>
-                <div class="form-text">Text to match, or a regular expression if pattern is "regex"</div>
-              </div>
-            </div>
-
-            <hr class="my-3">
-            <div class="d-flex align-items-center justify-content-between mb-2">
-              <h6 class="text-muted small text-uppercase mb-0">Additional conditions</h6>
-              <span class="badge text-bg-secondary" x-show="conditions.length" x-text="conditions.length"></span>
-            </div>
-            <div class="form-text small mb-2">
-              Evaluated top to bottom. Rows are combined with their selected operator (AND/OR).
-            </div>
-            <p class="text-muted small fst-italic" x-show="!conditions.length">
-              No extra conditions - the primary match alone decides.
-            </p>
-
-            <template x-for="(cond, idx) in conditions" :key="idx">
-              <div class="row g-2 align-items-center mb-2 cond-row">
-                <div class="col-auto" x-show="idx > 0">
-                  <select class="form-select form-select-sm cond-op" name="cond_operator"
-                          x-model="cond.operator" style="width: 5.5rem;">
-                    <option value="AND">AND</option>
-                    <option value="OR">OR</option>
-                  </select>
-                </div>
-                <div class="col-auto text-muted small" x-show="idx === 0">
-                  AND
-                </div>
-                <div class="col">
-                  <input type="text" class="form-control form-control-sm" name="cond_field_target"
-                         x-model="cond.field_target" placeholder="field"
-                         list="field-suggestions">
-                </div>
-                <div class="col-auto">
-                  <select class="form-select form-select-sm" name="cond_match_pattern" x-model="cond.match_pattern">
-                    {% for p in patterns %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
-                  </select>
-                </div>
-                <div class="col">
-                  <input type="text" class="form-control form-control-sm" name="cond_match_value"
-                         x-model="cond.match_value" placeholder="value">
-                </div>
-                <div class="col-auto">
-                  <div class="btn-group btn-group-sm">
-                    <button type="button" class="btn btn-outline-secondary"
-                            @click="moveUp(idx)" :disabled="idx === 0"
-                            title="Move up" aria-label="Move up">
-                      <i class="bi bi-arrow-up"></i>
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary"
-                            @click="moveDown(idx)" :disabled="idx === conditions.length - 1"
-                            title="Move down" aria-label="Move down">
-                      <i class="bi bi-arrow-down"></i>
-                    </button>
-                    <button type="button" class="btn btn-outline-danger"
-                            @click="removeCondition(idx)"
-                            title="Delete condition" aria-label="Delete condition">
-                      <i class="bi bi-x-lg"></i>
-                    </button>
-                  </div>
-                </div>
-                <input type="hidden" name="cond_sort_order" :value="idx">
-              </div>
-            </template>
-
-            <button type="button" class="btn btn-outline-primary btn-sm mt-2" @click="addCondition()">
-              <i class="bi bi-plus-lg"></i> Add condition
-            </button>
-          </div>
-        </div>
-      </div>
+      {% include "_rule_match_card.html" %}
 
       <div class="col-lg-5">
-        <div class="card shadow-sm mb-3">
+        <div class="card shadow-sm">
           <div class="card-header d-flex align-items-center gap-2">
             <i class="bi bi-tag"></i>
             <span class="fw-semibold">Assign</span>
@@ -217,50 +105,6 @@
             </div>
           </div>
         </div>
-
-        <div class="card shadow-sm">
-          <div class="card-header d-flex align-items-center justify-content-between"
-               data-bs-toggle="collapse" data-bs-target="#context-filters"
-               style="cursor: pointer;" role="button">
-            <div class="d-flex align-items-center gap-2">
-              <i class="bi bi-funnel"></i>
-              <span class="fw-semibold">Context filters</span>
-              <small class="text-muted">optional</small>
-            </div>
-            <i class="bi bi-chevron-down"></i>
-          </div>
-          <div id="context-filters" class="collapse"
-               {% if vm.filter_account or vm.filter_currency or vm.filter_date_from or vm.filter_date_to %}show{% endif %}>
-            <div class="card-body">
-              <div class="row g-3">
-                <div class="col-12">
-                  <label class="form-label" for="account">Account</label>
-                  <select id="account" name="filter_account" class="form-select">
-                    <option value="">All accounts</option>
-                    {% for acc in accounts %}
-                    <option value="{{ acc }}" {% if vm.filter_account == acc %}selected{% endif %}>{{ acc }}</option>
-                    {% endfor %}
-                  </select>
-                </div>
-                <div class="col-4">
-                  <label class="form-label" for="currency">Currency</label>
-                  <input type="text" id="currency" name="filter_currency" class="form-control"
-                         value="{{ vm.filter_currency or '' }}" maxlength="3" placeholder="EUR">
-                </div>
-                <div class="col-4">
-                  <label class="form-label" for="date_from">Date from</label>
-                  <input type="date" id="date_from" name="filter_date_from" class="form-control"
-                         value="{{ vm.filter_date_from.isoformat() if vm.filter_date_from else '' }}">
-                </div>
-                <div class="col-4">
-                  <label class="form-label" for="date_to">Date to</label>
-                  <input type="date" id="date_to" name="filter_date_to" class="form-control"
-                         value="{{ vm.filter_date_to.isoformat() if vm.filter_date_to else '' }}">
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -269,6 +113,7 @@
         <button type="button" id="preview-btn" class="btn btn-outline-primary"
                 hx-post="/rules/preview" hx-target="#preview-panel" hx-swap="innerHTML"
                 hx-include="#rule-form"
+                hx-trigger="click, rule-sample-loaded from:body, rule-auto-preview from:body"
                 hx-on::after-swap="document.getElementById('preview-panel').scrollIntoView({behavior:'smooth'})">
           <i class="bi bi-eye"></i> Preview matches
           <span id="preview-indicator" class="htmx-indicator ms-1">

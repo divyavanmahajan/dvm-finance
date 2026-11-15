@@ -70,10 +70,11 @@ final class DescriptionParserTests: XCTestCase {
         let description =
             "/TRTP/SEPA OVERBOEKING/IBAN/NL13ABNA8992624444/BIC/ABNANL2A/NAME/ AAB INZ TIKKIE/REMI/TIKKIE ID 584357511540, BRUH, VAN A VAN LCJFO ST, NL21ABNA9847172551/EREF/4364003958"
         let expected = try expectedObject(#"""
-        {"transaction_type": "SEPA OVERBOEKING", "iban": "NL13ABNA8992624444", "bic": "ABNANL2A",
+        {"transaction_type": "SEPA Transfer", "sepa_type": "OVERBOEKING",
+         "iban": "NL13ABNA8992624444", "bic": "ABNANL2A",
          "name": "AAB INZ TIKKIE",
          "remittance_info": "TIKKIE ID 584357511540, BRUH, VAN A VAN LCJFO ST, NL21ABNA9847172551",
-         "end_to_end_reference": "4364003958", "format": "mt940", "is_tikkie": true,
+         "end_to_end_reference": "4364003958", "format": "sepa", "is_tikkie": true,
          "payment_service": "Tikkie", "tikkie_id": "584357511540",
          "payer_name": "VAN A VAN LCJFO ST", "payer_iban": "NL21ABNA9847172551"}
         """#)
@@ -109,7 +110,7 @@ final class DescriptionParserTests: XCTestCase {
         {"sepa_type": "INCASSO", "transaction_type": "SEPA Direct Debit", "direct_debit_type": "General",
          "recurring": true, "iban": "NL77RABO8509119907", "name": "VRAWD-KFQONIZ FITNESS",
          "creditor_identifier": "TF45FAQ873822907467", "mandate_reference": "ANYTIME-NL-5363362",
-         "reference": "39857858-65913", "format": "sepa"}
+         "end_to_end_reference": "39857858-65913", "format": "sepa"}
         """#)
         let actual = try actualObject(DescriptionParser.parseSEPADescription(description))
         XCTAssertEqual(actual, expected)
@@ -159,9 +160,26 @@ final class DescriptionParserTests: XCTestCase {
     // MARK: - MT940 with an unrecognized field tag (other_fields nesting)
 
     func testMT940UnknownFieldGoesToOtherFields() throws {
+        // `ZZZZ` is a tag that the parser does not know. `CSID` used to serve
+        // as the example here, but it is now a known tag that maps to
+        // `creditor_identifier`, so it no longer reaches `other_fields`.
+        let description = "/TRTP/BETALING/ZZZZ/XYZ123/"
+        let expected = try expectedObject(#"""
+        {"transaction_type": "BETALING", "other_fields": {"ZZZZ": "XYZ123"}, "format": "mt940"}
+        """#)
+        let actual = try actualObject(DescriptionParser.parseMT940Description(description))
+        XCTAssertEqual(actual, expected)
+    }
+
+    // MARK: - CSID and MARF are known tags
+
+    /// Port of `test_tagged_form_promotes_csid_and_marf` in
+    /// `tests/test_parsers.py`. A non-SEPA transaction type keeps the format
+    /// `mt940`, and the two tags still take their canonical keys.
+    func testMT940PromotesCSIDOutOfOtherFields() throws {
         let description = "/TRTP/BETALING/CSID/XYZ123/"
         let expected = try expectedObject(#"""
-        {"transaction_type": "BETALING", "other_fields": {"CSID": "XYZ123"}, "format": "mt940"}
+        {"transaction_type": "BETALING", "creditor_identifier": "XYZ123", "format": "mt940"}
         """#)
         let actual = try actualObject(DescriptionParser.parseMT940Description(description))
         XCTAssertEqual(actual, expected)

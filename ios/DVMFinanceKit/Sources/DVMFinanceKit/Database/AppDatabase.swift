@@ -256,6 +256,85 @@ public struct AppDatabase {
             }
         }
 
+        // v4 adds `end_to_end_reference` and `merged_into`. Port of the
+        // Alembic revision `c81a4f73be20`.
+        //
+        // The bank writes one SEPA payment in two description forms. The two
+        // forms hold a different raw text, so each form gives a different
+        // transaction id. `end_to_end_reference` is the second match key of
+        // the duplicate check, and it joins the two forms.
+        //
+        // `merged_into` holds the id of the row that absorbed a folded row.
+        // The two columns land together, exactly as in the Python migration.
+        //
+        // The Python migration backfills the reference from
+        // `description_structured`. The Swift side does the same, so that a
+        // row that an earlier version of the app wrote also joins the check.
+        migrator.registerMigration("v4") { db in
+            try db.alter(table: "transactions") { t in
+                t.add(column: "end_to_end_reference", .text).indexed()
+                t.add(column: "merged_into", .text).indexed()
+            }
+
+            // The data step: read each stored structured description and take
+            // the canonical key, and otherwise the old key of the labelled
+            // parser. Mirrors `_backfill_the_reference` in the Python
+            // migration.
+            let rows = try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT id, description_structured FROM transactions
+                    WHERE description_structured IS NOT NULL
+                    """
+            )
+            for row in rows {
+                guard let raw: String = row["description_structured"],
+                      let id: String = row["id"],
+                      let data = raw.data(using: .utf8),
+                      let object = try? JSONSerialization.jsonObject(with: data),
+                      let dict = object as? [String: Any]
+                else { continue }
+
+                var reference: String?
+                for key in ["end_to_end_reference", "reference"] {
+                    if let value = dict[key] as? String,
+                       !value.trimmingCharacters(in: .whitespaces).isEmpty {
+                        reference = value.trimmingCharacters(in: .whitespaces)
+                        break
+                    }
+                }
+                guard let reference else { continue }
+                try db.execute(
+                    sql: "UPDATE transactions SET end_to_end_reference = ? WHERE id = ?",
+                    arguments: [reference, id]
+                )
+            }
+        }
+
+        // v5 adds `merge_reports`. Port of the same table in the Alembic
+        // revision `c81a4f73be20`.
+        migrator.registerMigration("v5") { db in
+            try db.create(table: "merge_reports") { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("created_at", .text).notNull().indexed()
+                t.column("groups", .text)
+                t.column("refused", .text)
+                t.column("summary", .text)
+            }
+        }
+
+        // Alembic e4b7d2a91c36: one category and period can hold several
+        // budgets whose validity ranges do not overlap, so the index on the
+        // pair is no longer unique.
+        migrator.registerMigration("v6") { db in
+            try db.drop(index: "idx_budgets_category_period")
+            try db.create(
+                index: "idx_budgets_category_period",
+                on: "budgets",
+                columns: ["category", "period"]
+            )
+        }
+
         return migrator
     }
 }

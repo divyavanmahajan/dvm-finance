@@ -328,3 +328,32 @@ def test_the_detail_view_links_to_the_edit_page_of_a_cash_row(client):
     html = client.get(f"/transactions/{txn_id}/detail").text
     assert f"/manual/{txn_id}/edit" in html
     assert "Cash payment" in html
+
+
+# ---------------------------------------------------------------------------
+# 7.2 The list of the flagged transactions holds no merged row
+# ---------------------------------------------------------------------------
+
+
+def test_the_flagged_list_hides_a_merged_row(client, db):
+    """Task 7.2: the merge wrote that flag, and not the user.
+
+    The user undoes a merge from the merge report, and not from this list. The
+    purge is built around this list, and it must not delete a merged row.
+    """
+    _seed_imported(
+        db,
+        txn_id="merged-away",
+        description="The merged description form",
+        deleted_at=datetime(2026, 10, 28, 9, 0, 0),
+        merged_into="the-survivor",
+    )
+    _create_manual(client, description="The flagged cash payment")
+    flagged_id = _only_manual(db).id
+    client.post(f"/manual/{flagged_id}/flag", follow_redirects=False)
+
+    resp = client.get("/manual/flagged")
+
+    assert resp.status_code == 200
+    assert "The flagged cash payment" in resp.text
+    assert "The merged description form" not in resp.text

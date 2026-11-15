@@ -11,45 +11,57 @@
       <strong>Note:</strong> Budget actuals exclude transfers. Transfer transactions are not counted toward budget spend.
     </p>
   </div>
-  <form method="post" action="/budgets/create-top-level">
-    <input type="hidden" name="period" value="{{ period }}">
-    <button type="submit" class="btn btn-outline-primary btn-sm">
-      <i class="bi bi-magic"></i> Create budgets for top-level categories
-    </button>
-    <div class="form-text">
-      {% if period == 'year' %}
-      One yearly budget per top-level category, proposing 12× the {{ average_months }}-month
-      average as the amount. Categories that already have a yearly budget are left alone.
-      {% else %}
-      One {{ period }} budget per top-level category, proposing the {{ average_months }}-month
-      average as the amount. Categories that already have a {{ period }} budget are left alone.
-      {% endif %}
-    </div>
-  </form>
 </div>
 
 {% if error %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endif %}
 
 <ul class="nav nav-tabs mb-3">
   <li class="nav-item">
-    <a class="nav-link {% if period == 'month' %}active{% endif %}"
-       href="/budgets?period=month&ref={{ ref.isoformat() }}">Monthly</a>
+    <a class="nav-link {% if period == 'month' %}active{% endif %}" href="{{ month_tab_url }}">Monthly</a>
   </li>
   <li class="nav-item">
-    <a class="nav-link {% if period == 'year' %}active{% endif %}"
-       href="/budgets?period=year&ref={{ ref.isoformat() }}">Yearly</a>
+    <a class="nav-link {% if period == 'year' %}active{% endif %}" href="{{ year_tab_url }}">Yearly</a>
   </li>
 </ul>
 
 <div class="card card-body mb-3">
-  <form class="row g-3 align-items-end" method="get" action="/budgets">
-    <input type="hidden" name="period" value="{{ period }}">
-    <div class="col-auto">
-      <label class="form-label" for="budgets-ref">Reference date</label>
-      <input type="date" class="form-control form-control-sm" id="budgets-ref" name="ref" value="{{ ref.isoformat() }}" onchange="this.form.submit()">
+  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
+    <form class="row g-3 align-items-end" method="get" action="/budgets" id="budgets-selection">
+      <input type="hidden" name="period" value="{{ period }}">
+      {% if request.query_params.get('sort') %}
+      <input type="hidden" name="sort" value="{{ request.query_params.get('sort') }}">
+      {% endif %}
+      <div class="col-auto">
+        {% if period == 'year' %}
+        <label class="form-label" for="budgets-year">Year</label>
+        <select class="form-select form-select-sm" id="budgets-year" name="year" onchange="this.form.submit()">
+          {% for y in year_options %}
+          <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+        {% else %}
+        <label class="form-label" for="budgets-month">Month</label>
+        <input type="month" class="form-control form-control-sm" id="budgets-month" name="month"
+               value="{{ selected_month }}" onchange="this.form.submit()">
+        {% endif %}
+      </div>
+      <noscript><div class="col-auto"><button type="submit" class="btn btn-primary btn-sm">Apply</button></div></noscript>
+    </form>
+    <div class="text-end">
+      <a href="{{ seed_url }}" class="btn btn-outline-primary btn-sm" id="budgets-seed-link">
+        <i class="bi bi-magic"></i> Create budgets
+      </a>
+      <div class="form-text">
+        {% if period == 'year' %}
+        Proposes a yearly budget for each top-level category: 12 times the {{ average_months }}-month average.
+        You select the start year and the categories to create or to override.
+        {% else %}
+        Proposes a monthly budget for each top-level category: the {{ average_months }}-month average.
+        You select the start month and the categories to create or to override.
+        {% endif %}
+      </div>
     </div>
-    <noscript><div class="col-auto"><button type="submit" class="btn btn-primary btn-sm">Apply</button></div></noscript>
-  </form>
+  </div>
 </div>
 
 {% include "_budgets_table.html" %}
@@ -79,11 +91,12 @@
       </div>
       <div class="col-md-2">
         <label class="form-label" for="add-start-date">Valid from</label>
-        <input type="date" class="form-control" id="add-start-date" name="start_date" value="{{ current_month_start.isoformat() }}">
+        <input type="date" class="form-control" id="add-start-date" name="start_date" value="{{ current_period_start.isoformat() }}">
       </div>
       <div class="col-md-2">
         <label class="form-label" for="add-end-date">Valid to</label>
-        <input type="date" class="form-control" id="add-end-date" name="end_date" value="{{ current_month_end.isoformat() }}">
+        <input type="date" class="form-control" id="add-end-date" name="end_date" value="">
+        <div class="form-text">Leave empty: the budget repeats each {{ period }}.</div>
       </div>
       <div class="col-md-3">
         <label class="form-label" for="add-notes">Notes</label>

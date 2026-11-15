@@ -73,6 +73,7 @@ async def api_upload(
         filename=summary.source_file,
         new=summary.new,
         duplicates=summary.duplicates,
+        corrected=summary.corrected,
     )
 
     # htmx requests get the inline partial; plain API clients get JSON.

@@ -75,12 +75,19 @@ def test_flow_b_create_rule_from_uncategorized(live_app, page):
     # Create a rule from this transaction.
     page.click("#txn-row-e2e-ah a.create-rule")
     page.wait_for_selector("form.rule-form")
-    page.fill("input[name=match_value]", "albert heijn")
+    # The transaction holds no structured field, so the editor selects the
+    # description row of the field list. The preview runs at once.
+    desc_row = page.locator(".field-row", has=page.locator("input[data-field=description]"))
+    assert desc_row.locator("input[type=checkbox]").is_checked()
+    page.wait_for_selector("#preview-panel .rule-preview")
+    desc_row.locator("input[type=text]").fill("albert heijn")
+    assert page.is_checked("#use_account")
     page.fill("input[name=category]", "groceries")
 
     # Preview the draft — nothing saved yet.
     page.click("#preview-btn")
-    page.wait_for_selector("#preview-panel .rule-preview")
+    page.wait_for_function(
+        "document.querySelector('#preview-panel').innerText.includes('Matched: 1')")
     assert "Matched: 1" in page.locator("#preview-panel").inner_text()
     page.screenshot(path=str(SCREENSHOT_DIR / "flow-b-preview.png"), full_page=True)
 
@@ -171,6 +178,18 @@ def test_flow_d_edit_rule_preview_diff_save_history(live_app, page):
     preview = page.locator("#preview-panel").inner_text()
     assert "Would change: 2" in preview
     page.screenshot(path=str(SCREENSHOT_DIR / "flow-d-preview-diff.png"), full_page=True)
+
+    # Use a matched transaction as the sample: the field list appears with the
+    # saved match selected, the category edit stays, and the preview runs again.
+    assert page.locator(".field-row").count() == 0
+    page.locator("#preview-panel .use-sample").first.click()
+    page.wait_for_selector(".field-row")
+    desc_row = page.locator(".field-row", has=page.locator("input[data-field=description]"))
+    assert desc_row.locator("input[type=checkbox]").is_checked()
+    assert desc_row.locator("input[type=text]").input_value() == "spotify"
+    assert page.input_value("input[name=category]") == "entertainment"
+    page.wait_for_selector("#preview-panel .rule-preview")
+    assert "Would change: 2" in page.locator("#preview-panel").inner_text()
 
     # Save → redirect to the rules list.
     page.click("form.rule-form button[type=submit]")

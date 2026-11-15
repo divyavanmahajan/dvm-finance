@@ -3,6 +3,47 @@
 import re
 from typing import Any
 
+# The display name of each SEPA type that the bank writes in Dutch. The tagged
+# form and the labelled form share this table, so one payment type needs one
+# edit.
+_SEPA_TYPE_DISPLAY = {
+    "OVERBOEKING": "SEPA Transfer",
+    "IDEAL": "SEPA iDEAL",
+    "INCASSO": "SEPA Direct Debit",
+}
+
+
+def sepa_type_fields(text: str) -> dict[str, Any]:
+    """Return the normalized SEPA type fields for a Dutch SEPA text.
+
+    The text is the whole labelled description, or the value of the ``/TRTP/``
+    tag. Both forms start with the word ``SEPA``. The function returns
+    ``sepa_type`` always, and ``transaction_type`` for a type that the table
+    knows. For a direct debit it also returns ``direct_debit_type`` and
+    ``recurring`` when the text names them.
+
+    The function returns an empty dictionary when the text names no SEPA type.
+    """
+    match = re.match(r"SEPA\s+(\w+)", text, re.IGNORECASE)
+    if not match:
+        return {}
+
+    sepa_type = match.group(1).upper()
+    fields: dict[str, Any] = {"sepa_type": sepa_type}
+
+    display = _SEPA_TYPE_DISPLAY.get(sepa_type)
+    if display:
+        fields["transaction_type"] = display
+
+    if sepa_type == "INCASSO":
+        upper = text.upper()
+        if "ALGEMEEN" in upper:
+            fields["direct_debit_type"] = "General"
+        if "DOORLOPEND" in upper:
+            fields["recurring"] = True
+
+    return fields
+
 
 def parse_mt940_description(description: str) -> dict[str, Any] | None:
     """Parse MT940 description into structured JSON format.
@@ -38,7 +79,14 @@ def parse_mt940_description(description: str) -> dict[str, Any] | None:
 
         # Handle special cases
         if field == "TRTP":
-            result["transaction_type"] = value
+            # A SEPA value takes the normalized fields of the shared table, so
+            # that the tagged form and the labelled form agree. Another value
+            # keeps its own text.
+            sepa_fields = sepa_type_fields(value)
+            if sepa_fields:
+                result.update(sepa_fields)
+            else:
+                result["transaction_type"] = value
         elif field == "IBAN":
             result["iban"] = value
         elif field == "BIC":
@@ -51,6 +99,10 @@ def parse_mt940_description(description: str) -> dict[str, Any] | None:
             result["end_to_end_reference"] = value
         elif field == "MREF":
             result["mandate_reference"] = value
+        elif field == "MARF":
+            result["mandate_reference"] = value
+        elif field == "CSID":
+            result["creditor_identifier"] = value
         elif field == "PREF":
             result["payment_reference"] = value
         elif field == "CRED":
@@ -68,7 +120,9 @@ def parse_mt940_description(description: str) -> dict[str, Any] | None:
             result["other_fields"][field] = value
 
     if result:
-        result["format"] = "mt940"
+        # A SEPA payment reports the format "sepa" in both description forms.
+        # Another tagged type keeps the format "mt940".
+        result["format"] = "sepa" if result.get("sepa_type") else "mt940"
 
         # Check if this is a Tikkie transaction and parse Tikkie-specific fields
         parse_tikkie_fields(result)
@@ -105,7 +159,7 @@ def parse_tikkie_fields(result: dict[str, Any]) -> None:
 
     # Parse Tikkie SEPA OVERBOEKING format
     # REMI format: "TIKKIE ID 434142529147, PICS, VAN Q VAN EXAMPLEDAM, NL83ABNA5175097314"
-    if transaction_type == "SEPA OVERBOEKING" and "TIKKIE ID" in remi.upper():
+    if result.get("sepa_type") == "OVERBOEKING" and "TIKKIE ID" in remi.upper():
         # Extract Tikkie ID
         tikkie_id_match = re.search(r"TIKKIE ID\s+(\d+)", remi, re.IGNORECASE)
         if tikkie_id_match:
@@ -210,8 +264,8 @@ def parse_tikkie_fields(result: dict[str, Any]) -> None:
 
         # Extract timestamp from KENMERK field if present
         # Format: "15-07-2025 18:46 003151 6243165508"
-        if result.get("reference"):
-            kenmerk = result["reference"]
+        if result.get("end_to_end_reference"):
+            kenmerk = result["end_to_end_reference"]
             timestamp_match = re.search(
                 r"(\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2})", kenmerk
             )
@@ -400,23 +454,8 @@ def parse_sepa_description(description: str) -> dict[str, Any] | None:
 
     result = {}
 
-    # Extract SEPA transaction type
-    sepa_type_match = re.match(r"SEPA\s+(\w+)", description, re.IGNORECASE)
-    if sepa_type_match:
-        sepa_type = sepa_type_match.group(1).upper()
-        result["sepa_type"] = sepa_type
-
-        if sepa_type == "OVERBOEKING":
-            result["transaction_type"] = "SEPA Transfer"
-        elif sepa_type == "IDEAL":
-            result["transaction_type"] = "SEPA iDEAL"
-        elif sepa_type == "INCASSO":
-            result["transaction_type"] = "SEPA Direct Debit"
-            # Check for additional modifiers
-            if "ALGEMEEN" in description.upper():
-                result["direct_debit_type"] = "General"
-            if "DOORLOPEND" in description.upper():
-                result["recurring"] = True
+    # Extract SEPA transaction type from the shared table
+    result.update(sepa_type_fields(description))
 
     # Extract IBAN (format: IBAN: followed by alphanumeric, typically 15-34 chars)
     iban_match = re.search(
@@ -452,7 +491,7 @@ def parse_sepa_description(description: str) -> dict[str, Any] | None:
         re.IGNORECASE,
     )
     if omschrijving_match:
-        result["description"] = omschrijving_match.group(1).strip()
+        result["remittance_info"] = omschrijving_match.group(1).strip()
 
     # Extract BETALINGSKENM. (payment reference) - everything after "BETALINGSKENM.:" until next field or end
     betalingskenm_match = re.search(
@@ -482,7 +521,7 @@ def parse_sepa_description(description: str) -> dict[str, Any] | None:
         re.IGNORECASE,
     )
     if kenmerk_match:
-        result["reference"] = kenmerk_match.group(1).strip()
+        result["end_to_end_reference"] = kenmerk_match.group(1).strip()
 
     # Check if this is a Tikkie transaction and parse Tikkie-specific fields
     # For SEPA IDEAL with "VIA TIKKIE" in NAAM field
@@ -503,8 +542,8 @@ def parse_sepa_description(description: str) -> dict[str, Any] | None:
             # Format: "327826342655 00315 88265879905 YEAH NL58INGB1220774 608"
             # Or: "447531226743 00314 79465503525 MASKS NL31ABNA387071 8505"
             # Pattern: Tikkie ID (12 digits), payment ref (variable digits), description, IBAN (may have spaces), optional number
-            if result.get("description"):
-                omschrijving = result["description"]
+            if result.get("remittance_info"):
+                omschrijving = result["remittance_info"]
 
                 # Extract Tikkie ID (first 12-digit number)
                 tikkie_id_match = re.search(r"^(\d{12})", omschrijving)
@@ -567,8 +606,8 @@ def parse_sepa_description(description: str) -> dict[str, Any] | None:
 
             # Extract timestamp from KENMERK field if present
             # Format: "15-07-2025 18:46 003151 6243165508"
-            if result.get("reference"):
-                kenmerk = result["reference"]
+            if result.get("end_to_end_reference"):
+                kenmerk = result["end_to_end_reference"]
                 timestamp_match = re.search(
                     r"(\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2})", kenmerk
                 )

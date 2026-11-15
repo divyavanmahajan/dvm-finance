@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Create budgets — Your Finance{% endblock %}
+{% block content %}
+<div class="mb-3">
+  <h1 class="h3 mb-2">Create {{ 'yearly' if period == 'year' else 'monthly' }} budgets</h1>
+  <p class="text-muted small mb-0">
+    The proposed amount is the average monthly spend of the last {{ average_months }} complete months{% if period == 'year' %}, times 12{% endif %}.
+    Each budget starts at the selected {{ period }} and repeats until you end it.
+    The system changes nothing until you select <strong>Create budgets</strong>.
+  </p>
+</div>
+
+<div class="card card-body mb-3">
+  <form class="row g-3 align-items-end" method="get" action="/budgets/seed">
+    <input type="hidden" name="period" value="{{ period }}">
+    <div class="col-auto">
+      {% if period == 'year' %}
+      <label class="form-label" for="seed-start">Start year</label>
+      <select class="form-select form-select-sm" id="seed-start" name="start" onchange="this.form.submit()">
+        {% for y in year_options %}
+        <option value="{{ y }}" {% if y == start.year %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+      {% else %}
+      <label class="form-label" for="seed-start">Start month</label>
+      <input type="month" class="form-control form-control-sm" id="seed-start" name="start"
+             value="{{ start_value }}" onchange="this.form.submit()">
+      {% endif %}
+    </div>
+    <noscript><div class="col-auto"><button type="submit" class="btn btn-primary btn-sm">Apply</button></div></noscript>
+  </form>
+</div>
+
+<form method="post" action="/budgets/seed">
+  <input type="hidden" name="period" value="{{ period }}">
+  <input type="hidden" name="start" value="{{ start_value }}">
+  {% if rows %}
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0" id="seed-table">
+        <thead class="table-light">
+          <tr>
+            <th scope="col"><span class="visually-hidden">Select</span></th>
+            <th scope="col">Category</th>
+            <th scope="col" class="text-end">Proposed amount €</th>
+            <th scope="col">Budget valid on {{ start.isoformat() }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr data-category="{{ row.category }}">
+            <td>
+              <input class="form-check-input" type="checkbox" name="selected" value="{{ row.category }}"
+                     id="seed-{{ loop.index }}" {% if row.selected %}checked{% endif %}
+                     aria-label="Create or override the budget for {{ row.category }}">
+            </td>
+            <td><label for="seed-{{ loop.index }}">{{ row.category }}</label></td>
+            <td class="text-end">
+              <input type="hidden" name="row_category" value="{{ row.category }}">
+              <input type="number" class="form-control form-control-sm text-end ms-auto" style="max-width: 9rem;"
+                     name="row_amount" step="0.01" min="0" value="{{ '%.2f' | format(row.amount) }}"
+                     aria-label="Amount for {{ row.category }}">
+            </td>
+            <td>
+              {% if row.current %}
+              {{ '%.2f' | format(row.current.amount) }}
+              <span class="text-muted small">
+                ({{ row.current.start_date.isoformat() if row.current.start_date else 'no start' }}
+                to {{ row.current.end_date.isoformat() if row.current.end_date else 'no end' }})
+              </span>
+              <div class="form-text">Select the row to override it from {{ start.isoformat() }}.</div>
+              {% else %}
+              <span class="text-muted">None</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="alert alert-info">No top-level category has recent spend.</div>
+  {% endif %}
+  <div class="d-flex gap-2 mt-3">
+    <button type="submit" class="btn btn-primary" {% if not rows %}disabled{% endif %}>
+      <i class="bi bi-check-lg"></i> Create budgets
+    </button>
+    <a href="{{ back_url }}" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+{% endblock %}

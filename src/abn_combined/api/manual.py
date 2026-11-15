@@ -317,10 +317,16 @@ def manual_restore(
 
 
 def _flagged_rows(db: Session) -> list[Transaction]:
-    """Return each flagged transaction. The purge deletes exactly these rows."""
+    """Return each row that the user flagged. The purge deletes exactly these.
+
+    The list holds no merged row. A merged row also holds ``deleted_at``, but
+    the merge wrote that flag and not the user. Such a row holds a value in
+    ``merged_into``, and the user undoes a merge from the merge report.
+    """
     return (
         db.query(Transaction)
         .filter(Transaction.deleted_at.isnot(None))
+        .filter(Transaction.merged_into.is_(None))
         .order_by(Transaction.transactiondate.desc())
         .all()
     )

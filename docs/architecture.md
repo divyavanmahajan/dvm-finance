@@ -52,8 +52,94 @@ Dropped: users/auth tables, LLM/vector artifacts.
   UUID, because a content-derived id cannot survive an edit. See
   [Hand-entered transactions](#hand-entered-transactions-cash-is_manual-deleted_at).
 - Rule matching normalization: lowercase, strip spaces, drop `WERO/` prefix (ported `normalize_string_for_matching`).
+- SEPA structured keys are canonical across the two description forms. See
+  [The two SEPA description forms](#the-two-sepa-description-forms).
 - All schema changes via Alembic.
 - Snapshot merge: insert-or-overwrite (incoming wins), never deletes local rows; whole import is one transaction with a pre-import DB backup.
+
+## The two SEPA description forms
+
+The bank writes one SEPA payment in either of two forms. The tagged form uses
+slash tags. The labelled form uses Dutch labels. `parsers/description.py` parses
+both, and both give the same structured keys.
+
+| Meaning | Tagged tag | Dutch label | Structured key |
+| --- | --- | --- | --- |
+| The transaction type | `/TRTP/` | the first words | `transaction_type`, `sepa_type` |
+| The creditor identifier | `/CSID/` | `INCASSANT:` | `creditor_identifier` |
+| The mandate reference | `/MARF/`, `/MREF/` | `MACHTIGING:` | `mandate_reference` |
+| The remittance text | `/REMI/` | `OMSCHRIJVING:` | `remittance_info` |
+| The end-to-end reference | `/EREF/` | `KENMERK:` | `end_to_end_reference` |
+| The counterparty IBAN | `/IBAN/` | `IBAN:` | `iban` |
+| The counterparty name | `/NAME/` | `NAAM:` | `name` |
+
+`sepa_type_fields` holds the one table that maps the Dutch type text to
+`transaction_type`, `sepa_type`, `direct_debit_type`, and `recurring`. Both
+parsers call it, so a new payment type needs one edit. A SEPA payment reports
+the format `sepa` in both forms. Another tagged type keeps the format `mt940`.
+
+Caution: do not select a branch on the display text of `transaction_type`.
+Select on `sepa_type`. The Tikkie extraction compared `SEPA OVERBOEKING` before
+the normalization, and the normalization broke it with no failure.
+
+The two forms do not hold the same raw text. The labelled form can hold a
+line-break space inside the remittance text. One payment therefore reads
+`LEBARA NL-039442543-277` in one form and `LEBARA NL-03944254 3-277` in the
+other. For this reason the duplicate check uses `end_to_end_reference`, and not
+a hash of the description.
+
+### The second match key: the counterparty
+
+A transfer between two accounts of the user carries no reference. The bank
+writes `NOTPROVIDED`, so the reference cannot join its two description forms.
+`core/dedup.py:counterparty_key` covers such a row. The key is the account, the
+transaction date, the amount, the normalized counterparty IBAN, and the
+normalized remittance text.
+
+A row with a usable reference does not take this key, so no row belongs to two
+groups.
+
+Caution: keep the remittance text in the key. Two payments of one day can share
+an account, an amount, and a counterparty. A real database holds three payments
+of -149,00 euro of one day to one PayPal IBAN, and only their remittance texts
+differ.
+
+Caution: do not join two rows of one statement file by this key. The two
+description forms of one payment always come from two downloads, because the
+bank changed the form between them. Two rows of one file are two payments. The
+merge refuses such a group and names the reason.
+
+The key allows an empty remittance text, because an internal transfer often
+carries none: 189 of the 214 groups of a real database are of that shape. The
+rule of the statement file carries the safety instead.
+
+### The match key of the reference
+
+The key is the account, the reference, and the amount.
+
+Caution: do not drop the amount from the key. A reversal carries the reference
+of the payment that it reverses, with the opposite sign. `mt940_sample.STA`
+holds three such pairs, for example a direct debit of -149,88 with its
+`SEPA INCASSO TERUGBOEKING` of +149,88. The amount keeps them apart. The two
+description forms of one payment always report the same amount, because they
+describe one statement line.
+
+Caution: do not shorten the list of the values that the check ignores. They are
+the empty value, `NONREF`, and `NOTPROVIDED`. `mt940_sample.STA` holds
+`NOTPROVIDED` 136 times, and `NOTP ROVIDED` three times, because the
+description wraps at a fixed width. `tests/test_dedup.py` holds a test that the
+reference check adds no duplicate on that whole file.
+
+Each comparison of a reference uses `normalize_reference`: it removes each
+whitespace character, each period, and each hyphen, and then changes the text to
+upper case. The column keeps the original text, for the report and the page.
+
+Caution: do not compare a reference without the normalization. The wrap of the
+description can fall inside the reference, and the two description forms can
+print one reference with different separators. One payment reads
+`8022764496926345` in one form and `8022.7644 .9692.6345` in the other. On a
+real database of 7202 rows the normalization raises the count of the found
+duplicate pairs from 21 to 46.
 
 ## Rules categorization (two-pass, v1.1.0+)
 
@@ -235,6 +321,41 @@ database path from `request.app.state.settings.db_path`.
 
 A rollback of the Alembic migration drops the two columns. A rollback after a
 purge cannot return the purged rows; only the backup of the purge holds them.
+
+## The merge of the duplicate rows
+
+`core/merge.py` folds each group of live rows of one account that share an
+end-to-end reference. `api/merge.py` holds the preview route, the merge route,
+and the undo route.
+
+The survivor is the lowest id in the lexicographic order. The choice must not
+depend on the import order, the source file, or the parser version: two machines
+that pick different survivors would each flag the other's row, and a snapshot
+merge would then lose the payment.
+
+The merge writes `deleted_at` and `merged_into` on each folded row. It deletes
+no row.
+
+### The two kinds of flag
+
+| | `deleted_at` | `merged_into` | In `/manual/flagged` | The purge deletes it |
+| --- | --- | --- | --- | --- |
+| The user flagged a hand-entered row | set | NULL | yes | yes |
+| The merge folded an imported row | set | the survivor id | no | no |
+
+Caution: do not filter on `deleted_at` alone where the purge or the flagged list
+reads. `purge_flagged_transactions` and `api/manual.py:_flagged_rows` each add
+`merged_into IS NULL`. A purge of a merged row would free its id, and the next
+import would write the duplicate again.
+
+`live_only` filters on `deleted_at` alone, and that is correct: both kinds of
+flag must stay out of each list and each total.
+
+### The report
+
+`merge_reports` holds each merged group and each refused group. The carried
+manual categorization is not recoverable from the transaction table, so the
+report keeps it. The undo reads `merged_into`.
 
 ## Category hierarchy convention
 

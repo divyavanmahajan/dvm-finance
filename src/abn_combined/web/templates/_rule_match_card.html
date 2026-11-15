@@ -1,0 +1,228 @@
+{# Match card of the rule editor. POST /rules/sample swaps it for a new sample. #}
+<div class="col-lg-7" id="match-card" x-data='ruleMatch({{ match_state | tojson }})'
+     {% if auto_preview %}data-auto-preview{% endif %}>
+  <div class="card shadow-sm h-100">
+    <div class="card-header d-flex align-items-center gap-2">
+      <i class="bi bi-crosshair"></i>
+      <span class="fw-semibold">Match</span>
+      <small class="text-muted">which transactions this rule targets</small>
+    </div>
+    <div class="card-body">
+      <datalist id="field-suggestions">
+        {% for f in field_suggestions %}<option value="{{ f }}"></option>{% endfor %}
+      </datalist>
+
+      {% if vm.field_rows %}
+      <input type="hidden" name="sample_transaction_id" value="{{ vm.sample_transaction_id }}">
+      <h6 class="text-muted small text-uppercase mb-1">Fields of the sample transaction</h6>
+      <div class="form-text small mb-2">
+        Select each field that the rule must match. The first selected field is the main match.
+        Each other selected field must also match.
+      </div>
+
+      <template x-for="(row, idx) in rows" :key="row.field">
+        <div class="row g-2 align-items-center mb-2 field-row" :class="{ 'field-row-off': !row.selected }">
+          <div class="col-auto">
+            <input class="form-check-input" type="checkbox" x-model="row.selected"
+                   :id="'field-row-' + idx" :data-field="row.field"
+                   :aria-label="'Match on ' + row.field">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label mb-0 small" :for="'field-row-' + idx">
+              <code x-text="row.field"></code>
+            </label>
+            <span class="badge text-bg-light" x-show="!row.in_sample"
+                  title="The sample transaction does not hold this field">not in sample</span>
+          </div>
+          <div class="col-auto">
+            <select class="form-select form-select-sm" x-model="row.pattern"
+                    :aria-label="'Pattern for ' + row.field">
+              {% for p in patterns %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col">
+            <input type="text" class="form-control form-control-sm" x-model="row.value"
+                   :aria-label="'Value for ' + row.field">
+          </div>
+        </div>
+      </template>
+      <p class="text-danger small mb-0" x-show="!primary">Select at least one field.</p>
+
+      {# The selected rows post the same fields as the editor without a sample.
+         The server derives the rule type from field_target. #}
+      <input type="hidden" name="rule_type" value="keyword">
+      <input type="hidden" name="field_target" :value="primary ? primary.field : ''">
+      <input type="hidden" name="match_pattern" :value="primary ? primary.pattern : 'contains'">
+      <input type="hidden" name="match_value" :value="primary ? primary.value : ''">
+      <template x-for="(row, idx) in andRows" :key="row.field">
+        <div>
+          <input type="hidden" name="cond_field_target" :value="row.field">
+          <input type="hidden" name="cond_match_pattern" :value="row.pattern">
+          <input type="hidden" name="cond_match_value" :value="row.value">
+          <input type="hidden" name="cond_operator" value="AND">
+          <input type="hidden" name="cond_sort_order" :value="idx">
+        </div>
+      </template>
+      {% else %}
+      <div class="row g-3">
+        <div class="col-md-5">
+          <label class="form-label" for="field">Field</label>
+          <input type="text" id="field" name="field_target" class="form-control"
+                 list="field-suggestions" value="{{ vm.field_target or 'description' }}" required>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label" for="pattern">Pattern</label>
+          <select id="pattern" name="match_pattern" class="form-select" required>
+            {% for p in patterns %}
+            <option value="{{ p }}" {% if vm.match_pattern == p %}selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label for="rule_type" class="form-label">Type</label>
+          <select class="form-select" id="rule_type" name="rule_type" required>
+            {% for rt in rule_types %}
+            <option value="{{ rt }}" {% if vm.rule_type == rt %}selected{% endif %}>
+              {{ rt | replace('_', ' ') | title }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="row g-3 mt-0">
+        <div class="col-12">
+          <label class="form-label" for="value">Match value</label>
+          <input type="text" id="value" name="match_value" class="form-control"
+                 value="{{ vm.match_value }}" placeholder="text or regex pattern" required>
+          <div class="form-text">
+            Text to match, or a regular expression if pattern is "regex".
+            To see the fields of a transaction, select "Use as sample" in the preview.
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <hr class="my-3">
+      <h6 class="text-muted small text-uppercase mb-1">Context filters</h6>
+      <div class="form-text small mb-2">
+        The rule applies only to transactions that match each selected filter.
+      </div>
+      <div class="row g-2 align-items-center mb-2 filter-row">
+        <div class="col-auto">
+          <input class="form-check-input" type="checkbox" id="use_account"
+                 x-model="filters.account.on" aria-label="Filter on the account">
+        </div>
+        <label class="col-md-3 col-form-label col-form-label-sm" for="account">Account</label>
+        <div class="col">
+          <select id="account" name="filter_account" class="form-select form-select-sm"
+                  x-model="filters.account.value" :disabled="!filters.account.on">
+            <option value="">All accounts</option>
+            {% for acc in accounts %}<option value="{{ acc }}">{{ acc }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="row g-2 align-items-center mb-2 filter-row">
+        <div class="col-auto">
+          <input class="form-check-input" type="checkbox" id="use_currency"
+                 x-model="filters.currency.on" aria-label="Filter on the currency">
+        </div>
+        <label class="col-md-3 col-form-label col-form-label-sm" for="currency">Currency</label>
+        <div class="col">
+          <input type="text" id="currency" name="filter_currency" class="form-control form-control-sm"
+                 x-model="filters.currency.value" :disabled="!filters.currency.on"
+                 maxlength="3" placeholder="EUR">
+        </div>
+      </div>
+      <div class="row g-2 align-items-center mb-2 filter-row">
+        <div class="col-auto">
+          <input class="form-check-input" type="checkbox" id="use_date_from"
+                 x-model="filters.date_from.on" aria-label="Filter on the start date">
+        </div>
+        <label class="col-md-3 col-form-label col-form-label-sm" for="date_from">Date from</label>
+        <div class="col">
+          <input type="date" id="date_from" name="filter_date_from" class="form-control form-control-sm"
+                 x-model="filters.date_from.value" :disabled="!filters.date_from.on">
+        </div>
+      </div>
+      <div class="row g-2 align-items-center mb-2 filter-row">
+        <div class="col-auto">
+          <input class="form-check-input" type="checkbox" id="use_date_to"
+                 x-model="filters.date_to.on" aria-label="Filter on the end date">
+        </div>
+        <label class="col-md-3 col-form-label col-form-label-sm" for="date_to">Date to</label>
+        <div class="col">
+          <input type="date" id="date_to" name="filter_date_to" class="form-control form-control-sm"
+                 x-model="filters.date_to.value" :disabled="!filters.date_to.on">
+        </div>
+      </div>
+
+      <hr class="my-3">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <h6 class="text-muted small text-uppercase mb-0">Advanced conditions</h6>
+        <span class="badge text-bg-secondary" x-show="conditions.length" x-text="conditions.length"></span>
+      </div>
+      <div class="form-text small mb-2">
+        Use these for OR logic, or for a field that the sample does not hold.
+        The main match must always match. The rule checks the other conditions from top to bottom:
+        an OR row passes when the conditions above it pass, or when the OR row itself matches.
+      </div>
+      <p class="text-muted small fst-italic" x-show="!conditions.length">
+        No advanced conditions.
+      </p>
+
+      <template x-for="(cond, idx) in conditions" :key="idx">
+        <div class="row g-2 align-items-center mb-2 cond-row">
+          <div class="col-auto" x-show="idx > 0 || andRows.length">
+            <select class="form-select form-select-sm cond-op" name="cond_operator"
+                    x-model="cond.operator" style="width: 5.5rem;">
+              <option value="AND">AND</option>
+              <option value="OR">OR</option>
+            </select>
+          </div>
+          <div class="col-auto text-muted small" x-show="idx === 0 && !andRows.length">
+            AND
+          </div>
+          <div class="col">
+            <input type="text" class="form-control form-control-sm" name="cond_field_target"
+                   x-model="cond.field_target" placeholder="field"
+                   list="field-suggestions">
+          </div>
+          <div class="col-auto">
+            <select class="form-select form-select-sm" name="cond_match_pattern" x-model="cond.match_pattern">
+              {% for p in patterns %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col">
+            <input type="text" class="form-control form-control-sm" name="cond_match_value"
+                   x-model="cond.match_value" placeholder="value">
+          </div>
+          <div class="col-auto">
+            <div class="btn-group btn-group-sm">
+              <button type="button" class="btn btn-outline-secondary"
+                      @click="moveUp(idx)" :disabled="idx === 0"
+                      title="Move up" aria-label="Move up">
+                <i class="bi bi-arrow-up"></i>
+              </button>
+              <button type="button" class="btn btn-outline-secondary"
+                      @click="moveDown(idx)" :disabled="idx === conditions.length - 1"
+                      title="Move down" aria-label="Move down">
+                <i class="bi bi-arrow-down"></i>
+              </button>
+              <button type="button" class="btn btn-outline-danger"
+                      @click="removeCondition(idx)"
+                      title="Delete condition" aria-label="Delete condition">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+          </div>
+          <input type="hidden" name="cond_sort_order" :value="andRows.length + idx">
+        </div>
+      </template>
+
+      <button type="button" class="btn btn-outline-primary btn-sm mt-2" @click="addCondition()">
+        <i class="bi bi-plus-lg"></i> Add condition
+      </button>
+    </div>
+  </div>
+</div>

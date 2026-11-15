@@ -15,7 +15,10 @@ transaction.
 
 A removal is a flag, not a delete. ``flag`` writes ``deleted_at`` and ``restore``
 clears it. The row stays in the table, and it travels in a snapshot with its
-flag. Only :func:`purge_flagged_transactions` deletes a row, and it copies the
+flag. A merged row also holds ``deleted_at``, but the merge wrote that flag and
+not the user. Such a row holds a value in ``merged_into``, and the purge and the
+list of the flagged transactions both exclude it.
+Only :func:`purge_flagged_transactions` deletes a row, and it copies the
 database first.
 """
 
@@ -228,6 +231,11 @@ def purge_flagged_transactions(db: Session, db_path: Path) -> int:
     The function copies the database to a timestamped backup beside it before it
     deletes a row. It uses the same backup helper as the snapshot import. It
     deletes no row that holds no flag.
+
+    Caution: the function deletes no merged row. A merged row holds a value in
+    ``merged_into``, and the merge wrote its flag, not the user. A delete would
+    free the id of that row, and the next import would write the duplicate
+    again.
     """
     db.commit()
     db_file = Path(db_path)
@@ -237,6 +245,7 @@ def purge_flagged_transactions(db: Session, db_path: Path) -> int:
     deleted = (
         db.query(Transaction)
         .filter(Transaction.deleted_at.isnot(None))
+        .filter(Transaction.merged_into.is_(None))
         .delete(synchronize_session="fetch")
     )
     db.commit()

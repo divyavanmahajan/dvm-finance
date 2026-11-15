@@ -210,7 +210,7 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(remaining, 0, "rule_conditions must cascade-delete with their rule")
     }
 
-    // MARK: - Budget round-trip / unique constraint
+    // MARK: - Budget round-trip / several budgets for one pair
 
     func testBudgetRoundTrip() throws {
         var budget = BudgetRecord(
@@ -233,19 +233,23 @@ final class DatabaseTests: XCTestCase {
         XCTAssertNil(fetched?.endDate)
     }
 
-    func testBudgetCategoryPeriodUniqueConstraint() throws {
-        var first = BudgetRecord(category: "groceries", amount: Decimal(string: "100.00")!, period: "monthly")
-        var second = BudgetRecord(category: "groceries", amount: Decimal(string: "200.00")!, period: "monthly")
+    /// Migration v6 (Alembic e4b7d2a91c36): the pair index is no longer
+    /// unique, so one category and period can hold two budgets.
+    func testTwoBudgetsForOnePairStore() throws {
+        var first = BudgetRecord(
+            category: "groceries", amount: Decimal(string: "100.00")!, period: "month",
+            startDate: makeDate(2026, 7, 1), endDate: makeDate(2026, 10, 31))
+        var second = BudgetRecord(
+            category: "groceries", amount: Decimal(string: "150.00")!, period: "month",
+            startDate: makeDate(2026, 11, 1), endDate: nil)
 
-        try appDatabase.dbWriter.write { db in try first.insert(db) }
-
-        XCTAssertThrowsError(try appDatabase.dbWriter.write { db in try second.insert(db) }) { error in
-            guard let dbError = error as? DatabaseError else {
-                XCTFail("expected DatabaseError, got \(error)")
-                return
-            }
-            XCTAssertEqual(dbError.resultCode, .SQLITE_CONSTRAINT)
+        try appDatabase.dbWriter.write { db in
+            try first.insert(db)
+            try second.insert(db)
         }
+
+        let count = try appDatabase.dbWriter.read { db in try BudgetRecord.fetchCount(db) }
+        XCTAssertEqual(count, 2)
     }
 
     func testBudgetSameCategoryDifferentPeriodAllowed() throws {

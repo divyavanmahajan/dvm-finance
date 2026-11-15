@@ -250,22 +250,34 @@ public enum ManualTransactions {
 
     // MARK: - The flagged rows
 
-    /// Each flagged transaction, newest flag first. The user reads this list
-    /// before the purge. It is the one list of the app that shows a flagged
-    /// row.
+    /// The predicate of a row that the user flagged. Port of the two filters
+    /// of `api/manual.py:_flagged_rows`.
+    ///
+    /// A merged row also holds `deleted_at`, but the merge wrote that flag and
+    /// not the user. Such a row holds a value in `merged_into`, and the user
+    /// undoes a merge from the merge report.
+    ///
+    /// Caution: do not filter on `deleted_at` alone here or in the purge. A
+    /// purge of a merged row would free its id, and the next import would
+    /// write the duplicate again.
+    static let userFlaggedSQL = "deleted_at IS NOT NULL AND merged_into IS NULL"
+
+    /// Each row that the user flagged, newest flag first. The user reads this
+    /// list before the purge. It is the one list of the app that shows a
+    /// flagged row. It holds no merged row.
     public static func flaggedTransactions(db: Database) throws -> [TransactionRecord] {
         try TransactionRecord.fetchAll(
             db,
-            sql: "SELECT * FROM transactions WHERE deleted_at IS NOT NULL "
+            sql: "SELECT * FROM transactions WHERE \(userFlaggedSQL) "
                 + "ORDER BY deleted_at DESC, id ASC"
         )
     }
 
-    /// The number of the flagged transactions. The purge control shows it.
+    /// The number of the rows that the user flagged. The purge control shows it.
     public static func flaggedCount(db: Database) throws -> Int {
         try Int.fetchOne(
             db,
-            sql: "SELECT COUNT(*) FROM transactions WHERE deleted_at IS NOT NULL"
+            sql: "SELECT COUNT(*) FROM transactions WHERE \(userFlaggedSQL)"
         ) ?? 0
     }
 
@@ -298,6 +310,11 @@ public enum ManualTransactions {
     /// A purged row can return. A later snapshot of the computer that still
     /// holds the row brings it back with its flag, and it stays out of each
     /// list and each total. This is harmless, and it needs no tombstone.
+    ///
+    /// Caution: the purge deletes no merged row. A merged row holds a value in
+    /// `merged_into`, and the merge wrote its flag, not the user. A delete
+    /// would free the id of that row, and the next import would write the
+    /// duplicate again.
     @discardableResult
     public static func purgeFlagged(
         appDatabase: AppDatabase,
@@ -311,7 +328,9 @@ public enum ManualTransactions {
             )
         }
         let deleted = try appDatabase.dbWriter.write { db -> Int in
-            try db.execute(sql: "DELETE FROM transactions WHERE deleted_at IS NOT NULL")
+            try db.execute(
+                sql: "DELETE FROM transactions WHERE \(userFlaggedSQL)"
+            )
             return db.changesCount
         }
         return PurgeResult(deleted: deleted, backupURL: backupURL)

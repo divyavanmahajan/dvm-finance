@@ -703,4 +703,65 @@ final class SnapshotTests: XCTestCase {
         let siblingNames = try FileManager.default.contentsOfDirectory(atPath: tempDirectory.path)
         XCTAssertTrue(siblingNames.isEmpty, "no database file existed, so nothing should have been backed up")
     }
+
+    // MARK: - Several budgets for one category (core/snapshots.py:_merge_budgets)
+
+    private func budget(_ amount: String, _ start: String?, _ end: String?) throws -> BudgetRecord {
+        BudgetRecord(
+            category: "groceries", amount: Decimal(string: amount)!, period: "month",
+            startDate: try start.map(dateOnly), endDate: try end.map(dateOnly))
+    }
+
+    private func incoming(_ amount: String, _ start: String?, _ end: String?) -> SnapshotBudget {
+        SnapshotBudget(category: "groceries", amount: amount, period: "month",
+                       startDate: start, endDate: end, notes: nil)
+    }
+
+    func testTwoBudgetsForOneCategoryArrive() throws {
+        let appDatabase = try AppDatabase.inMemory()
+        var local = try budget("90.00", "2026-07-01", "2026-10-31")
+        let result = try appDatabase.dbWriter.write { db -> SnapshotImporter.BudgetMergeResult in
+            try local.insert(db)
+            return try SnapshotImporter.mergeBudgets(db: db, incomingBudgets: [
+                incoming("100.00", "2026-07-01", "2026-10-31"),
+                incoming("150.00", "2026-11-01", nil),
+            ])
+        }
+        XCTAssertEqual(result.counter.inserted, 1)
+        XCTAssertEqual(result.counter.updated, 1)
+        let rows = try appDatabase.dbWriter.read { db in
+            try BudgetRecord.order(Column("start_date")).fetchAll(db)
+        }
+        XCTAssertEqual(rows.map(\.amount), [Decimal(string: "100.00")!, Decimal(string: "150.00")!])
+        XCTAssertEqual(rows.last?.endDate, nil)
+    }
+
+    func testIncomingBudgetReplacesAnOverlappingLocalBudget() throws {
+        let appDatabase = try AppDatabase.inMemory()
+        var local = try budget("100.00", "2026-07-01", nil)
+        var other = BudgetRecord(category: "other", amount: Decimal(string: "5.00")!, period: "month",
+                                 startDate: try dateOnly("2026-07-01"), endDate: nil)
+        let result = try appDatabase.dbWriter.write { db -> SnapshotImporter.BudgetMergeResult in
+            try local.insert(db)
+            try other.insert(db)
+            return try SnapshotImporter.mergeBudgets(
+                db: db, incomingBudgets: [incoming("150.00", "2026-08-01", nil)])
+        }
+        let groceries = try appDatabase.dbWriter.read { db in
+            try BudgetRecord.filter(Column("category") == "groceries").fetchAll(db)
+        }
+        XCTAssertEqual(groceries.count, 1)
+        XCTAssertEqual(groceries.first?.startDate, try dateOnly("2026-08-01"))
+        XCTAssertEqual(groceries.first?.amount, Decimal(string: "150.00")!)
+        let otherCount = try appDatabase.dbWriter.read { db in
+            try BudgetRecord.filter(Column("category") == "other").fetchCount(db)
+        }
+        XCTAssertEqual(otherCount, 1)
+        XCTAssertEqual(result.overwrites.count, 1)
+        guard case .object(let entry)? = result.overwrites.first,
+              case .object(let fields)? = entry["fields"] else {
+            return XCTFail("expected an overwrite entry with fields")
+        }
+        XCTAssertNotNil(fields["deleted"])
+    }
 }

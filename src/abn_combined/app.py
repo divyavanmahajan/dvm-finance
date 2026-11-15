@@ -51,7 +51,21 @@ def _css_id(s: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_-]", "_", str(s))
 
 
+def _static_url(path: str) -> str:
+    """Return the URL of a static file with its change time as a version.
+
+    The static files have no Cache-Control header, so a browser can keep an
+    old copy for days. A new version in the URL makes it fetch the new file.
+    """
+    try:
+        version = int((_STATIC_DIR / path).stat().st_mtime)
+    except OSError:
+        return f"/static/{path}"
+    return f"/static/{path}?v={version}"
+
+
 templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
+templates.env.globals["static_url"] = _static_url
 templates.env.globals["nav_tabs"] = NAV_TABS
 templates.env.globals["app_version"] = __version__
 templates.env.filters["css_id"] = _css_id
@@ -65,9 +79,25 @@ def create_app(settings: Settings) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        from .core.restructure import (
+            migrate_rule_field_targets,
+            rewrite_sepa_structured_descriptions,
+        )
+        from .db import get_session_factory
         from .migrations import upgrade_to_head
 
         upgrade_to_head(settings)
+        # One-time pass: the rules read the stored structured description, so a
+        # row from before the canonical SEPA keys needs a reparse. The pass
+        # matches no row after its first run.
+        db = get_session_factory()()
+        try:
+            rewrite_sepa_structured_descriptions(db)
+            # A rule names a structured key by its field target. The rename of a
+            # key must carry each rule with it, or the rule would match nothing.
+            migrate_rule_field_targets(db)
+        finally:
+            db.close()
         logger.info("app_started", data_dir=str(settings.data_dir))
         yield
 
@@ -121,6 +151,7 @@ API_ROUTER_MODULES = [
     "cash_flow",
     "downloads",
     "snapshots",
+    "merge",
     "help",
 ]
 
