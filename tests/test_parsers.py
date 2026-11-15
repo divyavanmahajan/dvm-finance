@@ -12,6 +12,7 @@ from abn_combined.parsers.description import (
     parse_mt940_description,
     parse_pos_description,
     parse_sepa_description,
+    sepa_type_fields,
 )
 from abn_combined.parsers.mt940 import parse_mt940_file
 
@@ -340,8 +341,10 @@ class TestDescriptionParsers(unittest.TestCase):
         result = parse_mt940_description(description)
 
         self.assertIsNotNone(result, "Should parse Tikkie SEPA description")
-        self.assertEqual(result['format'], 'mt940')
-        self.assertEqual(result['transaction_type'], 'SEPA OVERBOEKING')
+        # A tagged SEPA payment reports the format sepa, like the labelled form.
+        self.assertEqual(result['format'], 'sepa')
+        self.assertEqual(result['sepa_type'], 'OVERBOEKING')
+        self.assertEqual(result['transaction_type'], 'SEPA Transfer')
         self.assertTrue(result.get('is_tikkie'))
         self.assertEqual(result['payment_service'], 'Tikkie')
         self.assertEqual(result['tikkie_id'], '434142529147')
@@ -515,7 +518,7 @@ class TestDescriptionParsers(unittest.TestCase):
         self.assertEqual(result['iban'], 'NL86INGB0274974340')
         self.assertEqual(result['bic'], 'INGBNL2A')
         self.assertEqual(result['name'], 'BDOLWGP GRWMDQ ARTIST')
-        self.assertEqual(result['description'], 'JYNQ VAN LCJFOST')
+        self.assertEqual(result['remittance_info'], 'JYNQ VAN LCJFOST')
 
         print("✓ SEPA OVERBOEKING description parser test passed")
 
@@ -533,9 +536,9 @@ class TestDescriptionParsers(unittest.TestCase):
         self.assertEqual(result['bic'], 'INGBNL2A')
         self.assertEqual(result['name'], 'BSGW')
         self.assertEqual(result['payment_reference'], '8313040666451382')
-        self.assertEqual(result['reference'], 'BSGW 2025')
-        # Should not have description field when OMSCHRIJVING is not present
-        self.assertNotIn('description', result)
+        self.assertEqual(result['end_to_end_reference'], 'BSGW 2025')
+        # Should not have the remittance key when OMSCHRIJVING is not present
+        self.assertNotIn('remittance_info', result)
 
         print("✓ SEPA OVERBOEKING with BETALINGSKENM parser test passed")
 
@@ -552,7 +555,7 @@ class TestDescriptionParsers(unittest.TestCase):
         self.assertEqual(result['iban'], 'DE17471785880725371008')
         self.assertEqual(result['bic'], 'SXPYDEHH')
         self.assertIn('AMAZON PAYMENTS', result['name'])
-        self.assertIn('6526BPW', result['description'])
+        self.assertIn('6526BPW', result['remittance_info'])
 
         print("✓ SEPA IDEAL description parser test passed")
 
@@ -614,7 +617,7 @@ class TestDescriptionParsers(unittest.TestCase):
         self.assertEqual(result['name'], 'VRAWD-KFQONIZ FITNESS')
         self.assertEqual(result['mandate_reference'], 'ANYTIME-NL-0267546')
         self.assertEqual(result['iban'], 'NL77RABO8509119907')
-        self.assertEqual(result['reference'], '42215366-68650')
+        self.assertEqual(result['end_to_end_reference'], '42215366-68650')
 
         print("✓ SEPA INCASSO description parser test passed")
 
@@ -762,6 +765,118 @@ class TestDescriptionParsers(unittest.TestCase):
         print("✓ Main parser account balance test passed")
 
 
+class TestCanonicalSepaKeys(unittest.TestCase):
+    """The two SEPA description forms use one set of keys.
+
+    The bank writes one payment either with the slash tags or with the Dutch
+    labels. Both forms must give the same structured keys, so that one rule
+    matches both and the duplicate check joins them.
+    """
+
+    # One LEBARA direct debit, in the two forms. The labelled form holds a
+    # line-break space inside the remittance text, so the two raw texts differ.
+    TAGGED = (
+        "/TRTP/SEPA INCASSO ALGEMEEN DOORLOPEND/CSID/VP20XNL847867841319 "
+        "/NAME/LEBARA/MARF/B0OXIVC5T2O3ZJ58/REMI/LEBARA NL-039442543-277 "
+        "/IBAN/NL65ADYB0257164544/BIC/ADYBNL2A/EREF/KFF5Q4D85TQK39G6"
+    )
+    LABELLED = (
+        "SEPA INCASSO ALGEMEEN DOORLOPEND INCASSANT: VP20XNL847867841319 "
+        "NAAM: LEBARA MACHTIGING: B0OXIVC5T2O3ZJ58 "
+        "OMSCHRIJVING: LEBARA NL-03944254 3-277 IBAN: NL65ADYB0257164544 "
+        "KENMERK: KFF5Q4D85TQK39G6"
+    )
+
+    def test_sepa_type_fields_direct_debit(self):
+        """Task 1.1: the shared table maps the Dutch text of a direct debit."""
+        fields = sepa_type_fields("SEPA INCASSO ALGEMEEN DOORLOPEND")
+        self.assertEqual(fields["transaction_type"], "SEPA Direct Debit")
+        self.assertEqual(fields["sepa_type"], "INCASSO")
+        self.assertEqual(fields["direct_debit_type"], "General")
+        self.assertTrue(fields["recurring"])
+
+    def test_sepa_type_fields_ignores_another_text(self):
+        """The table returns nothing for a text that names no SEPA type."""
+        self.assertEqual(sepa_type_fields("BEA, BETAALPAS JUMBO"), {})
+
+    def test_tagged_form_promotes_csid_and_marf(self):
+        """Task 2.1: the tagged tags become the canonical keys."""
+        result = parse_mt940_description(self.TAGGED)
+        self.assertEqual(result["creditor_identifier"], "VP20XNL847867841319")
+        self.assertEqual(result["mandate_reference"], "B0OXIVC5T2O3ZJ58")
+        self.assertNotIn("other_fields", result)
+
+    def test_tagged_sepa_reports_the_format_sepa(self):
+        """Task 2.2: a SEPA value flips the format."""
+        self.assertEqual(parse_mt940_description(self.TAGGED)["format"], "sepa")
+
+    def test_tagged_other_type_keeps_the_format_mt940(self):
+        """Task 2.2: another tagged type keeps its own format and text."""
+        result = parse_mt940_description(
+            "/TRTP/IDEAL/IBAN/DE17471785880725371008/NAME/AMAZON"
+            "/REMI/order 42/EREF/XYZ1234"
+        )
+        self.assertEqual(result["format"], "mt940")
+        self.assertEqual(result["transaction_type"], "IDEAL")
+        self.assertNotIn("sepa_type", result)
+
+    def test_tagged_tikkie_survives_the_normalization(self):
+        """Task 2.3: the Tikkie branch selects by the SEPA type.
+
+        The branch compared the display text ``SEPA OVERBOEKING`` before this
+        change. The normalization of that text would otherwise drop each Tikkie
+        field without a failure.
+        """
+        result = parse_mt940_description(
+            "/TRTP/SEPA OVERBOEKING/IBAN/NL83ABNA5175097314"
+            "/NAME/Q VAN EXAMPLEDAM"
+            "/REMI/TIKKIE ID 434142529147, PICS, VAN Q VAN EXAMPLEDAM, "
+            "NL83ABNA5175097314/EREF/ABC12345"
+        )
+        self.assertEqual(result["transaction_type"], "SEPA Transfer")
+        self.assertEqual(result["tikkie_id"], "434142529147")
+        self.assertEqual(result["payer_name"], "VAN Q VAN EXAMPLEDAM")
+        self.assertEqual(result["payer_iban"], "NL83ABNA5175097314")
+
+    def test_labelled_form_uses_the_canonical_keys(self):
+        """Task 3.1: the labelled parser drops the two old key names."""
+        result = parse_sepa_description(self.LABELLED)
+        self.assertEqual(result["remittance_info"], "LEBARA NL-03944254 3-277")
+        self.assertEqual(result["end_to_end_reference"], "KFF5Q4D85TQK39G6")
+        self.assertNotIn("description", result)
+        self.assertNotIn("reference", result)
+
+    def test_the_two_forms_agree(self):
+        """Task 2.4: one payment gives the same value for each shared key."""
+        tagged = parse_transaction_description(self.TAGGED)
+        labelled = parse_transaction_description(self.LABELLED)
+
+        for key in (
+            "format",
+            "sepa_type",
+            "transaction_type",
+            "direct_debit_type",
+            "recurring",
+            "creditor_identifier",
+            "mandate_reference",
+            "iban",
+            "name",
+            "end_to_end_reference",
+        ):
+            self.assertEqual(tagged[key], labelled[key], f"the key {key} differs")
+
+    def test_the_raw_remittance_text_still_differs(self):
+        """The reason the duplicate check cannot use the description.
+
+        The labelled form holds a line-break space inside the remittance text.
+        No hash of the description can therefore join the two forms.
+        """
+        tagged = parse_transaction_description(self.TAGGED)
+        labelled = parse_transaction_description(self.LABELLED)
+        self.assertNotEqual(
+            tagged["remittance_info"], labelled["remittance_info"]
+        )
+
+
 if __name__ == '__main__':
     unittest.main()
-

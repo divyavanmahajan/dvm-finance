@@ -12,6 +12,8 @@ from abn_combined.parsers.paypal import (
 )
 
 FIXTURE = Path(__file__).parent / "fixtures" / "paypal_sample.TXT"
+# Made-up report in the English number format (period as the decimal separator).
+PERIOD_FIXTURE = Path(__file__).parent / "fixtures" / "paypal_period_decimal.TXT"
 
 
 class TestPayPalParser(unittest.TestCase):
@@ -21,6 +23,30 @@ class TestPayPalParser(unittest.TestCase):
         self.assertAlmostEqual(float(_parse_european_number("89,71")), 89.71)
         self.assertIsNone(_parse_european_number(""))
         self.assertIsNone(_parse_european_number(None))
+
+    def test_parse_number_finds_the_decimal_separator(self):
+        cases = {
+            "-12,34": -12.34,
+            "-12.34": -12.34,
+            "1.458,32": 1458.32,
+            "1,458.32": 1458.32,
+            "1.458": 1458,
+            "1,458": 1458,
+            "1,5": 1.5,
+            "1.5": 1.5,
+            "1.234.567,89": 1234567.89,
+            "1,234,567.89": 1234567.89,
+            "0,00": 0,
+            "12": 12,
+            '"-12.34"': -12.34,
+        }
+        for raw, expected in cases.items():
+            with self.subTest(raw=raw):
+                self.assertAlmostEqual(float(_parse_european_number(raw)), expected)
+
+    def test_parse_number_rejects_text(self):
+        self.assertIsNone(_parse_european_number("abc"))
+        self.assertIsNone(_parse_european_number("   "))
 
     def test_parse_date(self):
         self.assertEqual(_parse_date("13/08/2025"), date(2025, 8, 13))
@@ -33,6 +59,14 @@ class TestPayPalParser(unittest.TestCase):
         self.assertEqual(_email_to_account("user@example.com"), "pp:user")
         self.assertEqual(_email_to_account(""), "pp:unknown")
         self.assertEqual(_email_to_account("no-at-sign"), "pp:unknown")
+
+    def test_parse_report_with_period_decimals(self):
+        transactions = parse_paypal_file(PERIOD_FIXTURE)
+        amounts = {t["paypal_transaction_id"]: t["amount"] for t in transactions}
+        self.assertAlmostEqual(amounts["TESTDOT0000000001"], -12.34)
+        self.assertAlmostEqual(amounts["TESTDOT0000000003"], -1458.32)
+        for t in transactions:
+            self.assertLess(abs(t["amount"]), 10_000)
 
     def test_parse_paypal_file(self):
         transactions = parse_paypal_file(FIXTURE)

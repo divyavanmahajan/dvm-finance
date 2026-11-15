@@ -191,3 +191,292 @@ final class DedupTests: XCTestCase {
         }
     }
 }
+
+// MARK: - Duplicate detection by the end-to-end reference
+
+/// Port of the reference-dedup group of `tests/test_dedup.py`.
+///
+/// The bank writes one SEPA payment in two description forms. The two forms
+/// hold a different raw text, so the id of the two forms differs. Only the
+/// reference joins them.
+final class DedupReferenceTests: XCTestCase {
+    var appDatabase: AppDatabase!
+
+    static let taggedDescription =
+        "/TRTP/SEPA INCASSO ALGEMEEN DOORLOPEND/CSID/VP20XNL847867841319 "
+        + "/NAME/LEBARA/MARF/B0OXIVC5T2O3ZJ58/REMI/LEBARA NL-039442543-277 "
+        + "/IBAN/NL65ADYB0257164544/BIC/ADYBNL2A/EREF/KFF5Q4D85TQK39G6"
+    static let labelledDescription =
+        "SEPA INCASSO ALGEMEEN DOORLOPEND INCASSANT: VP20XNL847867841319 "
+        + "NAAM: LEBARA MACHTIGING: B0OXIVC5T2O3ZJ58 "
+        + "OMSCHRIJVING: LEBARA NL-03944254 3-277 IBAN: NL65ADYB0257164544 "
+        + "KENMERK: KFF5Q4D85TQK39G6"
+    static let posDescription =
+        "BEA, BETAALPAS                   JUMBO 123375,PAS603 "
+        + "NR:97EX02, 30.05.24/17:07        DDUWAS EN KEE"
+
+    override func setUpWithError() throws {
+        appDatabase = try AppDatabase.inMemory()
+    }
+
+    override func tearDownWithError() throws {
+        appDatabase = nil
+    }
+
+    private func makeDate() -> Date {
+        var components = DateComponents()
+        components.year = 2024
+        components.month = 1
+        components.day = 1
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar.date(from: components)!
+    }
+
+    /// Build a parsed transaction the way a parser hands one to the importer.
+    private func parsed(_ description: String, amount: Double = -5.75) -> ParsedTransaction {
+        ParsedTransaction(
+            accountNumber: "720317081",
+            transactiondate: makeDate(),
+            amount: amount,
+            description: description,
+            descriptionStructured: DescriptionParser.parseTransactionDescription(description),
+            currency: "EUR"
+        )
+    }
+
+    // MARK: The stored column
+
+    func testInsertStoresTheReference() throws {
+        try appDatabase.dbWriter.write { db in
+            try Dedup.insertTransactions(db: db, transactions: [parsed(Self.taggedDescription)])
+        }
+
+        let row = try appDatabase.dbWriter.read { db in
+            try TransactionRecord.fetchOne(db)
+        }
+        XCTAssertEqual(row?.endToEndReference, "KFF5Q4D85TQK39G6")
+    }
+
+    func testInsertLeavesAPOSRowWithoutAReference() throws {
+        try appDatabase.dbWriter.write { db in
+            try Dedup.insertTransactions(db: db, transactions: [parsed(Self.posDescription)])
+        }
+
+        let row = try appDatabase.dbWriter.read { db in
+            try TransactionRecord.fetchOne(db)
+        }
+        XCTAssertNil(row?.endToEndReference)
+    }
+
+    // MARK: The match
+
+    /// The premise of the whole change: the id cannot join the two forms.
+    func testTheTwoFormsHaveDifferentIDs() {
+        let tagged = TransactionID.generateTransactionID(parsed(Self.taggedDescription))
+        let labelled = TransactionID.generateTransactionID(parsed(Self.labelledDescription))
+        XCTAssertNotEqual(tagged, labelled)
+    }
+
+    func testTheLabelledFormMatchesAStoredTaggedRow() throws {
+        try appDatabase.dbWriter.write { db in
+            try Dedup.insertTransactions(db: db, transactions: [parsed(Self.taggedDescription)])
+        }
+
+        let result = try appDatabase.dbWriter.read { db in
+            try Dedup.checkDuplicates(db: db, transactions: [parsed(Self.labelledDescription)])
+        }
+
+        XCTAssertTrue(result.new.isEmpty)
+        XCTAssertEqual(result.duplicates.count, 1)
+    }
+
+    func testTheTwoFormsInOneBatch() throws {
+        let result = try appDatabase.dbWriter.read { db in
+            try Dedup.checkDuplicates(
+                db: db,
+                transactions: [parsed(Self.taggedDescription), parsed(Self.labelledDescription)]
+            )
+        }
+
+        XCTAssertEqual(result.new.count, 1)
+        XCTAssertEqual(result.duplicates.count, 1)
+    }
+
+    /// The key holds the account, so two accounts do not collide.
+    func testTwoAccountsKeepTheSameReference() throws {
+        try appDatabase.dbWriter.write { db in
+            try Dedup.insertTransactions(db: db, transactions: [parsed(Self.taggedDescription)])
+        }
+
+        var other = parsed(Self.labelledDescription)
+        other.accountNumber = "123456789"
+        let result = try appDatabase.dbWriter.read { db in
+            try Dedup.checkDuplicates(db: db, transactions: [other])
+        }
+
+        XCTAssertEqual(result.new.count, 1)
+        XCTAssertTrue(result.duplicates.isEmpty)
+    }
+
+    // MARK: The references that the check ignores
+
+    func testNonrefDoesNotJoinTwoPayments() throws {
+        let first = parsed(
+            "/TRTP/SEPA OVERBOEKING/IBAN/NL65ADYB0257164544/NAME/A/REMI/one/EREF/NONREF"
+        )
+        let second = parsed(
+            "/TRTP/SEPA OVERBOEKING/IBAN/NL65ADYB0257164544/NAME/B/REMI/two/EREF/NONREF",
+            amount: -9.99
+        )
+
+        let result = try appDatabase.dbWriter.read { db in
+            try Dedup.checkDuplicates(db: db, transactions: [first, second])
+        }
+
+        XCTAssertEqual(result.new.count, 2)
+        XCTAssertTrue(result.duplicates.isEmpty)
+    }
+
+    func testTheHelperIgnoresAnEmptyReference() {
+        let blank = ParsedTransaction(
+            accountNumber: "720317081",
+            descriptionStructured: "{\"end_to_end_reference\": \"   \"}"
+        )
+        XCTAssertNil(Dedup.extractEndToEndReference(blank))
+
+        let none = ParsedTransaction(accountNumber: "720317081")
+        XCTAssertNil(Dedup.extractEndToEndReference(none))
+    }
+
+    // MARK: The id does not change
+
+    /// The reference is a match key, and not part of the id. A new id would
+    /// make the next import write a second row, and the manual categorization
+    /// of the first row would lose its transaction.
+    func testTheIDIgnoresTheReference() {
+        let without = ParsedTransaction(
+            accountNumber: "720317081",
+            transactiondate: makeDate(),
+            amount: -5.75,
+            description: Self.taggedDescription
+        )
+        let with = parsed(Self.taggedDescription)
+
+        XCTAssertEqual(
+            TransactionID.generateTransactionID(without),
+            TransactionID.generateTransactionID(with)
+        )
+    }
+
+    // MARK: - The second match key (tests/test_merge_counterparty.py)
+
+    /// Mirrors `_parsed` in `tests/test_merge_counterparty.py`.
+    private func counterpartyTransaction(
+        iban: String = "NL92ABNA8756430569",
+        remittance: String? = nil,
+        reference: String = "NOTPROVIDED",
+        amount: Double = -1000.00,
+        sourceFile: String = "MT940251116145104.STA",
+        when: DateComponents = DateComponents(year: 2025, month: 11, day: 10),
+        description: String? = nil
+    ) throws -> ParsedTransaction {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        var structured: [String: String] = [
+            "format": "sepa", "sepa_type": "OVERBOEKING",
+            "transaction_type": "SEPA Transfer", "iban": iban,
+            "end_to_end_reference": reference,
+        ]
+        if let remittance { structured["remittance_info"] = remittance }
+        let json = String(
+            data: try JSONSerialization.data(withJSONObject: structured, options: [.sortedKeys]),
+            encoding: .utf8
+        )
+        let text = description
+            ?? "SEPA OVERBOEKING \(iban) \(remittance ?? "")".trimmingCharacters(in: .whitespaces)
+        return ParsedTransaction(
+            accountNumber: "915190158",
+            transactiondate: calendar.date(from: when),
+            amount: amount,
+            description: text,
+            descriptionStructured: json,
+            currency: "EUR",
+            sourceFile: sourceFile
+        )
+    }
+
+    private func check(_ batch: [ParsedTransaction])
+        throws -> (new: [ParsedTransaction], duplicates: [ParsedTransaction]) {
+        try appDatabase.dbWriter.read { db in
+            try Dedup.checkDuplicates(db: db, transactions: batch)
+        }
+    }
+
+    /// `test_the_second_form_of_a_transfer_is_a_duplicate`.
+    func testTheSecondFormOfATransferIsADuplicate() throws {
+        let stored = try counterpartyTransaction(sourceFile: "MT940251116145104.STA")
+        _ = try appDatabase.dbWriter.write { db in
+            try Dedup.insertTransactions(db: db, transactions: [stored])
+        }
+
+        let result = try check([counterpartyTransaction(sourceFile: "MT940260105110307.STA")])
+
+        XCTAssertTrue(result.new.isEmpty)
+        XCTAssertEqual(result.duplicates.count, 1)
+    }
+
+    /// `test_three_payments_of_one_day_all_import`.
+    func testThreePaymentsOfOneDayAllImport() throws {
+        let batch = try ["1881164974955/PAYP AL", "3404065959685/PAYP AL",
+                         "7624611028858/PAYP AL"].map {
+            try counterpartyTransaction(
+                iban: "LU89563814393733142M", remittance: $0, amount: -149.00,
+                when: DateComponents(year: 2025, month: 4, day: 29)
+            )
+        }
+
+        let result = try check(batch)
+
+        XCTAssertEqual(result.new.count, 3)
+        XCTAssertTrue(result.duplicates.isEmpty)
+    }
+
+    /// `test_a_row_with_a_reference_uses_the_reference_key_only`.
+    func testARowWithAReferenceUsesTheReferenceKeyOnly() throws {
+        let stored = try counterpartyTransaction(
+            reference: "REALREF12345", sourceFile: "MT940251116145104.STA")
+        XCTAssertNil(Dedup.counterpartyKey(stored))
+        _ = try appDatabase.dbWriter.write { db in
+            try Dedup.insertTransactions(db: db, transactions: [stored])
+        }
+
+        let result = try check([counterpartyTransaction(
+            reference: "REALREF12345", sourceFile: "MT940260105110307.STA")])
+
+        XCTAssertTrue(result.new.isEmpty)
+        XCTAssertEqual(result.duplicates.count, 1)
+    }
+
+    /// `test_two_rows_of_one_file_are_two_payments`.
+    func testTwoRowsOfOneFileAreTwoPayments() throws {
+        let result = try check([
+            counterpartyTransaction(description: "first"),
+            counterpartyTransaction(description: "second"),
+        ])
+
+        XCTAssertEqual(result.new.count, 2)
+        XCTAssertTrue(result.duplicates.isEmpty)
+    }
+
+    /// `test_two_rows_of_two_files_are_one_payment`.
+    func testTwoRowsOfTwoFilesAreOnePayment() throws {
+        let result = try check([
+            counterpartyTransaction(sourceFile: "MT940251116145104.STA", description: "the tagged form"),
+            counterpartyTransaction(sourceFile: "MT940260105110307.STA", description: "the labelled form"),
+        ])
+
+        XCTAssertEqual(result.new.count, 1)
+        XCTAssertEqual(result.duplicates.count, 1)
+    }
+}

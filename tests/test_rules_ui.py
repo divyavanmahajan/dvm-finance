@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import date
 
 import pytest
@@ -476,24 +477,170 @@ def test_rule_id_redirects_to_edit(client, seed):
     assert r.headers["location"].endswith(f"/rules/{r1_id}/edit")
 
 
+def _match_state(html: str) -> dict:
+    """Return the initial state of the ruleMatch Alpine component on the page."""
+    m = re.search(r"ruleMatch\((.*?)\)'", html, re.S)
+    assert m, "the page holds no Match card"
+    return json.loads(m.group(1))
+
+
+def _selected_fields(state: dict) -> list[str]:
+    return [r["field"] for r in state["rows"] if r["selected"]]
+
+
 def test_from_transaction_prefills_structured(client, seed):
     r = client.get("/rules/new?from_transaction=t1")
     assert r.status_code == 200
-    assert "ALBERT HEIJN" in r.text        # match value prefilled
-    assert 'value="NL01"' in r.text        # account filter prefilled
-    assert "structured_field" in r.text
+    state = _match_state(r.text)
+    assert _selected_fields(state) == ["merchant_name"]
+    row = state["rows"][0]
+    assert (row["value"], row["pattern"]) == ("ALBERT HEIJN", "contains")
+    assert state["filters"]["account"] == {"on": True, "value": "NL01"}
+    assert state["filters"]["currency"] == {"on": False, "value": "EUR"}
+    assert 'name="sample_transaction_id" value="t1"' in r.text
 
 
 def test_from_transaction_prefills_iban(client, seed):
     r = client.get("/rules/new?from_transaction=t3")
     assert r.status_code == 200
-    assert "NL91ABNA0417164300" in r.text
-    assert "account_iban" in r.text
+    state = _match_state(r.text)
+    assert _selected_fields(state) == ["iban"]
+    assert state["rows"][0]["value"] == "NL91ABNA0417164300"
+
+
+def test_from_transaction_shows_all_fields(client, seed):
+    state = _match_state(client.get("/rules/new?from_transaction=t3").text)
+    assert [r["field"] for r in state["rows"]] == ["iban", "description"]
 
 
 def test_from_transaction_auto_preview_marker(client, seed):
     r = client.get("/rules/new?from_transaction=t2")
-    assert "load" in r.text  # preview auto-triggers on load
+    assert "data-auto-preview" in r.text  # the Match card fires the first preview
+    assert "rule-auto-preview from:body" in r.text
+
+
+def test_edit_has_no_auto_preview(client, seed):
+    _, (r1_id, _) = seed
+    assert "data-auto-preview" not in client.get(f"/rules/{r1_id}/edit").text
+
+
+def test_edit_shows_no_field_list(client, seed):
+    _, (_, r2_id) = seed
+    r = client.get(f"/rules/{r2_id}/edit")
+    state = _match_state(r.text)
+    assert state["rows"] == []
+    assert 'name="sample_transaction_id"' not in r.text
+    # The saved primary match stays in the classic inputs.
+    assert 'name="match_value" class="form-control"' in r.text
+    assert 'value="rent"' in r.text
+    assert [c["match_value"] for c in state["conditions"]] == ["landlord"]
+    assert state["filters"]["account"] == {"on": False, "value": ""}
+
+
+def test_edit_shows_saved_filters_as_selected_rows(client, seed):
+    factory, (r1_id, _) = seed
+    db = factory()
+    rule = db.get(CategorizationRule, r1_id)
+    rule.filter_currency = "USD"
+    rule.filter_date_from = date(2024, 1, 1)
+    db.commit()
+    db.close()
+    state = _match_state(client.get(f"/rules/{r1_id}/edit").text)
+    assert state["filters"]["currency"] == {"on": True, "value": "USD"}
+    assert state["filters"]["date_from"] == {"on": True, "value": "2024-01-01"}
+    assert state["filters"]["date_to"] == {"on": False, "value": ""}
+
+
+def test_sample_returns_match_card_for_edit_draft(client, seed):
+    factory, (_, r2_id) = seed
+    before = len(_reports(factory))
+    form = {
+        "rule_id": str(r2_id), "rule_type": "keyword", "match_pattern": "exact",
+        "field_target": "description", "match_value": "rent",
+        "category": "housing", "priority": "50", "is_active": "1",
+        "cond_field_target": "description", "cond_match_pattern": "contains",
+        "cond_match_value": "landlord", "cond_operator": "AND", "cond_sort_order": "0",
+        "use_sample_id": "t1",
+    }
+    r = client.post("/rules/sample", data=form)
+    assert r.status_code == 200
+    assert r.headers["HX-Trigger-After-Settle"] == "rule-sample-loaded"
+    assert 'id="match-card"' in r.text
+    assert "Assign" not in r.text  # only the Match card
+    state = _match_state(r.text)
+    desc = next(row for row in state["rows"] if row["field"] == "description")
+    assert desc == {"field": "description", "value": "rent", "pattern": "exact",
+                    "selected": True, "in_sample": True}
+    assert _selected_fields(state) == ["description"]
+    # The second condition on description stays in the advanced builder.
+    assert [c["match_value"] for c in state["conditions"]] == ["landlord"]
+    # A filter that the draft does not use takes the value of the sample.
+    assert state["filters"]["account"] == {"on": False, "value": "NL01"}
+    assert len(_reports(factory)) == before  # writes nothing
+
+
+def test_sample_unknown_transaction_404(client, seed):
+    r = client.post("/rules/sample", data={"use_sample_id": "nope", "match_value": "x"})
+    assert r.status_code == 404
+
+
+def test_save_from_field_rows_form(client, seed):
+    """The form shape that the selected rows post saves the expected rule."""
+    factory, _ = seed
+    form = {
+        "sample_transaction_id": "t1", "rule_type": "keyword",
+        "field_target": "merchant_name", "match_pattern": "exact",
+        "match_value": "ALBERT HEIJN",
+        # One row condition (AND), then one advanced condition (OR).
+        "cond_field_target": ["description", "description"],
+        "cond_match_pattern": ["contains", "contains"],
+        "cond_match_value": ["groceries", "jumbo"],
+        "cond_operator": ["AND", "OR"],
+        "cond_sort_order": ["0", "1"],
+        "filter_account": "NL01", "category": "food:ah", "priority": "5",
+        "is_active": "1",
+    }
+    r = client.post("/rules", data=form, follow_redirects=False)
+    assert r.status_code == 303
+    db = factory()
+    rule = db.query(CategorizationRule).filter_by(category="food:ah").one()
+    assert (rule.field_target, rule.match_pattern, rule.match_value) == (
+        "merchant_name", "exact", "ALBERT HEIJN")
+    assert rule.filter_account == "NL01"
+    assert rule.filter_currency is None
+    assert [(c.field_target, c.match_value, c.operator) for c in rule.conditions] == [
+        ("description", "groceries", "AND"), ("description", "jumbo", "OR")]
+    assert db.get(Transaction, "t1").category == "food:ah"
+    db.close()
+
+
+def test_save_with_no_selected_field_asks_for_one(client, seed):
+    r = client.post("/rules", data={
+        "sample_transaction_id": "t1", "rule_type": "keyword", "field_target": "",
+        "match_pattern": "contains", "match_value": "", "category": "x",
+    })
+    assert r.status_code == 400
+    assert "Select at least one field." in r.text
+    # The re-rendered editor keeps the field list of the sample.
+    assert [row["field"] for row in _match_state(r.text)["rows"]][0] == "merchant_name"
+
+
+def test_preview_with_no_selected_field_asks_for_one(client, seed):
+    r = client.post("/rules/preview", data={
+        "sample_transaction_id": "t1", "rule_type": "keyword", "field_target": "",
+        "match_pattern": "contains", "match_value": "",
+    })
+    assert r.status_code == 200
+    assert "Select at least one field." in r.text
+
+
+def test_preview_rows_offer_use_as_sample(client, seed):
+    r = client.post("/rules/preview", data={
+        "rule_type": "keyword", "field_target": "description",
+        "match_pattern": "contains", "match_value": "albert",
+    })
+    assert "Use as sample" in r.text
+    assert "&#34;use_sample_id&#34;: &#34;t1&#34;" in r.text or '"use_sample_id": "t1"' in r.text
 
 
 def test_from_transaction_unknown_id_404(client, seed):
@@ -568,3 +715,10 @@ def test_recategorize_preserves_manual(client, seed):
     assert t4.manual_category == "food:coffee"
     assert t4.category is None
     db.close()
+
+
+def test_editor_assets_carry_a_version(client, seed):
+    """A new version in the URL stops a browser from using an old rules.js."""
+    r = client.get("/rules/new")
+    assert re.search(r'src="/static/js/rules\.js\?v=\d+"', r.text)
+    assert re.search(r'href="/static/rules\.css\?v=\d+"', r.text)

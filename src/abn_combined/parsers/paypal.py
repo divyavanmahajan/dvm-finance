@@ -15,18 +15,27 @@ from typing import Any
 
 
 def _parse_european_number(value: str) -> Decimal | None:
-    """Parse European number format: comma=decimal, period=thousands.
+    """Parse a PayPal amount. The amount itself shows the decimal separator.
 
-    Examples: -89,71 -> -89.71, 1.458,32 -> 1458.32
+    The last period or comma is the decimal separator when one or two digits
+    follow it. Each other period or comma is a thousands separator. PayPal
+    writes the European form or the English form, by the report settings.
+
+    Examples: -89,71 -> -89.71, 1.458,32 -> 1458.32, -9.99 -> -9.99,
+    1,458.32 -> 1458.32, 1.458 -> 1458
     """
     if not value or not isinstance(value, str):
         return None
     s = value.strip().strip('"')
     if not s:
         return None
+    last = max(s.rfind("."), s.rfind(","))
+    if last != -1 and 1 <= len(s) - last - 1 <= 2:
+        whole, decimals = s[:last], s[last + 1:]
+        s = whole.replace(".", "").replace(",", "") + "." + decimals
+    else:
+        s = s.replace(".", "").replace(",", "")
     try:
-        # Remove thousands separator (period), replace decimal (comma) with period
-        s = s.replace(".", "").replace(",", ".")
         return Decimal(s)
     except Exception:
         return None

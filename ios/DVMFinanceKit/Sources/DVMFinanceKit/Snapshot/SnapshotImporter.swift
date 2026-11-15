@@ -249,10 +249,11 @@ public enum SnapshotImporter {
     }
 
     /// Port of `core/snapshots.py:_merge_budgets`. Identity is
-    /// `(category, period, start_date)`; if no exact match, falls back to
-    /// `(category, period)` alone (the DB-unique pair) — a local row with
-    /// the same `(category, period)` but a different `start_date` still
-    /// collides, and incoming wins on that row.
+    /// `(category, period, start_date)`. One category and period can hold
+    /// several budgets whose validity ranges do not overlap. With no exact
+    /// match, each local budget of the pair whose range overlaps the incoming
+    /// range is deleted (incoming wins), and the overwrites name it under the
+    /// field `deleted`.
     static func mergeBudgets(db: Database, incomingBudgets: [SnapshotBudget]) throws -> BudgetMergeResult {
         var result = BudgetMergeResult()
 
@@ -263,13 +264,42 @@ public enum SnapshotImporter {
             var local = try BudgetRecord
                 .filter(Column("category") == data.category)
                 .filter(Column("period") == data.period)
-                .filter(Column("start_date") == startDate)
+                // BudgetRecord stores the dates as `YYYY-MM-DD` text, so the
+                // queries compare the snapshot strings (a `Date` value would
+                // bind as a date-time and never match).
+                .filter(Column("start_date") == data.startDate)
                 .fetchOne(db)
             if local == nil {
-                local = try BudgetRecord
+                var overlapping = BudgetRecord
                     .filter(Column("category") == data.category)
                     .filter(Column("period") == data.period)
-                    .fetchOne(db)
+                if let end = data.endDate {
+                    overlapping = overlapping.filter(
+                        Column("start_date") == nil || Column("start_date") <= end)
+                }
+                if let start = data.startDate {
+                    overlapping = overlapping.filter(
+                        Column("end_date") == nil || Column("end_date") >= start)
+                }
+                for old in try overlapping.order(Column("start_date")).fetchAll(db) {
+                    let oldSnapshot = SnapshotCodec.makeSnapshotBudget(old)
+                    result.overwrites.append(.object([
+                        "key": .object([
+                            "category": .string(old.category),
+                            "period": .string(old.period),
+                            "start_date": .from(oldSnapshot.startDate),
+                        ]),
+                        "fields": .object(["deleted": .object([
+                            "local": .string(
+                                "\(oldSnapshot.amount) from \(oldSnapshot.startDate ?? "None")"
+                                + " to \(oldSnapshot.endDate ?? "None")"),
+                            "incoming": .string(
+                                "\(data.amount) from \(data.startDate ?? "None")"
+                                + " to \(data.endDate ?? "None")"),
+                        ])]),
+                    ]))
+                    _ = try old.delete(db)
+                }
             }
 
             guard var existing = local else {

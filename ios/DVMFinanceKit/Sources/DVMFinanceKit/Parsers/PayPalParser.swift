@@ -15,7 +15,7 @@ public enum PayPalParser {
         let rawRows = CSVTokenizer.parse(content, delimiter: "\t")
         guard let rawHeaderRow = rawRows.first else { return [] }
 
-        // paypal.py:99-108: `k.strip().strip('"')` for header keys, skipping
+        // paypal.py:108-117: `k.strip().strip('"')` for header keys, skipping
         // any that clean to empty (`if k`); `v.strip().strip('"') if v else
         // ""` for values.
         let headers = rawHeaderRow.map(cleanQuoted)
@@ -31,8 +31,8 @@ public enum PayPalParser {
         }
         if rows.isEmpty { return [] }
 
-        // paypal.py:113-124: group child rows by `Reference Txn ID`.
-        // `parent_txn_ids` (paypal.py:124) is built in Python but never read
+        // paypal.py:122-133: group child rows by `Reference Txn ID`.
+        // `parent_txn_ids` (paypal.py:133) is built in Python but never read
         // again anywhere in the module — dead value, not ported.
         var refToRows: [String: [[String: String]]] = [:]
         var refOrder: [String] = []
@@ -46,7 +46,7 @@ public enum PayPalParser {
             refToRows[refId]!.append(row)
         }
 
-        // paypal.py:126-137: EUR funding row for each non-EUR parent —
+        // paypal.py:135-146: EUR funding row for each non-EUR parent —
         // first Bank-Deposit/User-Initiated-Withdrawal EUR child (in
         // first-seen row order) whose `Net` parses.
         var eurFundingForParent: [String: Double] = [:]
@@ -69,7 +69,7 @@ public enum PayPalParser {
             }
         }
 
-        // paypal.py:141-142. `ttype` is always already fully trimmed by the
+        // paypal.py:150-151. `ttype` is always already fully trimmed by the
         // row-cleaning step above, so the trailing space in Python's literal
         // `"Bank Deposit to PP Account "` (only meaningful against an
         // *un*trimmed value) never matters in practice; compared here in its
@@ -80,7 +80,7 @@ public enum PayPalParser {
         var transactions: [ParsedTransaction] = []
 
         for (offset, row) in rows.enumerated() {
-            let lineNum = offset + 2 // paypal.py:144 — line 1 is the header.
+            let lineNum = offset + 2 // paypal.py:153 — line 1 is the header.
 
             let name = (row["Name"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let ttype = (row["Type"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -163,29 +163,41 @@ public enum PayPalParser {
                 transactions.append(transaction)
             }
 
-            // Rule 3 (paypal.py:236): other rows without a Name — skipped.
+            // Rule 3 (paypal.py:245): other rows without a Name — skipped.
         }
 
         return transactions
     }
 
-    // MARK: - paypal.py:17-32 `_parse_european_number`
+    // MARK: - paypal.py:17-41 `_parse_european_number`
 
-    /// Comma=decimal, period=thousands: `-89,71` -> `-89.71`, `1.458,32` ->
-    /// `1458.32`. Amounts flow through Python's `Decimal(s)`, then `float(...)`
-    /// at the dict-building point — parsing the same normalized decimal
-    /// string directly as a `Double` here reproduces that conversion exactly
-    /// for realistic monetary magnitudes (see `ios/docs/spec.md` "Parsers").
+    /// The amount itself shows the decimal separator: the last period or
+    /// comma is the decimal separator when one or two digits follow it. Each
+    /// other period or comma is a thousands separator. `-89,71` -> `-89.71`,
+    /// `1.458,32` -> `1458.32`, `-9.99` -> `-9.99`, `1,458.32` -> `1458.32`,
+    /// `1.458` -> `1458`. Amounts flow through Python's `Decimal(s)`, then
+    /// `float(...)` at the dict-building point — parsing the same normalized
+    /// decimal string directly as a `Double` here reproduces that conversion
+    /// exactly for realistic monetary magnitudes (see `ios/docs/spec.md`
+    /// "Parsers").
     static func parseEuropeanNumber(_ value: String) -> Double? {
         let s = value
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: "\""))
         guard !s.isEmpty else { return nil }
-        let normalized = s.replacingOccurrences(of: ".", with: "").replacingOccurrences(of: ",", with: ".")
+        let separators = CharacterSet(charactersIn: ".,")
+        let normalized: String
+        if let last = s.rangeOfCharacter(from: separators, options: .backwards),
+           (1...2).contains(s.distance(from: last.upperBound, to: s.endIndex)) {
+            let whole = s[..<last.lowerBound].filter { $0 != "." && $0 != "," }
+            normalized = whole + "." + s[last.upperBound...]
+        } else {
+            normalized = s.filter { $0 != "." && $0 != "," }
+        }
         return Double(normalized)
     }
 
-    // MARK: - paypal.py:35-49 `_parse_date`
+    // MARK: - paypal.py:44-58 `_parse_date`
 
     /// `DD/MM/YYYY`.
     static func parsePayPalDate(_ value: String) -> Date? {
@@ -200,7 +212,7 @@ public enum PayPalParser {
         return ParserUtils.makeUTCDate(year: year, month: month, day: day)
     }
 
-    // MARK: - paypal.py:52-70 `_email_to_account` / `_get_account_from_row`
+    // MARK: - paypal.py:61-79 `_email_to_account` / `_get_account_from_row`
 
     private static func emailToAccount(_ email: String) -> String {
         let e = email
@@ -222,7 +234,7 @@ public enum PayPalParser {
         return emailToAccount(email)
     }
 
-    // MARK: - paypal.py:73-83 `_row_to_snake_case`
+    // MARK: - paypal.py:82-92 `_row_to_snake_case`
 
     /// Every original header, snake-cased (`" "`/`"/"`/`"-"` -> `"_"`,
     /// lowercased, non-alnum/underscore characters dropped), mapped to its

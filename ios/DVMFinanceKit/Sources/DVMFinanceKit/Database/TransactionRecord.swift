@@ -91,6 +91,25 @@ public struct TransactionRecord: Codable, Equatable, FetchableRecord, Persistabl
     /// `deletedAtDate` for a parsed `Date`.
     public var deletedAt: String?
 
+    /// The SEPA end-to-end reference of the payment, from the structured
+    /// description. Port of the Python column
+    /// `Transaction.end_to_end_reference`.
+    ///
+    /// The duplicate check uses it as a second match key. The bank writes one
+    /// SEPA payment in two description forms, and the two forms hold a
+    /// different raw text, so the two forms give two different ids. Only this
+    /// value joins them. See `Dedup.extractEndToEndReference`.
+    public var endToEndReference: String?
+
+    /// The id of the row that absorbed this row in a merge. Port of the Python
+    /// column `Transaction.merged_into`.
+    ///
+    /// Such a row also holds `deletedAt`, but the merge wrote that flag and
+    /// not the user. The purge and the list of the flagged transactions must
+    /// both exclude a row that holds this value: a delete would free the id,
+    /// and the next import would write the duplicate again.
+    public var mergedInto: String?
+
     enum CodingKeys: String, CodingKey {
         case id
         case accountNumber
@@ -116,6 +135,8 @@ public struct TransactionRecord: Codable, Equatable, FetchableRecord, Persistabl
         case updatedAt = "updated_at"
         case isManual = "is_manual"
         case deletedAt = "deleted_at"
+        case endToEndReference = "end_to_end_reference"
+        case mergedInto = "merged_into"
     }
 
     public init(
@@ -142,7 +163,9 @@ public struct TransactionRecord: Codable, Equatable, FetchableRecord, Persistabl
         transactionHash: String? = nil,
         updatedAt: String? = nil,
         isManual: Bool = false,
-        deletedAt: String? = nil
+        deletedAt: String? = nil,
+        endToEndReference: String? = nil,
+        mergedInto: String? = nil
     ) {
         self.id = id
         self.accountNumber = accountNumber
@@ -168,6 +191,8 @@ public struct TransactionRecord: Codable, Equatable, FetchableRecord, Persistabl
         self.updatedAt = updatedAt
         self.isManual = isManual
         self.deletedAt = deletedAt
+        self.endToEndReference = endToEndReference
+        self.mergedInto = mergedInto
     }
 
     public static var databaseDateDecodingStrategy: DatabaseDateDecodingStrategy {
@@ -203,4 +228,10 @@ public struct TransactionRecord: Codable, Equatable, FetchableRecord, Persistabl
     /// `true` when the user flagged this row for removal. The row stays in
     /// the database until a purge deletes it.
     public var isFlagged: Bool { deletedAt != nil }
+
+    /// True for a row that a merge folded into another row.
+    ///
+    /// Such a row is not a row that the user flagged. The purge keeps it, and
+    /// the list of the flagged transactions does not show it.
+    public var isMerged: Bool { mergedInto != nil }
 }

@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import re
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -12,6 +15,32 @@ from .models import Transaction
 from .utils import calculate_transaction_hash_components, normalize_category
 
 DEFAULT_CURRENCY = "EUR"
+
+# A reference that names no single payment. The bank writes one of these when
+# the payment carries no reference, so many rows share the value. The sample
+# statement of 2291 rows holds `NOTPROVIDED` 136 times.
+_UNUSABLE_REFERENCES = frozenset({"NONREF", "NOTPROVIDED"})
+
+# The separators that `normalize_reference` removes. An MT940 description wraps
+# at a fixed width, and the wrap can fall inside the reference. The bank also
+# prints the same reference with different separators in the two description
+# forms. One payment therefore reads `8022764496926345` in one form and
+# `8022.7644 .9692.6345` in the other.
+_REFERENCE_SEPARATORS = re.compile(r"[\s.\-]+")
+
+
+def normalize_reference(value: str) -> str:
+    """Return the comparison form of a reference.
+
+    The function removes each whitespace character, each period, and each
+    hyphen, and then changes the text to upper case. Two forms of one reference
+    therefore give one key.
+
+    The system stores the original text, and it compares this form. The rule
+    matching normalizes in the same manner, through
+    :func:`core.utils.normalize_string_for_matching`.
+    """
+    return _REFERENCE_SEPARATORS.sub("", value).upper()
 
 
 class ReservedAccountError(ValueError):
@@ -45,6 +74,135 @@ def generate_transaction_id(trans: dict[str, Any]) -> str:
     return f"{account}_{date}_{amount}_{desc_hash}"
 
 
+def extract_end_to_end_reference(trans: dict[str, Any]) -> str | None:
+    """Return the usable end-to-end reference of a parsed transaction.
+
+    The value comes from the structured description. The function returns the
+    original text, because the system stores it and shows it. Each comparison
+    uses :func:`normalize_reference`.
+
+    The function returns None for an empty value and for a value that names no
+    single payment, such as ``NONREF``. The duplicate check must not join two
+    payments on such a value.
+    """
+    value = trans.get("end_to_end_reference")
+
+    if value is None:
+        structured = trans.get("description_structured")
+        if isinstance(structured, str) and structured:
+            try:
+                data = json.loads(structured)
+            except ValueError:
+                data = None
+            if isinstance(data, dict):
+                value = data.get("end_to_end_reference")
+        elif isinstance(structured, dict):
+            value = structured.get("end_to_end_reference")
+
+    if not isinstance(value, str):
+        return None
+
+    value = value.strip()
+    if not value:
+        return None
+    if normalize_reference(value) in _UNUSABLE_REFERENCES:
+        return None
+    return value
+
+
+def _structured(trans: dict[str, Any]) -> dict[str, Any]:
+    """Return the structured description of a parsed transaction, as a dict."""
+    structured = trans.get("description_structured")
+    if isinstance(structured, dict):
+        return structured
+    if isinstance(structured, str) and structured:
+        try:
+            data = json.loads(structured)
+        except ValueError:
+            return {}
+        if isinstance(data, dict):
+            return data
+    return {}
+
+
+def _source_file(trans: dict[str, Any]) -> str:
+    """Return the source file of a parsed transaction, as a string."""
+    return str(trans.get("source_file") or "")
+
+
+def counterparty_key(
+    trans: dict[str, Any],
+) -> tuple[str, str, str, str, str] | None:
+    """Return the second match key, or None when it does not apply.
+
+    The key is the account, the transaction date, the amount, the normalized
+    counterparty IBAN, and the normalized remittance text. A transfer between
+    two accounts of the user carries no end-to-end reference, so only this key
+    joins its two description forms.
+
+    The key holds the remittance text, because two payments of one day can
+    share an account, an amount, and a counterparty. A real database holds
+    three payments of -149,00 euro of one day to one PayPal IBAN, and only
+    their remittance texts differ.
+
+    The function returns None when the transaction holds a usable reference,
+    because the reference key already covers it, and None when the transaction
+    holds no counterparty IBAN.
+    """
+    if extract_end_to_end_reference(trans) is not None:
+        return None
+
+    data = _structured(trans)
+    iban = data.get("iban")
+    if not isinstance(iban, str) or not iban.strip():
+        return None
+
+    remittance = data.get("remittance_info")
+    if not isinstance(remittance, str):
+        remittance = ""
+
+    return (
+        str(trans.get("accountNumber", "")),
+        str(trans.get("transactiondate", "")),
+        _amount_key(trans.get("amount")),
+        normalize_reference(iban),
+        normalize_reference(remittance),
+    )
+
+
+def _reference_key(trans: dict[str, Any]) -> tuple[str, str, str] | None:
+    """Return the (account, reference, amount) match key, or None if none.
+
+    The key holds the account, because a reference is unique for one creditor
+    and not for the world.
+
+    The key also holds the amount. A reversal carries the reference of the
+    payment that it reverses, with the opposite sign. The sample statement
+    holds three such pairs, for example a direct debit of -149,88 and its
+    `SEPA INCASSO TERUGBOEKING` of +149,88. Those are two transactions, and the
+    check must not join them. The two description forms of one payment always
+    report the same amount, because they describe one statement line.
+    """
+    reference = extract_end_to_end_reference(trans)
+    if reference is None:
+        return None
+    return (
+        str(trans.get("accountNumber", "")),
+        normalize_reference(reference),
+        _amount_key(trans.get("amount")),
+    )
+
+
+def _amount_key(amount: Any) -> str:
+    """Return the amount as a stable string with two decimal places."""
+    if amount is None:
+        return ""
+    try:
+        return f"{Decimal(str(amount)):.2f}"
+    except (ArithmeticError, ValueError):
+        return str(amount)
+
+
 def reject_reserved_account(transactions: list[dict[str, Any]]) -> None:
     """Refuse the batch if one transaction names the reserved pseudo account.
 
@@ -73,28 +231,125 @@ def check_duplicates(
     the date, the amount, and a hash of the description. The two forms cannot
     collide. The check reads each stored id, which includes the id of a flagged
     row. A flagged id therefore stays taken, and a second row cannot claim it.
+
+    The check also matches the account with the end-to-end reference. The bank
+    writes one SEPA payment in two description forms, and the two forms hold a
+    different raw text. The id of the two forms therefore differs, and only the
+    reference joins them. The check ignores an empty reference and a reference
+    that names no single payment, such as ``NONREF``.
+
+    The comparison of the reference uses :func:`normalize_reference`, because
+    the two forms can print one reference with different separators.
+
+    A transfer between two accounts of the user carries no reference. For such a
+    transaction the check uses :func:`counterparty_key`, which holds the
+    counterparty IBAN and the remittance text. It joins two such rows only when
+    they come from two statement files, because two rows of one file are two
+    payments.
     """
     incoming_ids: dict[str, dict[str, Any]] = {}
+    incoming_references: dict[tuple[str, str, str], str] = {}
+    # The counterparty key maps to the source file of the row that claimed it.
+    # Two rows of one file are two payments, and never two forms of one payment.
+    incoming_counterparties: dict[tuple[str, str, str, str, str], str] = {}
     duplicate_transactions: list[dict[str, Any]] = []
 
     for trans in transactions:
         trans_id = generate_transaction_id(trans)
         if trans_id in incoming_ids:
-            # In-batch duplicate.
+            # In-batch duplicate by the id.
             duplicate_transactions.append(trans)
-        else:
-            incoming_ids[trans_id] = trans
+            continue
+
+        reference_key = _reference_key(trans)
+        if reference_key is not None and reference_key in incoming_references:
+            # In-batch duplicate by the reference: the second description form
+            # of a payment that an earlier row of this batch already holds.
+            duplicate_transactions.append(trans)
+            continue
+
+        other_key = counterparty_key(trans)
+        if other_key is not None:
+            claimed_from = incoming_counterparties.get(other_key)
+            if claimed_from is not None and claimed_from != _source_file(trans):
+                # The second description form of a transfer that carries no
+                # reference. The two rows come from two statement files.
+                duplicate_transactions.append(trans)
+                continue
+
+        incoming_ids[trans_id] = trans
+        if reference_key is not None:
+            incoming_references[reference_key] = trans_id
+        if other_key is not None and other_key not in incoming_counterparties:
+            incoming_counterparties[other_key] = _source_file(trans)
 
     existing_ids: set[str] = set()
+    existing_references: set[tuple[str, str, str]] = set()
+    existing_counterparties: dict[tuple[str, str, str, str, str], str] = {}
     if incoming_ids:
         existing_ids = {row[0] for row in db.query(Transaction.id).all()}
+        # The column holds the original text, so the comparison normalizes each
+        # stored value as well.
+        existing_references = {
+            (
+                str(account),
+                normalize_reference(reference),
+                _amount_key(amount),
+            )
+            for account, reference, amount in db.query(
+                Transaction.accountNumber,
+                Transaction.end_to_end_reference,
+                Transaction.amount,
+            )
+            .filter(Transaction.end_to_end_reference.isnot(None))
+            .all()
+            if reference
+        }
+
+    if incoming_counterparties:
+        # Build the stored side with the same function, so that it agrees with
+        # the incoming side. Only a row with a structured description can hold
+        # this key.
+        for row in (
+            db.query(
+                Transaction.accountNumber,
+                Transaction.transactiondate,
+                Transaction.amount,
+                Transaction.description_structured,
+                Transaction.end_to_end_reference,
+                Transaction.source_file,
+            )
+            .filter(Transaction.description_structured.isnot(None))
+            .all()
+        ):
+            stored_key = counterparty_key(
+                {
+                    "accountNumber": row[0],
+                    "transactiondate": row[1],
+                    "amount": row[2],
+                    "description_structured": row[3],
+                    "end_to_end_reference": row[4],
+                }
+            )
+            if stored_key is not None and stored_key not in existing_counterparties:
+                existing_counterparties[stored_key] = str(row[5] or "")
 
     new_transactions: list[dict[str, Any]] = []
     for trans_id, trans in incoming_ids.items():
         if trans_id in existing_ids:
             duplicate_transactions.append(trans)
-        else:
-            new_transactions.append(trans)
+            continue
+        reference_key = _reference_key(trans)
+        if reference_key is not None and reference_key in existing_references:
+            duplicate_transactions.append(trans)
+            continue
+        other_key = counterparty_key(trans)
+        if other_key is not None:
+            stored_from = existing_counterparties.get(other_key)
+            if stored_from is not None and stored_from != _source_file(trans):
+                duplicate_transactions.append(trans)
+                continue
+        new_transactions.append(trans)
 
     return new_transactions, duplicate_transactions
 
@@ -141,6 +396,7 @@ def insert_transactions(db: Session, transactions: list[dict[str, Any]]) -> list
             source_line=trans.get("source_line"),
             transaction_type_code=trans.get("transaction_type_code"),
             transaction_reference=trans.get("transaction_reference"),
+            end_to_end_reference=extract_end_to_end_reference(trans),
             transaction_hash=transaction_hash,
         )
         db.merge(db_transaction)

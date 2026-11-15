@@ -14,6 +14,7 @@ and rule-change reports. Import merges with **incoming-wins** semantics:
 
 Identity is deterministic (Golden Principle 10): transactions by their
 deterministic id, rules by ``uuid``, budgets by (category, period, start_date).
+An incoming budget replaces each local budget whose validity range it overlaps.
 
 The whole merge runs in ONE database transaction, after the sqlite DB file has
 been backed up to a timestamped copy in the data dir. Rules are deliberately
@@ -32,11 +33,13 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..constants import CASH_ACCOUNT, is_reserved_account
 from ..logging_config import get_logger
 from .categorizer import rule_snapshot
+from .dedup import extract_end_to_end_reference
 from .models import (
     Budget,
     CategorizationRule,
@@ -446,6 +449,14 @@ def _txn_from_data(data: dict[str, Any]) -> dict[str, Any]:
         elif col in _TXN_NUMERIC_COLUMNS and value is not None:
             value = Decimal(str(value))
         values[col] = value
+
+    # A snapshot from an app before the reference column holds no such key. The
+    # column feeds the duplicate check, so derive it from the structured
+    # description. Without this the reference check would do nothing on the
+    # machine that received the snapshot.
+    if not values.get("end_to_end_reference"):
+        values["end_to_end_reference"] = extract_end_to_end_reference(values)
+
     return values
 
 
@@ -522,14 +533,33 @@ def _merge_budgets(
             .one_or_none()
         )
         if local is None:
-            # (category, period) is DB-unique; a row with the same pair but a
-            # different start_date still collides — incoming wins on that row.
-            local = (
-                db.query(Budget)
-                .filter(Budget.category == data["category"],
-                        Budget.period == data["period"])
-                .one_or_none()
-            )
+            # One category and period can hold several budgets with ranges
+            # that do not overlap. A local budget that overlaps the incoming
+            # one loses: incoming wins, and the report names the deleted row.
+            start = _parse_date(data.get("start_date"))
+            end = _parse_date(data.get("end_date"))
+            overlapping = db.query(Budget).filter(
+                Budget.category == data["category"], Budget.period == data["period"])
+            if end is not None:
+                overlapping = overlapping.filter(
+                    or_(Budget.start_date.is_(None), Budget.start_date <= end))
+            if start is not None:
+                overlapping = overlapping.filter(
+                    or_(Budget.end_date.is_(None), Budget.end_date >= start))
+            for old in overlapping.order_by(Budget.start_date).all():
+                old_dict = _budget_dict(old)
+                overwrites.append({
+                    "key": {"category": old.category, "period": old.period,
+                            "start_date": old_dict["start_date"]},
+                    "fields": {"deleted": {
+                        "local": f"{old_dict['amount']} from {old_dict['start_date']}"
+                                 f" to {old_dict['end_date']}",
+                        "incoming": f"{data['amount']} from {data.get('start_date')}"
+                                    f" to {data.get('end_date')}",
+                    }},
+                })
+                db.delete(old)
+            db.flush()
         if local is None:
             db.add(
                 Budget(

@@ -378,3 +378,60 @@ def test_purge_reports_zero_when_no_row_holds_a_flag(session, db_path):
     txn = _create(session)
     assert purge_flagged_transactions(session, db_path) == 0
     assert session.query(Transaction).filter_by(id=txn.id).count() == 1
+
+
+# ---------------------------------------------------------------------------
+# A merged row is not a row that the user flagged
+#
+# The merge writes `deleted_at` on the row that it folds away, and it also
+# writes `merged_into`. The purge must not delete such a row: a delete would
+# free its id, and the next import would write the duplicate again. See
+# openspec/changes/unify-sepa-description-and-reference-dedup, group 7.
+# ---------------------------------------------------------------------------
+
+
+def test_the_purge_keeps_a_merged_row(session, tmp_path):
+    """Task 7.1: the purge deletes only a row that the user flagged."""
+    from datetime import datetime
+
+    from abn_combined.core.manual_txn import purge_flagged_transactions
+
+    db_path = tmp_path / "purge.db"
+
+    user_flagged = Transaction(
+        id="user-flagged",
+        accountNumber="CASH",
+        transactiondate=date(2024, 5, 19),
+        amount=-5.0,
+        description="typed by hand",
+        currency="EUR",
+        is_manual=True,
+        deleted_at=datetime(2026, 10, 28, 9, 0, 0),
+    )
+    merged_away = Transaction(
+        id="merged-away",
+        accountNumber="720317081",
+        transactiondate=date(2024, 5, 19),
+        amount=-5.75,
+        description="the second description form",
+        currency="EUR",
+        deleted_at=datetime(2026, 10, 28, 9, 0, 0),
+        merged_into="the-survivor",
+    )
+    survivor = Transaction(
+        id="the-survivor",
+        accountNumber="720317081",
+        transactiondate=date(2024, 5, 19),
+        amount=-5.75,
+        description="the first description form",
+        currency="EUR",
+    )
+    session.add_all([user_flagged, merged_away, survivor])
+    session.commit()
+
+    deleted = purge_flagged_transactions(session, db_path)
+
+    assert deleted == 1
+    assert session.get(Transaction, "user-flagged") is None
+    assert session.get(Transaction, "merged-away") is not None
+    assert session.get(Transaction, "the-survivor") is not None

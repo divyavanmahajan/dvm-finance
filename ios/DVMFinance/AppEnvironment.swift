@@ -29,6 +29,13 @@ final class AppEnvironment: ObservableObject {
             self.dataDirectory = directory
             self.databaseURL = url
             self.database = try AppDatabase.live(at: url)
+            // One-time passes after the migrations. The rules read the stored
+            // structured description, so a row from before the canonical SEPA
+            // keys needs a reparse, and a rule that names a renamed key needs
+            // its new field target. Both passes match nothing after their
+            // first run. The desktop app runs the same two passes at startup;
+            // either app may run first.
+            try Restructure.runOnce(appDatabase: self.database)
             #if DEBUG
             // Screenshot / UI-test hook: repopulate with deterministic demo
             // data when launched with `-UITestSeed`. Never runs in Release.

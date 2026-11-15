@@ -97,3 +97,9 @@ tr.inactive { opacity: 0.55; }
 .card-header[data-bs-toggle="collapse"][aria-expanded="true"] .bi-chevron-down {
   transform: rotate(180deg);
 }
+
+/* Field list of the sample transaction: an unselected row is dimmed. */
+.field-row-off code,
+.field-row-off .form-select,
+.field-row-off .form-control { opacity: 0.55; }
+.field-row .col-md-3 code { word-break: break-all; }

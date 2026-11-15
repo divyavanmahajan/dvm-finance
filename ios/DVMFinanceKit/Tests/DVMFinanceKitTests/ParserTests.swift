@@ -188,6 +188,27 @@ final class ParserTests: XCTestCase {
 
     // MARK: - Wise (3 transactions, every row is golden)
 
+    /// paypal.py `_parse_european_number`: the last separator decides (same
+    /// cases as `tests/test_paypal_parser.py`).
+    func testPayPalNumberFindsTheDecimalSeparator() {
+        let cases: [(String, Double)] = [
+            ("-12,34", -12.34), ("-12.34", -12.34),
+            ("1.458,32", 1458.32), ("1,458.32", 1458.32),
+            ("1.458", 1458), ("1,458", 1458),
+            ("1,5", 1.5), ("1.5", 1.5),
+            ("1.234.567,89", 1234567.89), ("1,234,567.89", 1234567.89),
+            ("0,00", 0), ("12", 12), ("\"-12.34\"", -12.34),
+        ]
+        for (raw, expected) in cases {
+            let value = PayPalParser.parseEuropeanNumber(raw)
+            XCTAssertNotNil(value, raw)
+            XCTAssertEqual(value ?? .nan, expected, accuracy: 1e-9, raw)
+        }
+        XCTAssertNil(PayPalParser.parseEuropeanNumber("abc"))
+        XCTAssertNil(PayPalParser.parseEuropeanNumber(""))
+        XCTAssertNil(PayPalParser.parseEuropeanNumber("   "))
+    }
+
     func testWiseFixtureParity() throws {
         let expected = try loadExpected()
         let wiseExpected = try XCTUnwrap(expected["wise_sample.csv"] as? [String: Any])

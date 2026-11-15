@@ -1,9 +1,41 @@
-// Alpine component for the rule editor's dynamic condition rows.
-// No build step (Golden Principle 9) — plain function picked up by Alpine.
-function ruleEditor(initialConditions, initialTagOnly) {
+// Alpine components for the rule editor.
+// No build step (Golden Principle 9) — plain functions picked up by Alpine.
+
+// Form-level state: only the tag-only switch of the Assign card.
+function ruleEditor(initialTagOnly) {
   return {
-    conditions: Array.isArray(initialConditions) ? initialConditions : [],
     isTagOnly: !!initialTagOnly,
+  };
+}
+
+// Match card: field rows of the sample, context filter rows and the advanced
+// conditions. The selected rows feed hidden inputs with the same names as the
+// editor without a sample, so the server parses one form shape.
+function ruleMatch(state) {
+  return {
+    rows: Array.isArray(state.rows) ? state.rows : [],
+    conditions: Array.isArray(state.conditions) ? state.conditions : [],
+    filters: state.filters,
+    init() {
+      // The editor opened from a transaction: preview once the hidden inputs
+      // hold their values. htmx listens after DOMContentLoaded, so wait for it.
+      if (this.$el.dataset.autoPreview === undefined) return;
+      const fire = () => this.$nextTick(() => htmx.trigger(document.body, "rule-auto-preview"));
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", fire);
+      } else {
+        fire();
+      }
+    },
+    get selectedRows() {
+      return this.rows.filter((r) => r.selected);
+    },
+    get primary() {
+      return this.selectedRows[0] || null;
+    },
+    get andRows() {
+      return this.selectedRows.slice(1);
+    },
     addCondition() {
       this.conditions.push({
         field_target: "description",
@@ -30,3 +62,4 @@ function ruleEditor(initialConditions, initialTagOnly) {
   };
 }
 window.ruleEditor = ruleEditor;
+window.ruleMatch = ruleMatch;

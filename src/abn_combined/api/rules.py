@@ -31,7 +31,7 @@ from ..core.models import (
     RuleCondition,
     Transaction,
 )
-from ..core.rule_prefill import blank_rule_vm, prefill_rule_from_transaction
+from ..core.rule_prefill import apply_sample, blank_rule_vm, prefill_rule_from_transaction
 from ..core.utils import normalize_category
 from ..db import get_db
 from ..logging_config import get_logger
@@ -173,6 +173,7 @@ async def _parse_rule_form(request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="priority must be an integer") from exc
     vm["is_active"] = form.get("is_active") in ("on", "true", "1", "True")
     vm["is_tag_only"] = form.get("is_tag_only") in ("on", "true", "1", "True")
+    vm["sample_transaction_id"] = (form.get("sample_transaction_id") or "").strip() or None
 
     fields = form.getlist("cond_field_target")
     patterns = form.getlist("cond_match_pattern")
@@ -201,6 +202,10 @@ async def _parse_rule_form(request: Request) -> dict[str, Any]:
     return vm
 
 
+# With a field list the user selects rows instead of typing a match value.
+_NO_MATCH_MESSAGE = "Select at least one field."
+
+
 def _validate_vm(vm: dict[str, Any], require_category: bool = True) -> list[str]:
     errors = []
     if vm["rule_type"] not in VALID_RULE_TYPES:
@@ -208,7 +213,8 @@ def _validate_vm(vm: dict[str, Any], require_category: bool = True) -> list[str]
     if vm["match_pattern"] not in VALID_PATTERNS:
         errors.append(f"match_pattern must be one of: {', '.join(VALID_PATTERNS)}")
     if not vm["match_value"]:
-        errors.append("match_value is required")
+        errors.append(_NO_MATCH_MESSAGE if vm.get("sample_transaction_id")
+                      else "match_value is required")
     if vm.get("is_tag_only"):
         if not vm.get("tags"):
             errors.append("tags is required for a tag-only rule")
@@ -402,8 +408,40 @@ def _known_categories(db: Session) -> list[str]:
     return sorted(cats)
 
 
+def _iso(value: Any) -> str:
+    if not value:
+        return ""
+    return value.isoformat() if hasattr(value, "isoformat") else str(value)
+
+
+def _with_sample(db: Session, vm: dict[str, Any], sample_id: str | None) -> dict[str, Any]:
+    """Return ``vm`` with the field list of transaction ``sample_id``, if it exists."""
+    txn = db.get(Transaction, sample_id) if sample_id else None
+    return apply_sample(vm, txn) if txn is not None else vm
+
+
+def _match_card_state(vm: dict[str, Any]) -> dict[str, Any]:
+    """Initial state of the ``ruleMatch`` Alpine component."""
+    def flt(value: Any, fallback: str = "") -> dict[str, Any]:
+        return {"on": bool(value), "value": _iso(value) or fallback}
+
+    return {
+        "rows": vm.get("field_rows") or [],
+        "conditions": vm.get("conditions") or [],
+        "filters": {
+            "account": flt(vm.get("filter_account"), vm.get("sample_account") or ""),
+            "currency": flt(vm.get("filter_currency"), vm.get("sample_currency") or ""),
+            "date_from": flt(vm.get("filter_date_from")),
+            "date_to": flt(vm.get("filter_date_to")),
+        },
+    }
+
+
 def _editor_context(request: Request, db: Session, vm: dict[str, Any], *,
                     auto_preview: bool = False, errors: list[str] | None = None) -> dict:
+    # A re-render after a failed save gets the field list back from its sample.
+    if vm.get("sample_transaction_id") and not vm.get("field_rows"):
+        vm = _with_sample(db, vm, vm["sample_transaction_id"])
     return {
         "request": request,
         "active_path": "/rules",
@@ -417,6 +455,7 @@ def _editor_context(request: Request, db: Session, vm: dict[str, Any], *,
         "categories": _known_categories(db),
         "auto_preview": auto_preview,
         "errors": errors or [],
+        "match_state": _match_card_state(vm),
     }
 
 
@@ -676,9 +715,11 @@ async def rule_preview(request: Request, db: Session = Depends(get_db)) -> HTMLR
 
     tpl = _templates(request)
     if not vm["match_value"]:
+        message = (_NO_MATCH_MESSAGE if vm.get("sample_transaction_id")
+                   else "Enter a match value to preview.")
         return tpl.TemplateResponse(
             request, "_rule_preview.html",
-            {"request": request, "error": "Enter a match value to preview.", "preview": None, "include_transfers": include_transfers},
+            {"request": request, "error": message, "preview": None, "include_transfers": include_transfers},
         )
     try:
         draft = _vm_to_draft(vm, rule_id=rule_id)
@@ -719,6 +760,27 @@ async def rule_preview(request: Request, db: Session = Depends(get_db)) -> HTMLR
         ],
     }
     return tpl.TemplateResponse(request, "_rule_preview.html", ctx)
+
+
+@router.post("/rules/sample", response_class=HTMLResponse, include_in_schema=False)
+async def rule_sample(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
+    """Return the Match card of the current draft with the field list of a sample.
+
+    Writes nothing. The ``rule-sample-loaded`` event makes the editor run the
+    preview again.
+    """
+    vm = await _parse_rule_form(request)
+    form = await request.form()
+    # A separate name, because the form also posts the current sample id.
+    sample_id = (form.get("use_sample_id") or "").strip()
+    if db.get(Transaction, sample_id) is None:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    vm = _with_sample(db, vm, sample_id)
+    ctx = _editor_context(request, db, vm)
+    response = _templates(request).TemplateResponse(request, "_rule_match_card.html", ctx)
+    # After settle, so that Alpine has filled the hidden inputs of the new card.
+    response.headers["HX-Trigger-After-Settle"] = "rule-sample-loaded"
+    return response
 
 
 # ---------------------------------------------------------------------------

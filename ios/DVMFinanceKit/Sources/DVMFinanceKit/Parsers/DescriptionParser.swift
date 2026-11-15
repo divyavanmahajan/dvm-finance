@@ -59,13 +59,21 @@ public enum DescriptionParser {
             if value.isEmpty { continue }
 
             switch field {
-            case "TRTP": result.setString("transaction_type", value)
+            case "TRTP":
+                // A SEPA value takes the normalized fields of the shared
+                // table, so that the tagged form and the labelled form agree.
+                // Another value keeps its own text.
+                if !applySEPATypeFields(value, into: result) {
+                    result.setString("transaction_type", value)
+                }
             case "IBAN": result.setString("iban", value)
             case "BIC": result.setString("bic", value)
             case "NAME": result.setString("name", value)
             case "REMI": result.setString("remittance_info", value)
             case "EREF": result.setString("end_to_end_reference", value)
             case "MREF": result.setString("mandate_reference", value)
+            case "MARF": result.setString("mandate_reference", value)
+            case "CSID": result.setString("creditor_identifier", value)
             case "PREF": result.setString("payment_reference", value)
             case "CRED": result.setString("creditor_reference", value)
             case "DEBT": result.setString("debtor_reference", value)
@@ -76,9 +84,42 @@ public enum DescriptionParser {
         }
 
         guard !result.isEmpty else { return nil }
-        result.setString("format", "mt940")
+        // A SEPA payment reports the format "sepa" in both description forms.
+        // Another tagged type keeps the format "mt940".
+        result.setString("format", result.getString("sepa_type") != nil ? "sepa" : "mt940")
         parseTikkieFields(result)
         return result
+    }
+
+    // MARK: - sepa_type_fields (description.py)
+
+    /// Port of `description.py:sepa_type_fields`.
+    ///
+    /// The display name of each SEPA type that the bank writes in Dutch. The
+    /// tagged form and the labelled form share this table, so one payment type
+    /// needs one edit. The function writes nothing when the text names no SEPA
+    /// type.
+    static func applySEPATypeFields(_ text: String, into result: Fields) -> Bool {
+        // The leading "^" reproduces `re.match`'s "only try position 0".
+        guard let m = regexSearch("^SEPA\\s+(\\w+)", text, caseInsensitive: true),
+              let typeRaw = group(m, 1, in: text) else { return false }
+
+        let sepaType = typeRaw.uppercased()
+        result.setString("sepa_type", sepaType)
+        switch sepaType {
+        case "OVERBOEKING":
+            result.setString("transaction_type", "SEPA Transfer")
+        case "IDEAL":
+            result.setString("transaction_type", "SEPA iDEAL")
+        case "INCASSO":
+            result.setString("transaction_type", "SEPA Direct Debit")
+            let upper = text.uppercased()
+            if upper.contains("ALGEMEEN") { result.setString("direct_debit_type", "General") }
+            if upper.contains("DOORLOPEND") { result.setBool("recurring", true) }
+        default:
+            break
+        }
+        return true
     }
 
     // MARK: - parse_tikkie_fields (description.py:81-219)
@@ -98,7 +139,7 @@ public enum DescriptionParser {
         }
         guard isTikkie else { return }
 
-        if transactionType == "SEPA OVERBOEKING", remi.uppercased().contains("TIKKIE ID") {
+        if result.getString("sepa_type") == "OVERBOEKING", remi.uppercased().contains("TIKKIE ID") {
             // REMI: "TIKKIE ID 434142529147, PICS, VAN Q VAN EXAMPLEDAM, NL83ABNA5175097314"
             if let m = regexSearch("TIKKIE ID\\s+(\\d+)", remi, caseInsensitive: true),
                let id = group(m, 1, in: remi) {
@@ -173,7 +214,7 @@ public enum DescriptionParser {
                 result.setString("tikkie_timestamp", ts)
             }
 
-            if let kenmerk = result.getString("reference"),
+            if let kenmerk = result.getString("end_to_end_reference"),
                let m = regexSearch("(\\d{2}-\\d{2}-\\d{4}\\s+\\d{2}:\\d{2})", kenmerk),
                let ts = group(m, 1, in: kenmerk) {
                 result.setString("tikkie_timestamp", ts)
@@ -325,23 +366,7 @@ public enum DescriptionParser {
         // leading "^" below reproduces `re.match`'s "only try position 0"
         // semantics (every other pattern in this file uses `re.search`,
         // which needs no such anchor).
-        if let m = regexSearch("^SEPA\\s+(\\w+)", description, caseInsensitive: true), let typeRaw = group(m, 1, in: description) {
-            let sepaType = typeRaw.uppercased()
-            result.setString("sepa_type", sepaType)
-            switch sepaType {
-            case "OVERBOEKING":
-                result.setString("transaction_type", "SEPA Transfer")
-            case "IDEAL":
-                result.setString("transaction_type", "SEPA iDEAL")
-            case "INCASSO":
-                result.setString("transaction_type", "SEPA Direct Debit")
-                let upper = description.uppercased()
-                if upper.contains("ALGEMEEN") { result.setString("direct_debit_type", "General") }
-                if upper.contains("DOORLOPEND") { result.setBool("recurring", true) }
-            default:
-                break
-            }
-        }
+        _ = applySEPATypeFields(description, into: result)
 
         if let m = regexSearch("IBAN:\\s*([A-Z]{2}\\d{2}[A-Z0-9]{4,30})", description, caseInsensitive: true),
            let v = group(m, 1, in: description) {
@@ -363,7 +388,7 @@ public enum DescriptionParser {
             description,
             caseInsensitive: true
         ), let v = group(m, 1, in: description) {
-            result.setString("description", v.trimmingCharacters(in: .whitespacesAndNewlines))
+            result.setString("remittance_info", v.trimmingCharacters(in: .whitespacesAndNewlines))
         }
         if let m = regexSearch(
             "BETALINGSKENM\\.?:\\s*(.+?)(?=\\s+(?:IBAN|BIC|NAAM|OMSCHRIJVING|INCASSANT|MACHTIGING|KENMERK):|$)",
@@ -383,7 +408,7 @@ public enum DescriptionParser {
             description,
             caseInsensitive: true
         ), let v = group(m, 1, in: description) {
-            result.setString("reference", v.trimmingCharacters(in: .whitespacesAndNewlines))
+            result.setString("end_to_end_reference", v.trimmingCharacters(in: .whitespacesAndNewlines))
         }
 
         // Tikkie detection for SEPA IDEAL ("VIA TIKKIE"/"TIKKIE" in NAAM).
@@ -398,7 +423,7 @@ public enum DescriptionParser {
                 }
 
                 // "327826342655 00315 88265879905 YEAH NL58INGB1220774 608"
-                if let omschrijving = result.getString("description") {
+                if let omschrijving = result.getString("remittance_info") {
                     if let m = regexSearch("^(\\d{12})", omschrijving), let id = group(m, 1, in: omschrijving) {
                         result.setString("tikkie_id", id)
                     }
@@ -432,7 +457,7 @@ public enum DescriptionParser {
                     }
                 }
 
-                if let kenmerk = result.getString("reference"),
+                if let kenmerk = result.getString("end_to_end_reference"),
                    let m = regexSearch("(\\d{2}-\\d{2}-\\d{4}\\s+\\d{2}:\\d{2})", kenmerk),
                    let ts = group(m, 1, in: kenmerk) {
                     result.setString("tikkie_timestamp", ts)

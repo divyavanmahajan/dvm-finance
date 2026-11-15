@@ -4,14 +4,22 @@
     <table class="table table-hover table-sm align-middle mb-0">
       <thead class="table-light">
         <tr>
-          <th>Category</th>
-          <th>Period</th>
-          <th>Window</th>
-          <th class="text-end">Budget €</th>
-          <th class="text-end">Actual €</th>
-          <th class="text-end">Remaining €</th>
-          <th class="text-end">Used</th>
-          <th>Status</th>
+          {% for column, label, align in [
+               ('category', 'Category', ''), ('period', 'Period', ''), ('window', 'Window', ''),
+               ('budget', 'Budget €', 'text-end'), ('actual', 'Actual €', 'text-end'),
+               ('remaining', 'Remaining €', 'text-end'), ('used', 'Used', 'text-end'),
+               ('status', 'Status', '')] %}
+          <th class="{{ align }}"
+              {% if sort_column == column %}aria-sort="{{ 'descending' if sort_desc else 'ascending' }}"{% endif %}>
+            <a href="{{ sort_url(column) }}" class="link-body-emphasis text-decoration-none budget-sort"
+               data-column="{{ column }}">
+              {{ label }}
+              {% if sort_column == column %}
+              <i class="bi {{ 'bi-caret-down-fill' if sort_desc else 'bi-caret-up-fill' }} small"></i>
+              {% endif %}
+            </a>
+          </th>
+          {% endfor %}
           <th class="text-end">Actions</th>
         </tr>
       </thead>
@@ -54,7 +62,7 @@
   <div class="card-body text-center py-5">
     <i class="bi bi-piggy-bank display-4 text-muted d-block mb-3"></i>
     <p class="lead text-muted mb-0">
-      No budgets{% if period %} with period "{{ period }}"{% endif %} valid for this date. Add one below.
+      No {{ 'yearly' if period == 'year' else 'monthly' }} budgets for this {{ period }}. Use Create budgets, or add one below.
     </p>
   </div>
 </div>

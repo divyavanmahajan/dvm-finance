@@ -84,21 +84,34 @@ transactions carrying each one — handy alongside tag-only rules.
 
 ## Budgets
 
-The **Budgets** tab tracks spending against targets per category, split into
-**Monthly** and **Yearly** tabs.
+The **Budgets** tab compares the spend of each category with a target. It has a
+**Monthly** tab and a **Yearly** tab.
 
-- **Monthly / Yearly tabs** — switch between month budgets and full-year
-  budgets; each shows budget-vs-actual for the current period window.
-- **Add a budget** — pick a category, amount, and validity window. A live hint
-  shows the recent average spend for the category so you have a number to anchor
-  to.
-- **Seed from average** — one click creates a budget for every top-level
-  category that doesn't already have one, proposing the recent average as the
-  amount. On the Yearly tab the proposal is annualized (12× the monthly
-  average).
-- **Status at a glance** — each row shows a progress bar and an over / near
-  (≥ 80%) / under badge. Tap the category to see the transactions behind the
-  actual.
+- **Month or year** — the Monthly tab has a month selector, and the Yearly tab
+  has a year selector. The table shows the budgets and the actual spend of the
+  selected month or year.
+- **A budget repeats** — set a monthly amount once. The budget applies to each
+  later month until you end it. To end a budget, edit it and set **Valid to**
+  to the last day of a month.
+- **Add a budget** — enter a category, an amount, and a start. Leave **Valid
+  to** empty, so that the budget repeats. A hint shows the recent average spend
+  of the category.
+- **Create budgets** — this button is in each tab. It opens a page that asks
+  for the start month (Monthly tab) or the start year (Yearly tab). The page
+  lists each top-level category with recent spend and proposes the average of
+  the last three complete months. On the Yearly tab the proposal is 12 times
+  that average. You can change each amount. The page selects each category
+  that has no budget at that start.
+- **Override from a month** — to change an amount from a given month on,
+  select the category on the **Create budgets** page. The old budget ends on
+  the day before, and the new amount applies from the selected month. The
+  earlier months keep the old amount.
+- **Categories without a budget** — the page never proposes a budget for
+  `income` or `transfer`.
+- **Sort** — click a column header to sort on it. A second click reverses the
+  order. The default order is the largest budget first.
+- **Status** — each row shows an over / near (80% or more) / under badge.
+  Click the category to see the transactions behind the actual spend.
 
 Budget actuals exclude transfers.
 

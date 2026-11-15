@@ -9,6 +9,7 @@
         <th>Description</th>
         <th class="text-end">Amount</th>
         <th>Current category</th>
+        <th><span class="visually-hidden">Sample</span></th>
       </tr>
     </thead>
     <tbody>
@@ -19,6 +20,15 @@
         <td style="max-width: 28rem; word-wrap: break-word;">{{ (t.description or '')[:90] }}</td>
         <td class="text-end text-nowrap num {% if t.amount < 0 %}neg{% else %}pos{% endif %}">{{ '%.2f'|format(t.amount) }}</td>
         <td>{{ t.manual_category or t.category or '—' }}</td>
+        <td class="text-nowrap">
+          <button type="button" class="btn btn-outline-secondary btn-sm use-sample"
+                  hx-post="/rules/sample" hx-include="#rule-form"
+                  hx-vals='{{ {"use_sample_id": t.id} | tojson }}'
+                  hx-target="#match-card" hx-swap="outerHTML"
+                  title="Show the fields of this transaction in the Match card">
+            Use as sample
+          </button>
+        </td>
       </tr>
       {% endfor %}
     </tbody>

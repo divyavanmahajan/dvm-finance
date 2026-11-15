@@ -76,6 +76,17 @@ class Transaction(Base):
     # A flagged row stays in the table, travels in a snapshot, and keeps its id;
     # only an explicit purge deletes it.
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    # The SEPA end-to-end reference of the payment, from the structured
+    # description. The duplicate check uses it as a second match key, because
+    # the two SEPA description forms of one payment hold a different raw text.
+    end_to_end_reference: Mapped[str | None] = mapped_column(
+        String, nullable=True, index=True
+    )
+    # Set when a merge folded this row into another row. It holds the id of the
+    # surviving row. Such a row also holds `deleted_at`, but the merge wrote
+    # that flag and not the user. The purge and the list of the flagged
+    # transactions therefore both exclude a row that holds this value.
+    merged_into: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
 
     __table_args__ = (Index("idx_account_date", "accountNumber", "transactiondate"),)
 
@@ -158,7 +169,9 @@ class Budget(Base):
     __table_args__ = (
         Index("idx_budgets_category", "category"),
         Index("idx_budgets_period", "period"),
-        Index("idx_budgets_category_period", "category", "period", unique=True),
+        # Not unique: one category and period can hold several budgets whose
+        # validity ranges do not overlap (``budget_report.find_overlap``).
+        Index("idx_budgets_category_period", "category", "period"),
     )
 
 
@@ -167,6 +180,28 @@ class Budget(Base):
 # ---------------------------------------------------------------------------
 
 RULE_CHANGE_ACTIONS = ("create", "update", "delete", "toggle", "recategorize", "import")
+
+
+class MergeReport(Base):
+    """Audit record of one merge of the duplicate rows.
+
+    The row holds each group that the merge folded and each group that it
+    refused. The carried manual categorization is not recoverable from the
+    transaction table, so the report keeps it.
+    """
+
+    __tablename__ = "merge_reports"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=func.now(), index=True
+    )
+    # Each merged group: the account, the reference, the survivor, the flagged
+    # ids, and each carried value.
+    groups: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # Each group that the merge refused, with the reason.
+    refused: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    summary: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class RuleChangeReport(Base):

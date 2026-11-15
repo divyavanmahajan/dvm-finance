@@ -574,3 +574,229 @@ def test_round_trip_reproduces_effective_data(db_a, db_b):
     assert reports_strip(exported_again["rule_change_reports"]) == reports_strip(
         original["rule_change_reports"]
     )
+
+
+# ---------------------------------------------------------------------------
+# The end-to-end reference across a snapshot
+#
+# The column feeds the duplicate check. A snapshot from an app before the column
+# holds no such key, so the import must derive the value. Without this the
+# reference check would do nothing on the machine that received the snapshot.
+# See openspec/changes/unify-sepa-description-and-reference-dedup, tasks 5.5
+# to 5.7.
+# ---------------------------------------------------------------------------
+
+_SEPA_STRUCTURED = (
+    '{"format": "sepa", "transaction_type": "SEPA Direct Debit", '
+    '"name": "LEBARA", "end_to_end_reference": "KFF5Q4D85TQK39G6"}'
+)
+_SEPA_TAGGED_DESCRIPTION = (
+    "/TRTP/SEPA INCASSO ALGEMEEN DOORLOPEND/CSID/VP20XNL847867841319 "
+    "/NAME/LEBARA/MARF/B0OXIVC5T2O3ZJ58/REMI/LEBARA NL-039442543-277 "
+    "/IBAN/NL65ADYB0257164544/BIC/ADYBNL2A/EREF/KFF5Q4D85TQK39G6"
+)
+
+
+def test_snapshot_carries_the_reference(db_a, db_b):
+    """Task 5.5: the field travels when the snapshot holds it."""
+    (a, a_path), (b, b_path) = db_a, db_b
+    a.add(
+        make_txn(
+            "t1",
+            description_structured=_SEPA_STRUCTURED,
+            end_to_end_reference="KFF5Q4D85TQK39G6",
+        )
+    )
+    a.commit()
+    snap = _export_bytes(a, a_path.parent)
+
+    import_snapshot(b, snap, b_path)
+
+    assert b.get(Transaction, "t1").end_to_end_reference == "KFF5Q4D85TQK39G6"
+
+
+def test_snapshot_without_the_field_derives_the_reference(db_a, db_b):
+    """Task 5.5: a snapshot from an app before the column still fills it."""
+    (a, a_path), (b, b_path) = db_a, db_b
+    a.add(make_txn("t1", description_structured=_SEPA_STRUCTURED))
+    a.commit()
+    snap = _export_bytes(a, a_path.parent)
+
+    # Model the older snapshot: remove the key from each transaction.
+    for data in snap["transactions"]:
+        data.pop("end_to_end_reference", None)
+
+    import_snapshot(b, snap, b_path)
+
+    assert b.get(Transaction, "t1").end_to_end_reference == "KFF5Q4D85TQK39G6"
+
+
+def test_a_merge_reaches_a_second_machine(db_a, db_b):
+    """The flag and the survivor id both travel in a snapshot.
+
+    Covers the scenario "A merge reaches a second machine" of the
+    manual-transactions delta. Without this the second machine would show the
+    payment twice.
+    """
+    (a, a_path), (b, b_path) = db_a, db_b
+    a.add(
+        make_txn(
+            "aaa-survivor",
+            description_structured=_SEPA_STRUCTURED,
+            end_to_end_reference="KFF5Q4D85TQK39G6",
+        )
+    )
+    a.add(
+        make_txn(
+            "zzz-folded",
+            description_structured=_SEPA_STRUCTURED,
+            end_to_end_reference="KFF5Q4D85TQK39G6",
+        )
+    )
+    a.commit()
+
+    from abn_combined.core.merge import merge_duplicates
+
+    result = merge_duplicates(a)
+    assert len(result.groups) == 1
+
+    snap = _export_bytes(a, a_path.parent)
+    import_snapshot(b, snap, b_path)
+
+    survivor = b.get(Transaction, "aaa-survivor")
+    folded = b.get(Transaction, "zzz-folded")
+    assert survivor.merged_into is None
+    assert survivor.deleted_at is None
+    assert folded.merged_into == "aaa-survivor"
+    assert folded.deleted_at is not None
+
+
+def test_a_merged_row_stays_out_of_each_total_after_a_sync(db_a, db_b):
+    """The second machine hides the folded row, so each total holds it once."""
+    from abn_combined.core.filters import live_only
+    from abn_combined.core.merge import merge_duplicates
+
+    (a, a_path), (b, b_path) = db_a, db_b
+    for txn_id in ("aaa-survivor", "zzz-folded"):
+        a.add(
+            make_txn(
+                txn_id,
+                description_structured=_SEPA_STRUCTURED,
+                end_to_end_reference="KFF5Q4D85TQK39G6",
+            )
+        )
+    a.commit()
+    merge_duplicates(a)
+    import_snapshot(b, _export_bytes(a, a_path.parent), b_path)
+
+    live = live_only(b.query(Transaction)).all()
+
+    assert [row.id for row in live] == ["aaa-survivor"]
+
+
+def test_an_import_matches_a_payment_that_a_snapshot_supplied(db_a, db_b):
+    """Task 5.6: a later statement import does not write a second row."""
+    from abn_combined.core.dedup import check_duplicates
+    from abn_combined.parsers.description import parse_transaction_description
+
+    (a, a_path), (b, b_path) = db_a, db_b
+    a.add(make_txn("t1", description_structured=_SEPA_STRUCTURED))
+    a.commit()
+    snap = _export_bytes(a, a_path.parent)
+    for data in snap["transactions"]:
+        data.pop("end_to_end_reference", None)
+    import_snapshot(b, snap, b_path)
+
+    # The same payment arrives again, now from a statement of that account. Its
+    # id differs, because the raw description of the statement differs.
+    structured = parse_transaction_description(_SEPA_TAGGED_DESCRIPTION)
+    incoming = {
+        "accountNumber": "NL01TEST0123456789",
+        "transactiondate": date(2026, 1, 15),
+        "amount": Decimal("-42.50"),
+        "description": _SEPA_TAGGED_DESCRIPTION,
+        "currency": "EUR",
+        "description_structured": json.dumps(structured, ensure_ascii=False),
+    }
+
+    new, dup = check_duplicates(b, [incoming])
+
+    assert new == []
+    assert len(dup) == 1
+
+
+def test_the_snapshot_import_writes_a_row_with_a_known_reference(db_a, db_b):
+    """Task 5.7: the snapshot import stays the only path that may replace a row.
+
+    The reference check belongs to the statement import. It must not block a
+    snapshot row whose reference matches a stored row with another id.
+    """
+    (a, a_path), (b, b_path) = db_a, db_b
+    a.add(
+        make_txn(
+            "from_machine_a",
+            description_structured=_SEPA_STRUCTURED,
+            end_to_end_reference="KFF5Q4D85TQK39G6",
+        )
+    )
+    a.commit()
+    snap = _export_bytes(a, a_path.parent)
+
+    # The receiving machine already holds the same payment under another id.
+    b.add(
+        make_txn(
+            "local_other_id",
+            description_structured=_SEPA_STRUCTURED,
+            end_to_end_reference="KFF5Q4D85TQK39G6",
+        )
+    )
+    b.commit()
+
+    report = import_snapshot(b, snap, b_path)
+
+    assert report.counts["transactions"]["inserted"] == 1
+    assert b.get(Transaction, "from_machine_a") is not None
+    assert b.get(Transaction, "local_other_id") is not None
+
+
+# ---------------------------------------------------------------------------
+# Several budgets for one category (repeating-budgets-with-override)
+# ---------------------------------------------------------------------------
+
+
+def test_two_budgets_for_one_category_arrive(db_a, db_b):
+    (a, a_path), (b, b_path) = db_a, db_b
+    a.add(make_budget(start_date=date(2026, 7, 1), end_date=date(2026, 10, 31),
+                      amount=Decimal("100.00")))
+    a.add(make_budget(start_date=date(2026, 11, 1), amount=Decimal("150.00")))
+    b.add(make_budget(start_date=date(2026, 7, 1), end_date=date(2026, 10, 31),
+                      amount=Decimal("90.00")))
+    a.commit()
+    b.commit()
+
+    report = import_snapshot(b, _export_bytes(a, a_path.parent), b_path)
+    b.expire_all()
+    assert report.counts["budgets"] == {"inserted": 1, "updated": 1, "unchanged": 0}
+    rows = [(r.start_date, r.end_date, r.amount)
+            for r in b.query(Budget).order_by(Budget.start_date)]
+    assert rows == [(date(2026, 7, 1), date(2026, 10, 31), Decimal("100.00")),
+                    (date(2026, 11, 1), None, Decimal("150.00"))]
+
+
+def test_incoming_budget_replaces_an_overlapping_local_budget(db_a, db_b):
+    (a, a_path), (b, b_path) = db_a, db_b
+    a.add(make_budget(start_date=date(2026, 8, 1), amount=Decimal("150.00")))
+    b.add(make_budget(start_date=date(2026, 7, 1), amount=Decimal("100.00")))
+    b.add(make_budget(category="other", start_date=date(2026, 7, 1)))
+    a.commit()
+    b.commit()
+
+    report = import_snapshot(b, _export_bytes(a, a_path.parent), b_path)
+    b.expire_all()
+    groceries = b.query(Budget).filter_by(category="groceries").all()
+    assert [(g.start_date, g.amount) for g in groceries] == [(date(2026, 8, 1), Decimal("150.00"))]
+    assert b.query(Budget).filter_by(category="other").count() == 1
+    [deleted] = report.overwrites["budgets"]
+    assert deleted["key"] == {"category": "groceries", "period": "month",
+                              "start_date": "2026-07-01"}
+    assert "deleted" in deleted["fields"]

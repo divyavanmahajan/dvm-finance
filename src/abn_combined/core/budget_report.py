@@ -39,6 +39,45 @@ def get_period_dates(period: str, reference_date: date | None = None) -> tuple[d
     raise ValueError(f"Invalid period: {period}")
 
 
+def check_validity_bounds(period: str, start: date | None, end: date | None) -> str | None:
+    """Return an error message when the validity bounds do not fit ``period``.
+
+    A start must be the first day of a period, and an end the last day of a
+    period. At most one budget of a category is then valid in each window.
+    """
+    if start is not None and get_period_dates(period, start)[0] != start:
+        return f"The validity start must be the first day of a {period}."
+    if end is not None and get_period_dates(period, end)[1] != end:
+        return f"The validity end must be the last day of a {period}."
+    if start is not None and end is not None and end < start:
+        return "The validity end must not be before the validity start."
+    return None
+
+
+def find_overlap(db: Session, category: str, period: str, start: date | None,
+                 end: date | None, exclude_id: int | None = None) -> Budget | None:
+    """Return a budget of ``category`` and ``period`` whose validity overlaps.
+
+    An empty start has no lower limit, and an empty end has no upper limit.
+    ``exclude_id`` leaves out the budget under edit.
+    """
+    query = db.query(Budget).filter(Budget.category == category, Budget.period == period)
+    if exclude_id is not None:
+        query = query.filter(Budget.id != exclude_id)
+    if end is not None:
+        query = query.filter(or_(Budget.start_date.is_(None), Budget.start_date <= end))
+    if start is not None:
+        query = query.filter(or_(Budget.end_date.is_(None), Budget.end_date >= start))
+    return query.order_by(Budget.start_date).first()
+
+
+def describe_budget(budget: Budget) -> str:
+    """Short text that names a budget in a message, with its validity range."""
+    start = budget.start_date.isoformat() if budget.start_date else "the start"
+    end = budget.end_date.isoformat() if budget.end_date else "no end"
+    return f"the {budget.period} budget for '{budget.category}' ({start} to {end})"
+
+
 def _effective_category_expr():
     return func.coalesce(func.nullif(Transaction.manual_category, ""), Transaction.category)
 
@@ -120,6 +159,60 @@ def distinct_top_level_categories(db: Session) -> list[str]:
         if value:
             tops.add(value.split(CATEGORY_SEPARATOR, 1)[0])
     return sorted(tops)
+
+
+# Top-level categories that the seed never proposes: income is not spend, and
+# the actuals already leave out each transfer.
+SEED_EXCLUDED_CATEGORIES = ("income", "transfer")
+
+
+def valid_budget_on(db: Session, category: str, period: str, day: date) -> Budget | None:
+    """Return the budget of ``category`` and ``period`` that is valid on ``day``."""
+    return find_overlap(db, category, period, day, day)
+
+
+def seed_budgets(db: Session, period: str, start: date,
+                 choices: list[tuple[str, float]], notes: str) -> dict[str, list]:
+    """Create or override a budget from ``start`` for each ``(category, amount)``.
+
+    A budget that is valid on ``start`` and starts on it gets the new amount.
+    A budget that is valid on ``start`` and starts earlier ends on the day
+    before, and a new budget starts on ``start``. The new budget ends on the
+    day before the next later budget of the category, or it has no end.
+    Commits once. Returns the categories that were created, changed, and ended.
+    """
+    start = get_period_dates(period, start)[0]
+    result: dict[str, list] = {"created": [], "changed": [], "ended": []}
+    for category, amount in choices:
+        if category in SEED_EXCLUDED_CATEGORIES:
+            continue
+        current = valid_budget_on(db, category, period, start)
+        if current is not None and current.start_date == start:
+            current.amount = Decimal(str(round(amount, 2)))
+            current.notes = notes
+            result["changed"].append(category)
+            continue
+        if current is not None:
+            current.end_date = start - timedelta(days=1)
+            result["ended"].append(category)
+        later = (
+            db.query(Budget)
+            .filter(Budget.category == category, Budget.period == period,
+                    Budget.start_date > start)
+            .order_by(Budget.start_date)
+            .first()
+        )
+        db.add(Budget(
+            category=category,
+            amount=Decimal(str(round(amount, 2))),
+            period=period,
+            start_date=start,
+            end_date=later.start_date - timedelta(days=1) if later else None,
+            notes=notes,
+        ))
+        result["created"].append(category)
+    db.commit()
+    return result
 
 
 def budget_status(actual: float, budget_amount: float) -> str:

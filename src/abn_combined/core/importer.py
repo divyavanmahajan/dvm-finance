@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import asdict, dataclass, field
+from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy.orm import Session
 
+from ..logging_config import get_logger
 from ..parsers import (
     parse_csv_file,
     parse_paypal_file,
@@ -19,10 +22,14 @@ from .categorizer import apply_rules
 from .dedup import (
     ReservedAccountError,
     check_duplicates,
+    generate_transaction_id,
     insert_transactions,
     reject_reserved_account,
 )
 from .models import Transaction
+from .utils import calculate_transaction_hash_components
+
+logger = get_logger(__name__)
 
 # Explicit format overrides (auto = detect by extension via parse_statement_file).
 VALID_FORMATS = ("auto", "paypal", "wise", "seb", "csv")
@@ -39,7 +46,10 @@ class ImportSummary:
     duplicates: int = 0
     categorized: int = 0
     uncategorized: int = 0
+    corrected: int = 0
     new_ids: list[str] = field(default_factory=list)
+    # One dict for each corrected row: ``id``, ``old_amount``, ``new_amount``.
+    corrections: list[dict[str, Any]] = field(default_factory=list)
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -64,6 +74,48 @@ def _parse(path: Path, fmt: str, db: Session) -> list[dict]:
     if fmt == "csv":
         return parse_csv_file(path)
     return parse_statement_file(path)
+
+
+def correct_amounts(db: Session, duplicates: list[dict]) -> list[dict[str, Any]]:
+    """Correct the stored amount of each duplicate that has the same id.
+
+    A provider id (PayPal, Wise, SEB) does not hold the amount, so a fixed
+    parser gives a stored row a new amount for the same id. The function writes
+    that amount, a new content hash and ``updated_at``, and keeps each other
+    field. It skips a flagged row, an equal amount, and a duplicate whose id
+    has no stored row (a match through the reference or the counterparty).
+    It handles each id once.
+    """
+    corrections: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for trans in duplicates:
+        trans_id = generate_transaction_id(trans)
+        if trans_id in seen:
+            continue
+        seen.add(trans_id)
+        new_amount = trans.get("amount")
+        row = db.get(Transaction, trans_id)
+        if row is None or row.deleted_at is not None or new_amount is None:
+            continue
+        if round(float(row.amount), 2) == round(float(new_amount), 2):
+            continue
+        old_amount = float(row.amount)
+        row.amount = new_amount
+        row.transaction_hash = calculate_transaction_hash_components(
+            date_value=row.transactiondate,
+            description=row.description,
+            amount=new_amount,
+            account=row.accountNumber,
+        )
+        row.updated_at = datetime.now()
+        corrections.append(
+            {"id": trans_id, "old_amount": old_amount, "new_amount": float(new_amount)}
+        )
+        logger.info("amount_corrected", transaction_id=trans_id,
+                    old_amount=old_amount, new_amount=float(new_amount))
+    if corrections:
+        db.commit()
+    return corrections
 
 
 def import_file(
@@ -113,6 +165,8 @@ def import_file(
     new_transactions, duplicate_transactions = check_duplicates(db, transactions)
     new_ids = insert_transactions(db, new_transactions)
     apply_rules(db, transaction_ids=new_ids)
+    # No rule matches on the amount, so a correction needs no rule run.
+    corrections = correct_amounts(db, duplicate_transactions)
 
     categorized = 0
     if new_ids:
@@ -125,8 +179,10 @@ def import_file(
     return ImportSummary(
         source_file=original_name,
         new=len(new_ids),
-        duplicates=len(duplicate_transactions),
+        duplicates=len(duplicate_transactions) - len(corrections),
         categorized=categorized,
         uncategorized=len(new_ids) - categorized,
+        corrected=len(corrections),
         new_ids=new_ids,
+        corrections=corrections,
     )
