@@ -51,13 +51,13 @@ final class DescriptionParserTests: XCTestCase {
             "BEA, BETAALPAS                   DHYTO 2,PAS603 NR:89518832, 19.05.24/15:12      APELDOORN"
         // Ground truth: no "*" in "DHYTO 2" so no merchant_code; foreign
         // currency comes from parser_expected.json's first-5 fixture row 4
-        // (`"foreign_currency": "NAP", "foreign_amount": 2.0`) — the
-        // `([A-Z]{3})\s+([\d.,]+)` regex incidentally matches "NAP 2" from
+        // (`"foreign_currency": "YTO", "foreign_amount": 2.0`) — the
+        // `([A-Z]{3})\s+([\d.,]+)` regex incidentally matches "YTO 2" from
         // the merchant name itself.
         let expected = try expectedObject(#"""
         {"transaction_type": "POS", "payment_method": "Betaalpas", "merchant_name": "DHYTO 2",
          "card_terminal_id": "603", "transaction_reference": "89518832", "transaction_date": "2024-05-19",
-         "transaction_time": "15:12", "location": "APELDOORN", "foreign_currency": "NAP",
+         "transaction_time": "15:12", "location": "APELDOORN", "foreign_currency": "YTO",
          "foreign_amount": 2.0, "format": "pos"}
         """#)
         let actual = try actualObject(DescriptionParser.parsePOSDescription(description))
