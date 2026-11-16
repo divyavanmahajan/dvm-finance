@@ -33,7 +33,11 @@ def no_worker(monkeypatch):
     def _fake_seb(registry, settings, cdp_url=None, *a, **kw):
         calls.append(("seb", None, None, cdp_url))
 
+    def _fake_ftfcu(registry, settings, from_date, to_date, cdp_url=None, *a, **kw):
+        calls.append(("ftfcu", from_date, to_date, cdp_url))
+
     import abn_combined.downloaders.abn as abn_mod
+    import abn_combined.downloaders.ftfcu as ftfcu_mod
     import abn_combined.downloaders.paypal as pp_mod
     import abn_combined.downloaders.seb as seb_mod
     import abn_combined.downloaders.wise as wise_mod
@@ -42,6 +46,7 @@ def no_worker(monkeypatch):
     monkeypatch.setattr(pp_mod, "run_paypal_job", _fake_paypal)
     monkeypatch.setattr(wise_mod, "run_wise_job", _fake_wise)
     monkeypatch.setattr(seb_mod, "run_seb_job", _fake_seb)
+    monkeypatch.setattr(ftfcu_mod, "run_ftfcu_job", _fake_ftfcu)
     return calls
 
 
@@ -329,6 +334,73 @@ def test_start_seb_download_conflict_while_running(client, no_worker, fresh_regi
     fresh_registry.create("seb")
     resp = client.post("/api/download/seb", data={})
     assert resp.status_code == 409
+
+
+# ---------------------------------------------------------------------------
+# First Tech start endpoint
+# ---------------------------------------------------------------------------
+
+
+def test_download_page_has_ftfcu_card(client) -> None:
+    html = client.get("/download").text
+    assert "First Tech Federal Credit Union" in html
+    assert "Start First Tech download" in html
+    assert 'hx-post="/api/download/ftfcu"' in html
+
+
+def test_start_ftfcu_download_passes_dates_and_cdp_url(client, no_worker, fresh_registry) -> None:
+    import time
+    from datetime import date, timedelta
+
+    start = (date.today() - timedelta(days=30)).isoformat()
+    end = date.today().isoformat()
+    resp = client.post(
+        "/api/download/ftfcu",
+        data={"from_date": start, "to_date": end, "cdp_url": "http://127.0.0.1:9333"},
+    )
+    assert resp.status_code == 200
+    assert fresh_registry.get("ftfcu") is not None
+    for _ in range(50):
+        if no_worker:
+            break
+        time.sleep(0.02)
+    assert no_worker and no_worker[0] == ("ftfcu", start, end, "http://127.0.0.1:9333")
+
+
+def test_start_ftfcu_download_defaults_dates(client, no_worker, fresh_registry) -> None:
+    import time
+    from datetime import date
+
+    resp = client.post("/api/download/ftfcu", data={})
+    assert resp.status_code == 200
+    for _ in range(50):
+        if no_worker:
+            break
+        time.sleep(0.02)
+    assert no_worker[0][0] == "ftfcu"
+    assert no_worker[0][2] == date.today().isoformat()
+
+
+def test_start_ftfcu_download_rejects_malformed_date(client, no_worker, fresh_registry) -> None:
+    resp = client.post(
+        "/api/download/ftfcu", data={"from_date": "01-10-2026", "to_date": "2026-11-16"}
+    )
+    assert resp.status_code == 400
+    assert "YYYY-MM-DD" in resp.text
+    assert fresh_registry.get("ftfcu") is None
+    assert no_worker == []
+
+
+def test_start_ftfcu_download_conflict_while_running(client, no_worker, fresh_registry) -> None:
+    fresh_registry.create("ftfcu")
+    resp = client.post("/api/download/ftfcu", data={})
+    assert resp.status_code == 409
+
+
+def test_ftfcu_status_endpoint(client, fresh_registry) -> None:
+    fresh_registry.create("ftfcu")
+    resp = client.get("/api/download/ftfcu/status")
+    assert resp.status_code == 200
 
 
 # ---------------------------------------------------------------------------

@@ -4,6 +4,9 @@
     <dt>Full description</dt><dd>{{ t.description or '—' }}</dd>
     <dt>Value date</dt><dd>{{ t.valuedate.isoformat() if t.valuedate else '—' }}</dd>
     <dt>Currency</dt><dd>{{ t.currency }}</dd>
+    {% if row.original %}
+    <dt>Original amount</dt><dd>{{ '%.2f'|format(row.original.amount) }} {{ row.original.currency }}{% if structured.eur_rate_used %} (rate {{ structured.eur_rate_used }} {{ row.original.currency }} for 1 EUR){% endif %}</dd>
+    {% endif %}
     <dt>Source file</dt><dd>{{ t.source_file or '—' }}{% if t.source_line %} : line {{ t.source_line }}{% endif %}</dd>
     <dt>Categorization</dt>
     <dd>

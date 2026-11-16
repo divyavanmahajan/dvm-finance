@@ -37,6 +37,9 @@
 
     <!-- Amount (tabular-nums, color-coded) -->
     <td class="num {% if t.amount < 0 %}neg{% else %}pos{% endif %}">
+      {% if row.original %}
+        <small class="text-muted text-nowrap me-1 txn-original">{{ '%.2f'|format(row.original.amount) }} {{ row.original.currency }}</small>
+      {% endif %}
       {{ '%.2f'|format(t.amount) }} {{ t.currency }}
     </td>
 

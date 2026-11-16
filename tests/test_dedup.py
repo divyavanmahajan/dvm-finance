@@ -66,6 +66,13 @@ def test_wise_and_seb_id_recipe():
     assert generate_transaction_id(_txn(seb_voucher_id="V9")).endswith("_V9")
 
 
+def test_ftfcu_id_recipe():
+    tid = generate_transaction_id(
+        _txn(accountNumber="ftfcu:0002", ftfcu_fitid="20261113-100002-1049-7693")
+    )
+    assert tid == "ftfcu:0002_20261113-100002-1049-7693"
+
+
 def test_insert_and_dedup_counting(session):
     txns = [_txn(), _txn(amount=-10.0, description="second")]
     new, dup = check_duplicates(session, txns)

@@ -412,3 +412,65 @@ def test_manual_edit_survives_rule_reapplication(client, seed):
 def test_edit_404(client, seed):
     assert client.post("/transactions/nope/category",
                        data={"manual_category": "x"}).status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Original currency beside the EUR amount
+# ---------------------------------------------------------------------------
+
+
+def _structured(**kw) -> str:
+    import json
+
+    return json.dumps(kw)
+
+
+@pytest.mark.parametrize(
+    "amount,currency,structured,expected",
+    [
+        # First Tech / SEB: signed native amount.
+        (-8.39, "EUR", _structured(native_amount=-10.49, native_currency="USD",
+                                   eur_rate_used=1.25), {"amount": -10.49, "currency": "USD"}),
+        # Wise: unsigned native amount as a string; the sign comes from the EUR amount.
+        (-9.13, "EUR", _structured(native_amount="100.00", native_currency="SEK"),
+         {"amount": -100.0, "currency": "SEK"}),
+        # PayPal: original_amount / original_currency.
+        (-4.6, "EUR", _structured(original_amount=-5.0, original_currency="USD"),
+         {"amount": -5.0, "currency": "USD"}),
+        # No conversion happened (the rates were not available): nothing extra.
+        (-10.49, "USD", _structured(native_amount=-10.49, native_currency="USD"), None),
+        # Plain EUR row, and a malformed value.
+        (-1.0, "EUR", None, None),
+        (-1.0, "EUR", _structured(native_amount="1,00", native_currency="SEK"), None),
+    ],
+)
+def test_original_amount(amount, currency, structured, expected):
+    from abn_combined.api.transactions import original_amount
+
+    txn = _mk(amount=amount, currency=currency, description_structured=structured)
+    assert original_amount(txn) == expected
+
+
+def test_converted_row_shows_original_amount(client, app):
+    factory = get_session_factory()
+    db = factory()
+    db.add(_mk(id="usd1", accountNumber="ftfcu:0002", amount=-8.39, currency="EUR",
+               description="ACH Debit CARD ISSUER",
+               description_structured=_structured(native_amount=-10.49, native_currency="USD",
+                                                  eur_rate_used=1.25)))
+    db.add(_mk(id="eur1", amount=-3.0, description="Plain euro row"))
+    db.commit()
+    db.close()
+
+    html = client.get("/").text
+    assert "-8.39 EUR" in html
+    assert "-10.49 USD" in html
+    assert html.count("txn-original") == 1
+    # The original currency comes first, then the EUR amount.
+    assert html.index("-10.49 USD") < html.index("-8.39 EUR")
+
+    detail = client.get("/transactions/usd1/detail").text
+    assert "Original amount" in detail
+    assert "-10.49 USD" in detail
+    assert "rate 1.25 USD for 1 EUR" in detail
+    assert "Original amount" not in client.get("/transactions/eur1/detail").text

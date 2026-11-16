@@ -16,6 +16,7 @@ PAYPAL = FIXTURES / "paypal_sample.TXT"
 WISE = FIXTURES / "wise_sample.csv"
 SEB = FIXTURES / "seb_sample.csv"
 MT940 = FIXTURES / "mt940_sample.STA"
+FTFCU = FIXTURES / "ftfcu_sample.ofx"
 
 
 def _db(app):
@@ -26,9 +27,13 @@ def _db(app):
 
 @pytest.mark.parametrize(
     "fixture,fmt",
-    [(PAYPAL, "paypal"), (WISE, "wise"), (SEB, "seb"), (MT940, "auto")],
+    [(PAYPAL, "paypal"), (WISE, "wise"), (SEB, "seb"), (FTFCU, "ftfcu"), (MT940, "auto")],
 )
-def test_import_each_format(app, settings, fixture, fmt):
+def test_import_each_format(app, settings, fixture, fmt, monkeypatch):
+    # Keep the EUR conversion offline (SEB and First Tech fetch ECB rates).
+    import abn_combined.parsers.ftfcu as ftfcu_mod
+
+    monkeypatch.setattr(ftfcu_mod, "build_rate_cache", lambda dates, currency: {})
     db = _db(app)
     try:
         summary = import_file(

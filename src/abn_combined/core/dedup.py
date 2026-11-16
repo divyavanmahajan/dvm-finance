@@ -51,7 +51,8 @@ def generate_transaction_id(trans: dict[str, Any]) -> str:
     """Generate a deterministic unique ID for a transaction.
 
     PayPal: ``account_paypal_transaction_id``. Wise: ``account_wise_transaction_id``.
-    SEB: ``account_seb_voucher_id``. Otherwise ``account_date_amount_deschash``.
+    SEB: ``account_seb_voucher_id``. First Tech: ``account_ftfcu_fitid``.
+    Otherwise ``account_date_amount_deschash``.
     """
     account = str(trans.get("accountNumber", ""))
 
@@ -66,6 +67,10 @@ def generate_transaction_id(trans: dict[str, Any]) -> str:
     seb_voucher_id = trans.get("seb_voucher_id")
     if seb_voucher_id:
         return f"{account}_{seb_voucher_id}"
+
+    ftfcu_fitid = trans.get("ftfcu_fitid")
+    if ftfcu_fitid:
+        return f"{account}_{ftfcu_fitid}"
 
     date = str(trans.get("transactiondate", ""))
     amount = str(trans.get("amount", ""))

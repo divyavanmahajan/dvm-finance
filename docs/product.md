@@ -4,7 +4,9 @@
 
 ## Goals
 
-- Download (ABN AMRO, PayPal) and upload (MT940/XLS/CSV/PayPal/Wise/SEB) statements from the web UI; auto-import with dedup and rule application.
+- Download (ABN AMRO, PayPal, Wise, SEB, First Tech Federal Credit Union) and upload (MT940/XLS/CSV/PayPal/Wise/SEB/First Tech OFX) statements from the web UI; auto-import with dedup and rule application.
+- The First Tech download gets one OFX file for all accounts. Log in to First Tech in the debug Chrome when the job asks. The job attaches to Chrome only after the login, because the Cloudflare check on the login page fails while an automation client is attached. The bank gives at most two years of history.
+- The SEB and First Tech parsers convert each amount to the euro with the ECB reference rates. The PayPal parser uses the EUR funding row of a foreign-currency payment, and the ECB rate when no funding row exists. The transactions table shows the original amount and currency before the euro amount of each converted transaction (SEB, Wise, PayPal, First Tech). The detail view also shows the rate.
 - Rule-based categorization with conditions, priorities, tags; fast "create rule from transaction"; preview before saving; stored change reports after every rule change.
 - Two main tabs: **Transactions** (redesigned simple filter bar, URL-encoded filters; include and **exclude** category filters with subtree semantics; **transfer exclusion by default**) and **Category Trends** (table with cell/row click-through to filtered transactions). Plus Rules, Tags, Budgets, Cash Flow, Download/Upload, Snapshots.
 - **Transfer exclusion**: Transfers (inter-account movements) excluded from all views by default to focus financial reporting on actual spending. Toggles on Transactions, Trends, and Cash Flow pages allow opting-in per-session.

@@ -4,6 +4,18 @@ Parses the "Activity report for balance affecting transactions" (TAB-delimited)
 from https://www.paypal.com/reports/dlog
 
 See web2/specs/PAYPAL_UPLOAD_SPEC.md for full specification.
+
+EUR conversion strategy
+-----------------------
+A payment in another currency gets its EUR amount from the linked EUR funding
+row (Bank Deposit to PP Account or User Initiated Withdrawal). That is the EUR
+amount that PayPal took from the bank. A payment with no funding row (for
+example a subscription paid from a USD balance) gets the ECB reference rate of
+its date, as for SEB; see ``parsers/fx.py``. A bank deposit or a withdrawal
+in another currency (for example a deposit from a USD bank account) gets the
+ECB rate too. Both keep the native amount in
+``original_amount`` and ``original_currency``. If the rates are not available,
+the payment stays in its own currency.
 """
 
 import csv
@@ -12,6 +24,8 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
+
+from .fx import best_rate, build_rate_cache, to_eur
 
 
 def _parse_european_number(value: str) -> Decimal | None:
@@ -146,6 +160,28 @@ def parse_paypal_file(file_path: Path) -> list[dict[str, Any]]:
                         eur_funding_for_parent[ref_id] = (idx, child, float(net))
                         break
 
+    # ECB rates for each non-EUR payment that has no EUR funding row, and for
+    # each non-EUR bank deposit or withdrawal. The fetch runs only when such a
+    # row exists.
+    ecb_dates: dict[str, list[date]] = {}
+    for row in rows:
+        currency = (row.get("Currency") or "").strip().upper()
+        txn_id = (row.get("Transaction ID") or "").strip()
+        ttype = (row.get("Type") or "").strip()
+        trans_date = _parse_date(row.get("Date") or "")
+        if not currency or currency == "EUR" or not trans_date:
+            continue
+        has_name = bool((row.get("Name") or "").strip())
+        is_unfunded_payment = has_name and txn_id not in eur_funding_for_parent
+        is_funding = not has_name and (
+            "Bank Deposit to PP Account" in ttype or ttype == "User Initiated Withdrawal"
+        )
+        if is_unfunded_payment or is_funding:
+            ecb_dates.setdefault(currency, []).append(trans_date)
+    ecb_rates = {
+        currency: build_rate_cache(dates, currency) for currency, dates in ecb_dates.items()
+    }
+
     # Process rows
     bank_deposit_type = "Bank Deposit to PP Account "
     user_withdrawal_type = "User Initiated Withdrawal"
@@ -194,6 +230,18 @@ def parse_paypal_file(file_path: Path) -> list[dict[str, Any]]:
                     raw["original_amount"] = float(net)
                     raw["eur_amount"] = amount
                     raw["eur_currency"] = "EUR"
+                    raw["eur_conversion"] = "paypal_funding"
+                elif currency and net_val is not None:
+                    rate = best_rate(ecb_rates.get(currency, {}), trans_date)
+                    if rate and rate > 0:
+                        amount = to_eur(net_val, rate)
+                        curr_stored = "EUR"
+                        raw["original_currency"] = currency
+                        raw["original_amount"] = float(net_val)
+                        raw["eur_amount"] = amount
+                        raw["eur_currency"] = "EUR"
+                        raw["eur_rate_used"] = rate
+                        raw["eur_conversion"] = "ecb_reference_rate"
 
             trans = {
                 "accountNumber": account,
@@ -228,11 +276,26 @@ def parse_paypal_file(file_path: Path) -> list[dict[str, Any]]:
             # Description: Type + ":" + Reference Txn ID
             description = f"{ttype}:{ref_id}" if ref_id else ttype
 
+            # A deposit can come from a bank account in another currency.
+            amount = net
+            curr_stored = currency or "EUR"
+            if curr_stored != "EUR" and net_val is not None:
+                rate = best_rate(ecb_rates.get(curr_stored, {}), trans_date)
+                if rate and rate > 0:
+                    amount = to_eur(net_val, rate)
+                    raw["original_currency"] = curr_stored
+                    raw["original_amount"] = float(net_val)
+                    raw["eur_amount"] = amount
+                    raw["eur_currency"] = "EUR"
+                    raw["eur_rate_used"] = rate
+                    raw["eur_conversion"] = "ecb_reference_rate"
+                    curr_stored = "EUR"
+
             trans = {
                 "accountNumber": account,
                 "transactiondate": trans_date,
-                "amount": net,
-                "currency": "EUR",
+                "amount": amount,
+                "currency": curr_stored,
                 "description": description,
                 "description_structured": json.dumps(raw, ensure_ascii=False),
                 "category": "transfer-paypal",
