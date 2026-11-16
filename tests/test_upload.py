@@ -102,7 +102,7 @@ def test_import_unknown_format_raises(app, settings):
 # --- API -----------------------------------------------------------------
 
 def test_upload_page_renders(client):
-    resp = client.get("/upload")
+    resp = client.get("/import")
     assert resp.status_code == 200
     assert "Upload a statement" in resp.text
 

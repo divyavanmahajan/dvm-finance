@@ -1,6 +1,7 @@
-"""Snapshots page: export/download versioned snapshots, incoming-wins import.
+"""Export page: export/download versioned snapshots, incoming-wins import.
 
-Claims ``GET /snapshots`` from the placeholder. Export writes a gzipped JSON
+Claims ``GET /export``. ``GET /snapshots`` (the old name of the page) redirects
+there. The POST endpoints keep their ``/snapshots/…`` paths. Export writes a gzipped JSON
 snapshot to ``<data_dir>/snapshots/`` and returns it as a browser download; the
 page lists past exports and shows stored import reports. Import validates the
 file, backs up the DB, then merges in one transaction (see core.snapshots).
@@ -8,14 +9,16 @@ file, backs up the DB, then merges in one transaction (see core.snapshots).
 
 from __future__ import annotations
 
+import html
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Form, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from ..core.models import SnapshotImport
 from ..core.snapshots import (
+    SampleDataPresent,
     SnapshotError,
     export_snapshot,
     get_last_delta_export_at,
@@ -46,6 +49,8 @@ def _render(
     db: Session,
     *,
     error: str | None = None,
+    export_error: str | None = None,
+    auto_share: bool = False,
     imported_id: int | None = None,
     status_code: int = 200,
 ) -> HTMLResponse:
@@ -58,12 +63,14 @@ def _render(
     )
     ctx = {
         "request": request,
-        "active_path": "/snapshots",
-        "title": "Snapshots",
+        "active_path": "/export",
+        "title": "Export",
         "exports": list_exports(settings.data_dir),
         "imports": imports,
         "imported_id": imported_id,
         "error": error,
+        "export_error": export_error,
+        "auto_share": auto_share,
         "last_delta_export_at": get_last_delta_export_at(db),
     }
     return _templates(request).TemplateResponse(
@@ -71,24 +78,41 @@ def _render(
     )
 
 
-@router.get("/snapshots", response_class=HTMLResponse, include_in_schema=False)
-def snapshots_page(
-    request: Request, imported: int | None = None, db: Session = Depends(get_db)
+@router.get("/export", response_class=HTMLResponse, include_in_schema=False)
+def export_page(
+    request: Request,
+    imported: int | None = None,
+    share: str | None = None,
+    db: Session = Depends(get_db),
 ) -> HTMLResponse:
-    return _render(request, db, imported_id=imported)
+    """Render the page. ``share=1`` only makes the page script start a share
+    with a POST; this GET handler starts nothing."""
+    return _render(request, db, imported_id=imported, auto_share=share == "1")
+
+
+@router.get("/snapshots", include_in_schema=False)
+def snapshots_redirect(request: Request) -> RedirectResponse:
+    from .imports import redirect_keeping_query
+
+    return redirect_keeping_query(request, "/export")
 
 
 @router.post("/snapshots/export", include_in_schema=False)
-def snapshots_export(request: Request, db: Session = Depends(get_db)) -> FileResponse:
+def snapshots_export(
+    request: Request, db: Session = Depends(get_db)
+) -> Response:
     settings = _settings(request)
-    path = export_snapshot(db, settings.data_dir)
+    try:
+        path = export_snapshot(db, settings.data_dir)
+    except SampleDataPresent as exc:
+        return _render(request, db, export_error=str(exc), status_code=409)
     return FileResponse(path, filename=path.name, media_type="application/gzip")
 
 
 @router.post("/snapshots/export-delta", include_in_schema=False)
 def snapshots_export_delta(
     request: Request, since: str = Form(""), db: Session = Depends(get_db)
-) -> FileResponse:
+) -> Response:
     """Export a delta snapshot (only transactions changed since ``since``).
 
     ``since`` comes from a ``datetime-local`` input (``YYYY-MM-DDTHH:MM``); an
@@ -105,7 +129,10 @@ def snapshots_export_delta(
             since_dt = None
     if since_dt is None:
         since_dt = get_last_delta_export_at(db) or datetime.fromtimestamp(0)
-    path = export_snapshot(db, settings.data_dir, since=since_dt)
+    try:
+        path = export_snapshot(db, settings.data_dir, since=since_dt)
+    except SampleDataPresent as exc:
+        return _render(request, db, export_error=str(exc), status_code=409)
     return FileResponse(path, filename=path.name, media_type="application/gzip")
 
 
@@ -122,7 +149,13 @@ def snapshots_share(request: Request, db: Session = Depends(get_db)) -> HTMLResp
     from ..core.share import SHARE_TIMEOUT_SECONDS, start_share
 
     settings = _settings(request)
-    path = export_snapshot(db, settings.data_dir)
+    try:
+        path = export_snapshot(db, settings.data_dir)
+    except SampleDataPresent as exc:
+        # No file and no share server: show the reason in the QR area.
+        return HTMLResponse(
+            f'<div class="alert alert-warning mt-3 mb-0" role="alert">{html.escape(str(exc))}</div>'
+        )
     share = start_share(path)
     qr_data_uri = segno.make(share.url, error="m").svg_data_uri(scale=4)
     logger.info("snapshot_share_created", file=path.name)
@@ -172,4 +205,4 @@ async def snapshots_import(
     # import_snapshot backs up the DB file first and merges in ONE transaction;
     # it does NOT reapply rules — the snapshot's categorization is authoritative.
     result = import_snapshot(db, payload, settings.db_path)
-    return RedirectResponse(url=f"/snapshots?imported={result.id}", status_code=303)
+    return RedirectResponse(url=f"/export?imported={result.id}", status_code=303)

@@ -58,14 +58,12 @@ struct TransactionsListView: View {
 
     var body: some View {
         List {
-            if isDatabaseEmpty {
+            // While the database is empty, the overlay below holds the
+            // offer, and the summary row would only show "0 transactions".
+            if !isDatabaseEmpty {
                 Section {
-                    emptyDatabaseOffer
+                    summaryRow
                 }
-            }
-
-            Section {
-                summaryRow
             }
 
             ForEach(sections, id: \.date) { section in
@@ -85,6 +83,14 @@ struct TransactionsListView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .overlay {
+            // An overlay, not a list row: a list row limits the height of
+            // the action area, and the button then loses its label. The
+            // overlay keeps the title, the search field, and the toolbar.
+            if isDatabaseEmpty {
+                emptyDatabaseOffer
+            }
+        }
         .navigationTitle("Transactions")
         .searchable(text: searchText, prompt: "Search description")
         .toolbar {
@@ -187,7 +193,7 @@ struct TransactionsListView: View {
         ContentUnavailableView {
             Label("No transactions yet", systemImage: "tray")
         } description: {
-            Text("Import a statement file or a snapshot in the Import tab. Or load sample data to try the app. You can remove the sample data in the Help tab.")
+            Text("Import a statement file or a snapshot in the Import tab. Or load sample data to try the app. You can remove the sample data in the Import tab or the Help tab.")
         } actions: {
             Button {
                 Task { await loadSampleData() }
@@ -195,7 +201,9 @@ struct TransactionsListView: View {
                 Label("Load sample data", systemImage: "wand.and.stars")
             }
             .buttonStyle(.borderedProminent)
+            .controlSize(.large)
             .disabled(isLoadingSample)
+            .accessibilityIdentifier("loadSampleDataButton")
         }
     }
 
@@ -301,22 +309,26 @@ private struct TransactionRow: View {
     let transaction: TransactionRecord
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
+        // The description and the amount share the first line. The chips get
+        // the full width of the row below them, so that a long category or
+        // tag name shows in full (design D3a).
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 12) {
                 Text(transaction.description?.isEmpty == false ? transaction.description! : "(no description)")
                     .font(.body)
                     .lineLimit(2)
-                HStack(spacing: 6) {
-                    CategoryChip(category: TransactionQuery.effectiveCategory(transaction))
-                    if let tags = TransactionQuery.effectiveTags(transaction), !tags.isEmpty {
-                        TagChips(tags: tags)
-                    }
+                Spacer(minLength: 8)
+                Text(DisplayFormat.currency(transaction.amount, code: transaction.currency))
+                    .font(.callout.weight(.medium).monospacedDigit())
+                    .foregroundStyle(transaction.amount > 0 ? Theme.income : Color.primary)
+            }
+            FlowLayout {
+                CategoryChip(category: TransactionQuery.effectiveCategory(transaction), wraps: true)
+                    .accessibilityIdentifier("transactionRowCategory")
+                if let tags = TransactionQuery.effectiveTags(transaction), !tags.isEmpty {
+                    TagChips(tags: tags, wraps: true)
                 }
             }
-            Spacer(minLength: 8)
-            Text(DisplayFormat.currency(transaction.amount, code: transaction.currency))
-                .font(.callout.weight(.medium).monospacedDigit())
-                .foregroundStyle(transaction.amount > 0 ? Theme.income : Color.primary)
         }
         .padding(.vertical, 4)
     }

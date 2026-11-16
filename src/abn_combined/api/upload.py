@@ -1,11 +1,10 @@
-"""Manual upload endpoint and Upload page."""
+"""Manual upload endpoint. The upload form is on the Import page (api/imports.py)."""
 
 from __future__ import annotations
 
 from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
@@ -29,13 +28,9 @@ def _templates(request: Request):
     return templates
 
 
-@router.get("/upload", response_class=HTMLResponse, include_in_schema=False)
-def upload_page(request: Request) -> HTMLResponse:
-    return _templates(request).TemplateResponse(
-        request,
-        "upload.html",
-        {"active_path": "/upload", "title": "Upload", "formats": VALID_FORMATS},
-    )
+def upload_context() -> dict:
+    """The template context of the upload form on the Import page."""
+    return {"formats": VALID_FORMATS}
 
 
 @router.post("/api/upload")

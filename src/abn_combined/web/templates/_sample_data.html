@@ -1,0 +1,30 @@
+{# Sample data controls. The Import page and the Help page include this
+   fragment. The load and remove forms replace the fragment in place. #}
+<section id="sample-data" class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h2 class="h5"><i class="bi bi-magic"></i> Sample data</h2>
+    <p class="text-muted small mb-3">
+      The sample data is one year of fictional transactions and five budgets.
+      The app adds it next to your own data and does not change your data.
+      Remove the sample data before you export a snapshot.
+    </p>
+    {% if sample_loaded %}
+    <form hx-post="/sample-data/remove" hx-target="#sample-data" hx-swap="outerHTML"
+          action="/sample-data/remove" method="post" hx-disabled-elt="button">
+      <button type="submit" class="btn btn-outline-danger">
+        <i class="bi bi-trash"></i> Remove sample data
+      </button>
+    </form>
+    {% else %}
+    <form hx-post="/sample-data/load" hx-target="#sample-data" hx-swap="outerHTML"
+          action="/sample-data/load" method="post" hx-disabled-elt="button">
+      <button type="submit" class="btn btn-outline-primary">
+        <i class="bi bi-magic"></i> Load sample data
+      </button>
+    </form>
+    {% endif %}
+    {% if sample_message %}
+    <p class="small mt-2 mb-0" role="status">{{ sample_message }}</p>
+    {% endif %}
+  </div>
+</section>

@@ -44,33 +44,35 @@
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav nav-underline flex-grow-1">
           {% for path, label in nav_tabs %}
+          {% if label == 'Help' %}
+          <li class="nav-item">
+            <a class="nav-link text-nowrap" href="{{ share_to_phone_url }}"
+               title="Share to phone" aria-label="Share to phone" data-testid="nav-share-to-phone">
+              <i class="bi bi-qr-code" aria-hidden="true"></i>
+              <span class="d-lg-none">Share to phone</span>
+            </a>
+          </li>
+          {% endif %}
           <li class="nav-item">
             <a class="nav-link text-nowrap {% if path == active_path %}active{% endif %}" href="{{ path }}" {% if path == active_path %}aria-current="page"{% endif %}>
-              {% if label == 'Transactions' %}<i class="bi bi-list-check"></i>
-              {% elif label == 'Trends' %}<i class="bi bi-graph-up"></i>
-              {% elif label == 'Rules' %}<i class="bi bi-sliders"></i>
-              {% elif label == 'Tags' %}<i class="bi bi-tags"></i>
-              {% elif label == 'Budgets' %}<i class="bi bi-piggy-bank"></i>
-              {% elif label == 'Cash Flow' %}<i class="bi bi-cash-flow"></i>
-              {% elif label == 'Cash' %}<i class="bi bi-wallet2"></i>
-              {% endif %}
+              <i class="bi {{ nav_icons[label] }}" aria-hidden="true"></i>
               {{ label }}
             </a>
           </li>
           {% endfor %}
         </ul>
 
-        <!-- Utility menu (right-aligned) -->
+        <!-- Menu of the less frequent pages (right-aligned) -->
+        {% set menu_active = nav_menu | selectattr(0, 'equalto', active_path) | list %}
         <ul class="navbar-nav ms-auto">
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle" href="#" id="utilityDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <a class="nav-link dropdown-toggle {% if menu_active %}active{% endif %}" href="#" id="utilityDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="More pages">
               <i class="bi bi-three-dots-vertical"></i>
             </a>
             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="utilityDropdown">
-              <li><a class="dropdown-item" href="/download"><i class="bi bi-download"></i> Download</a></li>
-              <li><a class="dropdown-item" href="/upload"><i class="bi bi-upload"></i> Upload</a></li>
-              <li><a class="dropdown-item" href="/snapshots"><i class="bi bi-camera"></i> Snapshots</a></li>
-              <li><a class="dropdown-item {% if active_path == '/merge' %}active{% endif %}" href="/merge"><i class="bi bi-intersect"></i> Duplicates</a></li>
+              {% for path, label in nav_menu %}
+              <li><a class="dropdown-item {% if path == active_path %}active{% endif %}" href="{{ path }}" {% if path == active_path %}aria-current="page"{% endif %}><i class="bi {{ nav_icons[label] }}" aria-hidden="true"></i> {{ label }}</a></li>
+              {% endfor %}
             </ul>
           </li>
         </ul>

@@ -126,23 +126,45 @@ a transfer-exclusion toggle so you're looking at real income and spending.
 
 ## Getting statements in
 
+The **Import** page holds two ways to get statements in. The download sources
+are at the top, and the upload form is below them.
+
 ### Download
 
-The **Download** tab fetches statements directly from supported providers
+The download sources get statements directly from supported providers
 (ABN AMRO, PayPal). It opens a browser for you to authenticate; once you're in,
 statements are imported automatically with dedup and rule application, and you
 get a summary.
 
 ### Upload
 
-The **Upload** tab imports statement files you already have. Supported formats:
+The upload form imports statement files you already have. Supported formats:
 **MT940**, **XLS/XLSX**, **CSV**, **PayPal**, **Wise**, and **SEB**. Files are
 de-duplicated on import, so re-uploading an overlapping export won't create
 double entries.
 
 ---
 
-## Snapshots — sharing & backup
+### Sample data
+
+To try the app before you import real data, load the sample data. The sample
+data is one year of fictional transactions and five budgets.
+
+- When the database holds no transaction, the **Transactions** page shows a
+  **Load sample data** button.
+- The **Import** page and this **Help** page show **Load sample data** or
+  **Remove sample data**.
+- The load adds rows next to your data. It does not change your data.
+- The removal deletes only the sample rows.
+- Remove the sample data before you export a snapshot. The app does not export
+  or share a snapshot while the sample data is present.
+
+---
+
+## Export — sharing & backup
+
+Open the **Export** page from the **⋮** menu at the right end of the top bar.
+The **⋮** menu also holds **Rules**, **Tags**, and **Duplicates**.
 
 A **snapshot** is a compressed (`.json.gz`) copy of your data. Snapshots let you
 back up, move between machines, or share with one other person.

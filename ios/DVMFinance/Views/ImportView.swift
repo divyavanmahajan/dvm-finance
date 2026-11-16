@@ -3,8 +3,9 @@ import UniformTypeIdentifiers
 import DVMFinanceKit
 
 /// The Import tab (`ios/docs/spec.md` "UI" §3): statement file import,
-/// snapshot import, snapshot export, and read-only audit history
-/// (`snapshot_imports` / `rule_change_reports`).
+/// snapshot import, snapshot export, read-only audit history
+/// (`snapshot_imports` / `rule_change_reports`), the sample data controls,
+/// and, as the last section, "Delete all data" (`ios-data-reset`).
 ///
 /// Business logic (parsing, dedup, rule application, snapshot merge) is
 /// entirely `DVMFinanceKit` calls; this view only picks files, dispatches to
@@ -26,6 +27,13 @@ struct ImportView: View {
     @State private var statementSummary: StatementImportSummary?
     @State private var snapshotImportSummary: SnapshotImportSummaryDisplay?
     @State private var exportedFileURL: URL?
+
+    /// "Delete all data": the flag of the confirmation prompt, the result
+    /// message, and a counter that makes `SampleDataSection` read its state
+    /// again after the reset.
+    @State private var showDeleteAllConfirmation = false
+    @State private var deleteAllMessage: String?
+    @State private var resetCount = 0
 
     /// The `since` boundary for a delta export. Defaults to the stored
     /// last-delta-export marker (`export_state.last_delta_export_at`) when one
@@ -104,6 +112,13 @@ struct ImportView: View {
                         Label("Categorization runs", systemImage: "list.bullet.clipboard")
                     }
                 }
+
+                SampleDataSection(
+                    footer: "Remove the sample data before you export a snapshot.",
+                    refreshID: resetCount
+                )
+
+                deleteAllSection
             }
             .navigationTitle("Import")
             .task { await loadDeltaSinceDefault() }
@@ -136,6 +151,20 @@ struct ImportView: View {
                 }
                 Button("Cancel", role: .cancel) { pendingStatementURL = nil }
             }
+            // An alert, not a confirmation dialog: on iOS 26 a confirmation
+            // dialog shows as a popover without the "Cancel" action. The
+            // alert shows both actions on the iPhone and on the iPad.
+            .alert(
+                "Delete all data?",
+                isPresented: $showDeleteAllConfirmation
+            ) {
+                Button("Delete all data", role: .destructive) {
+                    Task { await deleteAllData() }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(Self.deleteAllWarning)
+            }
             .sheet(isPresented: $showQRSync) {
                 // The whole scan → download → import → summary flow is
                 // self-contained in SyncFromComputerView; the import it runs
@@ -156,6 +185,55 @@ struct ImportView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Delete all data
+
+    /// The warning of the confirmation prompt (`ios-data-reset`).
+    static let deleteAllWarning = "This removes every transaction, rule, tag, budget, and history record from this device. You cannot undo it. To keep a copy, export a snapshot first."
+
+    /// The last section of the tab: a red destructive button with a warning
+    /// icon. The button only opens the confirmation prompt.
+    private var deleteAllSection: some View {
+        Section {
+            Button(role: .destructive) {
+                showDeleteAllConfirmation = true
+            } label: {
+                Label("Delete all data", systemImage: "exclamationmark.triangle.fill")
+            }
+            .foregroundStyle(.red)
+            .disabled(isBusy)
+            .accessibilityIdentifier("deleteAllDataButton")
+            if let deleteAllMessage {
+                Text(deleteAllMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("deleteAllDataMessage")
+            }
+        } footer: {
+            Text("Deletes all data on this device and keeps the app. Export a snapshot first to keep a copy.")
+        }
+    }
+
+    /// Runs the reset in one write transaction, then deletes the exported
+    /// snapshot files. The other tabs read the database again when they
+    /// appear.
+    private func deleteAllData() async {
+        guard let appDatabase else { return }
+        isBusy = true
+        deleteAllMessage = nil
+        defer { isBusy = false }
+        do {
+            let count = try await AppQueries.deleteAllData(appDatabase: appDatabase, dataDirectory: appDataDirectory)
+            deleteAllMessage = "Deleted \(count) transaction\(count == 1 ? "" : "s") and all other data."
+            // The reset deleted the exported file, so the share link must go.
+            exportedFileURL = nil
+            deltaSince = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+        } catch {
+            // The transaction rolled back, so all data stays.
+            deleteAllMessage = "Couldn't delete the data. All data stays. \(error.localizedDescription)"
+        }
+        resetCount += 1
     }
 
     // MARK: - UTType lists (built defensively — a filename-extension UTType

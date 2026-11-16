@@ -101,7 +101,7 @@ def test_share_stop_route(client) -> None:
 
 
 def test_snapshots_page_has_share_button(client) -> None:
-    resp = client.get("/snapshots")
+    resp = client.get("/export")
     assert resp.status_code == 200
     assert "Share to phone" in resp.text
     assert 'id="share-qr"' in resp.text
