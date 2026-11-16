@@ -114,6 +114,7 @@ def download_page(
     abn_from, abn_to = _abn_default_dates(db)
     pp_from, pp_to = _paypal_default_dates(db)
     wise_from, wise_to = _iso_default_dates(db, "wise")
+    ftfcu_from, ftfcu_to = _iso_default_dates(db, "ftfcu")
 
     from ..downloaders.browser import DEFAULT_CDP_URL, chrome_launch_command
 
@@ -127,12 +128,15 @@ def download_page(
             "paypal_job": registry.get("paypal"),
             "wise_job": registry.get("wise"),
             "seb_job": registry.get("seb"),
+            "ftfcu_job": registry.get("ftfcu"),
             "abn_from": abn_from,
             "abn_to": abn_to,
             "pp_from": pp_from,
             "pp_to": pp_to,
             "wise_from": wise_from,
             "wise_to": wise_to,
+            "ftfcu_from": ftfcu_from,
+            "ftfcu_to": ftfcu_to,
             "chrome_launch_command": chrome_launch_command(),
             "default_cdp_url": DEFAULT_CDP_URL,
         },
@@ -266,6 +270,54 @@ def start_seb_download(
     return _status_partial(request, "seb")
 
 
+@router.post("/api/download/ftfcu", response_class=HTMLResponse)
+def start_ftfcu_download(
+    request: Request,
+    from_date: Annotated[str, Form()] = "",
+    to_date: Annotated[str, Form()] = "",
+    cdp_url: Annotated[str, Form()] = "",
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    """Start a First Tech Federal Credit Union download job in a background thread."""
+    registry = get_registry()
+
+    if registry.is_running("ftfcu"):
+        raise HTTPException(status_code=409, detail="First Tech download already running.")
+
+    if not from_date or not to_date:
+        from_date, to_date = _iso_default_dates(db, "ftfcu")
+
+    from ..downloaders.browser import DEFAULT_CDP_URL
+    from ..downloaders.ftfcu import clamp_range, run_ftfcu_job
+
+    # Reject a malformed date before any browser work. The job clamps the
+    # start to the two years of history that the bank gives.
+    try:
+        clamp_range(from_date, to_date)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400, detail=f"Invalid date range: {exc}; expected YYYY-MM-DD."
+        ) from exc
+
+    if not cdp_url:
+        cdp_url = DEFAULT_CDP_URL
+
+    settings = request.app.state.settings
+    registry.create("ftfcu")
+
+    t = threading.Thread(
+        target=run_ftfcu_job,
+        args=(registry, settings, from_date, to_date),
+        kwargs={"cdp_url": cdp_url},
+        daemon=True,
+        name="ftfcu-download",
+    )
+    t.start()
+
+    logger.info("ftfcu_job_started", from_date=from_date, to_date=to_date)
+    return _status_partial(request, "ftfcu")
+
+
 @router.post("/api/download/launch-chrome", response_class=HTMLResponse)
 def launch_chrome(
     request: Request,
@@ -333,7 +385,7 @@ def start_paypal_download(
 @router.get("/api/download/{source}/status", response_class=HTMLResponse)
 def download_status(source: str, request: Request) -> HTMLResponse:
     """Return the htmx status partial for *source*.  Polled every ~2 s."""
-    if source not in ("abn", "paypal", "wise", "seb"):
+    if source not in ("abn", "paypal", "wise", "seb", "ftfcu"):
         raise HTTPException(status_code=404, detail=f"Unknown source: {source}")
     return _status_partial(request, source)
 

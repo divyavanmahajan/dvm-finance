@@ -100,3 +100,91 @@ class TestPayPalParser(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# A non-EUR payment with no EUR funding row: ECB reference rate, as for SEB
+# ---------------------------------------------------------------------------
+
+UNFUNDED = Path(__file__).parent / "fixtures" / "paypal_usd_unfunded.TXT"
+
+
+def _ecb(monkeypatch, cache):
+    import abn_combined.parsers.paypal as paypal_mod
+
+    calls: list[tuple] = []
+
+    def _fake(dates, currency):
+        calls.append((sorted(set(dates)), currency))
+        return dict(cache)
+
+    monkeypatch.setattr(paypal_mod, "build_rate_cache", _fake)
+    return calls
+
+
+def test_unfunded_usd_payment_uses_ecb_rate(monkeypatch):
+    import json
+
+    calls = _ecb(monkeypatch, {date(2025, 12, 23): 1.15, date(2026, 1, 2): 1.20})
+    by_id = {t["paypal_transaction_id"]: t for t in parse_paypal_file(UNFUNDED)}
+
+    # The USD payments and the USD deposit ask for rates, in one request for USD.
+    assert calls == [([date(2025, 12, 28), date(2026, 1, 3)], "USD")]
+
+    small = by_id["TESTUSD0000000001"]  # 2025-12-28 → most recent earlier rate 1.15
+    assert small["currency"] == "EUR"
+    assert small["amount"] == -6.0  # -6.90 / 1.15
+    raw = json.loads(small["description_structured"])
+    assert raw["original_amount"] == -6.90
+    assert raw["original_currency"] == "USD"
+    assert raw["eur_rate_used"] == 1.15
+    assert raw["eur_conversion"] == "ecb_reference_rate"
+
+    large = by_id["TESTUSD0000000002"]  # -1.234,56 / 1.20 = -1028.80
+    assert large["amount"] == -1028.8
+    assert json.loads(large["description_structured"])["original_amount"] == -1234.56
+
+    # The USD bank deposit that funds the subscription converts at the same
+    # rate, so the pair nets to zero in EUR.
+    deposit = by_id["TESTDEP0000000004"]
+    assert deposit["currency"] == "EUR"
+    assert deposit["amount"] == 6.0
+    assert deposit["category"] == "transfer-paypal"
+    raw_dep = json.loads(deposit["description_structured"])
+    assert raw_dep["original_amount"] == 6.90
+    assert raw_dep["original_currency"] == "USD"
+
+    euro = by_id["TESTEUR0000000003"]
+    assert euro["amount"] == -12.5
+    assert "original_currency" not in json.loads(euro["description_structured"])
+
+
+def test_unfunded_usd_payment_without_rates_stays_in_usd(monkeypatch):
+    import json
+
+    _ecb(monkeypatch, {})
+    by_id = {t["paypal_transaction_id"]: t for t in parse_paypal_file(UNFUNDED)}
+    t = by_id["TESTUSD0000000001"]
+    assert t["currency"] == "USD"
+    assert t["amount"] == -6.90
+    assert "original_currency" not in json.loads(t["description_structured"])
+    # The deposit keeps its own currency too; it is not labelled EUR.
+    assert by_id["TESTDEP0000000004"]["currency"] == "USD"
+    assert by_id["TESTDEP0000000004"]["amount"] == 6.90
+
+
+def test_funded_payment_keeps_paypal_eur_amount(monkeypatch):
+    """A payment with an EUR funding row keeps the EUR that PayPal took; no ECB fetch."""
+    import json
+
+    calls = _ecb(monkeypatch, {date(2020, 1, 1): 99.0})
+    converted = [
+        t for t in parse_paypal_file(FIXTURE)
+        if "original_currency" in json.loads(t["description_structured"])
+    ]
+    assert converted
+    assert calls == []
+    for t in converted:
+        raw = json.loads(t["description_structured"])
+        assert raw["eur_conversion"] == "paypal_funding"
+        assert "eur_rate_used" not in raw

@@ -3,7 +3,7 @@
 {% block content %}
 <div class="mb-4">
   <h1 class="h2">Download statements</h1>
-  <p class="text-muted">Trigger ABN AMRO, PayPal, Wise or SEB downloads. Jobs run in the background; status updates every 2 s.</p>
+  <p class="text-muted">Trigger ABN AMRO, PayPal, Wise, SEB or First Tech downloads. Jobs run in the background; status updates every 2 s.</p>
 </div>
 
 {# ── Shared Chrome connection panel ──────────────────────────────────── #}
@@ -219,6 +219,59 @@
         {% if seb_job %}
           {% set source = "seb" %}
           {% set job = seb_job %}
+          {% include "_download_status.html" %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# ── First Tech card ────────────────────────────────────────────────── #}
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header bg-body-secondary">
+        <h5 class="mb-0">First Tech Federal Credit Union</h5>
+      </div>
+      <div class="card-body">
+        <form
+          hx-post="/api/download/ftfcu"
+          hx-target="#ftfcu-status"
+          hx-swap="innerHTML"
+          hx-include="#cdp-url"
+          hx-disabled-elt="button[type=submit]">
+
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label for="ftfcu-from" class="form-label">From (YYYY-MM-DD)</label>
+              <input type="text" id="ftfcu-from" class="form-control" name="from_date" value="{{ ftfcu_from }}"
+                     pattern="\d{4}-\d{2}-\d{2}" placeholder="YYYY-MM-DD">
+            </div>
+            <div class="col-md-6">
+              <label for="ftfcu-to" class="form-label">To (YYYY-MM-DD)</label>
+              <input type="text" id="ftfcu-to" class="form-control" name="to_date" value="{{ ftfcu_to }}"
+                     pattern="\d{4}-\d{2}-\d{2}" placeholder="YYYY-MM-DD">
+            </div>
+          </div>
+
+          <p class="text-muted small mb-3">
+            The job downloads one OFX file for all accounts. It converts each USD amount to EUR.
+            The bank gives at most two years of history.
+          </p>
+          <p class="text-muted small mb-3">
+            Do not start another download before the First Tech login is complete.
+            Another download job can stop the Cloudflare check on the login page.
+            Then log in to First Tech in the Chrome window when the job asks.
+          </p>
+
+          <div id="ftfcu-submit">
+            {% set source = "ftfcu" %}{% set job = ftfcu_job %}
+            {% include "_download_submit.html" %}
+          </div>
+        </form>
+      </div>
+      <div id="ftfcu-status">
+        {% if ftfcu_job %}
+          {% set source = "ftfcu" %}
+          {% set job = ftfcu_job %}
           {% include "_download_status.html" %}
         {% endif %}
       </div>

@@ -9,16 +9,9 @@ File format:
 EUR conversion strategy
 -----------------------
 Every transaction is stored in EUR. The native SEK amount is preserved in
-description_structured. EUR/SEK reference rates are fetched in a single
-request from the ECB XML feed (no API key required):
-
-    90-day:  https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml
-    history: https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.xml
-
-Rate lookup order:
-  1. Exact date from ECB feed
-  2. Most recent earlier business day in the cache (ECB doesn't publish on weekends/holidays)
-  3. If all fetches fail, transactions are stored in SEK as best-effort
+description_structured. The EUR/SEK reference rates come from the ECB feed;
+see ``parsers/fx.py`` for the feed and the rate lookup order. If all fetches
+fail, transactions are stored in SEK as best-effort.
 
 Deduplication
 -------------
@@ -30,18 +23,15 @@ how wise_transaction_id works.
 
 import csv
 import json
-import urllib.request
-import xml.etree.ElementTree as ET
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
+from .fx import best_rate, build_rate_cache, parse_ecb_xml
+
 _ACCOUNT = "seb:divyavanmahajan"
 _NATIVE_CURRENCY = "SEK"
-_ECB_NS = "http://www.ecb.int/vocabulary/2002-08-01/eurofxref"
-_ECB_90D_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml"
-_ECB_HIST_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.xml"
 
 
 def _parse_decimal(value: str) -> float | None:
@@ -68,60 +58,17 @@ def _parse_date(value: str) -> date | None:
 
 def _parse_ecb_xml(url: str) -> dict[date, float]:
     """Fetch and parse an ECB eurofxref XML file, returning {date: EUR/SEK rate}."""
-    cache: dict[date, float] = {}
-    try:
-        with urllib.request.urlopen(url, timeout=15) as resp:
-            tree = ET.parse(resp)
-        root = tree.getroot()
-        for day_cube in root.findall(f".//{{{_ECB_NS}}}Cube[@time]"):
-            day_str = day_cube.get("time")
-            if not day_str:
-                continue
-            try:
-                d = datetime.strptime(day_str, "%Y-%m-%d").date()
-            except ValueError:
-                continue
-            for ccy_cube in day_cube.findall(f"{{{_ECB_NS}}}Cube"):
-                if ccy_cube.get("currency") == "SEK":
-                    try:
-                        cache[d] = float(ccy_cube.get("rate", "0"))
-                    except (TypeError, ValueError):
-                        pass
-                    break
-    except Exception:
-        pass
-    return cache
+    return parse_ecb_xml(url, _NATIVE_CURRENCY)
 
 
 def _build_rate_cache(dates: list[date]) -> dict[date, float]:
-    """Return a {date: EUR→SEK rate} cache covering the given dates.
-
-    Fetches the 90-day ECB XML first. If the oldest date in the file predates
-    the 90-day window, also fetches the full history XML.
-    """
-    cache = _parse_ecb_xml(_ECB_90D_URL)
-
-    if dates and cache:
-        oldest_needed = min(dates)
-        oldest_cached = min(cache)
-        if oldest_needed < oldest_cached:
-            hist = _parse_ecb_xml(_ECB_HIST_URL)
-            cache.update(hist)
-
-    return cache
+    """Return a {date: EUR→SEK rate} cache covering the given dates."""
+    return build_rate_cache(dates, _NATIVE_CURRENCY)
 
 
 def _best_rate(cache: dict[date, float], target: date) -> float | None:
     """Return the rate for target, or the most recent earlier rate (weekend/holiday fallback)."""
-    if target in cache:
-        return cache[target]
-    earlier = [d for d in cache if d <= target]
-    if earlier:
-        return cache[max(earlier)]
-    # If target is before all cached dates, use the oldest
-    if cache:
-        return cache[min(cache)]
-    return None
+    return best_rate(cache, target)
 
 
 def parse_seb_file(file_path: Path) -> list[dict[str, Any]]:

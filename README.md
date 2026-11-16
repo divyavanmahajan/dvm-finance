@@ -44,7 +44,7 @@ bind address on an untrusted network.
 
 An empty install offers three ways in: migrate a legacy database (below), upload
 statement files on the **Upload** tab (MT940/STA, ABN XLS, generic CSV, PayPal
-TXT, Wise CSV, SEB CSV), or download directly from the **Download** tab.
+TXT, Wise CSV, SEB CSV, First Tech OFX), or download directly from the **Download** tab.
 
 ## Migrating from abn-analyst
 

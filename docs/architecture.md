@@ -21,8 +21,8 @@ CLI entry ── uvicorn ── FastAPI
    ├─ core/         rule engine + preview + change reports, dedup,
    │                snapshot export/import, legacy migration, models,
    │                manual_txn (hand-entered transactions)
-   ├─ parsers/      mt940, xls, csv, paypal, wise, seb, description
-   └─ downloaders/  abn, paypal (both CDP via browser.py) — background jobs
+   ├─ parsers/      mt940, xls, csv, paypal, wise, seb, ftfcu (OFX via ofxtools), fx (ECB rates), description
+   └─ downloaders/  abn, paypal, wise, seb, ftfcu (all CDP via browser.py) — background jobs
 ```
 
 ## Data model (delta vs abn-analyst)

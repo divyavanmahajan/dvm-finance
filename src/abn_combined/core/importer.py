@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from ..logging_config import get_logger
 from ..parsers import (
     parse_csv_file,
+    parse_ftfcu_file,
     parse_paypal_file,
     parse_seb_file,
     parse_statement_file,
@@ -32,7 +33,7 @@ from .utils import calculate_transaction_hash_components
 logger = get_logger(__name__)
 
 # Explicit format overrides (auto = detect by extension via parse_statement_file).
-VALID_FORMATS = ("auto", "paypal", "wise", "seb", "csv")
+VALID_FORMATS = ("auto", "paypal", "wise", "seb", "ftfcu", "csv")
 
 
 class ImportError_(ValueError):
@@ -71,6 +72,8 @@ def _parse(path: Path, fmt: str, db: Session) -> list[dict]:
         return parse_wise_file(path, db)
     if fmt == "seb":
         return parse_seb_file(path)
+    if fmt == "ftfcu":
+        return parse_ftfcu_file(path)
     if fmt == "csv":
         return parse_csv_file(path)
     return parse_statement_file(path)

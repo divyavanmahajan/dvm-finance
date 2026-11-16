@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -87,7 +88,35 @@ def _row_view(txn: Transaction) -> dict:
         "effective_category": effective_category(txn),
         "effective_tags": effective_tags(txn),
         "is_manual": is_manual(txn),
+        "original": original_amount(txn),
     }
+
+
+def original_amount(txn: Transaction) -> dict | None:
+    """The amount in the original currency of a converted transaction, or None.
+
+    The SEB, Wise and First Tech parsers keep ``native_amount`` and
+    ``native_currency``. The PayPal parser keeps ``original_amount`` and
+    ``original_currency``. The function returns a value only when that
+    currency is not the stored currency. Wise keeps the amount without a sign,
+    so the sign comes from the stored amount.
+    """
+    data = _structured_fields(txn)
+    for amount_key, currency_key in (
+        ("native_amount", "native_currency"),
+        ("original_amount", "original_currency"),
+    ):
+        currency = data.get(currency_key)
+        value = data.get(amount_key)
+        if not currency or value is None or currency == txn.currency:
+            continue
+        try:
+            magnitude = abs(Decimal(str(value)))
+        except (InvalidOperation, ValueError):
+            continue
+        sign = -1 if (txn.amount or 0) < 0 else 1
+        return {"amount": float(sign * magnitude), "currency": currency}
+    return None
 
 
 def _structured_fields(txn: Transaction) -> dict:

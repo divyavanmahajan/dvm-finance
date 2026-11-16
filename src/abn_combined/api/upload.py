@@ -20,7 +20,7 @@ logger = get_logger(__name__)
 class UploadParams(BaseModel):
     """Boundary validation for the upload form's non-file fields."""
 
-    format: Literal["auto", "paypal", "wise", "seb", "csv"] = "auto"
+    format: Literal["auto", "paypal", "wise", "seb", "ftfcu", "csv"] = "auto"
 
 
 def _templates(request: Request):

@@ -42,6 +42,8 @@ dependencies = [
     "xlrd",
     "markdown",
     "segno",
+    # OFX parser for the First Tech Federal Credit Union export.
+    "ofxtools",
     # Required by the statement downloaders, which attach to a running Chrome
     # over CDP. A core dependency (not an extra) so plain `uvx dvm-finance`
     # ships a working Downloads page.
