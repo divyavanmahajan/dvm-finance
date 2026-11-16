@@ -75,7 +75,7 @@ struct SyncFromComputerView: View {
                 QRScannerView { payload in
                     handleScannedPayload(payload)
                 }
-                Text("On your computer, open DVM Finance and choose \u{201C}Sync to phone\u{201D}, then point the camera at the QR code.")
+                Text("On your computer, open the Snapshots page of DVM Finance and click \u{201C}Share to phone\u{201D}. Then point the camera at the QR code.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

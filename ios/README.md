@@ -75,11 +75,29 @@ holds only SwiftUI views and app wiring.
   default, parents rolled up on the first hyphen segment and expandable to
   children; tapping a cell opens the Transactions screen filtered to
   exactly the transactions behind that cell.
+- **Help** — how the app works with the desktop app, the steps for a sync
+  with a file or with the QR code, and the controls that load and remove
+  the sample data.
 - **Import** — statement file import (MT940/.sta/.940, ABN CSV, PayPal,
   Wise, SEB — with dedup, automatic rule application and an audit report),
   snapshot import (incoming-wins merge with a pre-import DB backup),
   "Sync from computer" (see below) and snapshot export via the share
   sheet, plus the audit history of imports and categorization changes.
+
+## Sample data
+
+A new user can try the app before importing real data. When the database
+holds no transaction, the Transactions tab shows **Load sample data**. The
+Help tab holds the same control, and **Remove sample data** when the sample
+data is present.
+
+- The sample data (`DVMFinanceKit/.../Query/SampleDataset.swift`) is one year
+  of fictional transactions and five budgets.
+- The load adds rows and never changes or deletes a row of the user.
+- Each sample transaction id starts with `sample-`, and each sample budget has
+  the note `Sample budget`. The removal deletes only these rows.
+- The app refuses a snapshot export while the sample data is present, so the
+  fictional rows never reach the desktop database.
 
 ## Sync from computer (QR)
 

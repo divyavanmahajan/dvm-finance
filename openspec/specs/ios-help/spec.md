@@ -24,6 +24,27 @@ and never through a shared database file.
 - **THEN** the help describes snapshot import, snapshot export, and sync from
   the computer with a QR code
 
+### Requirement: Steps for the QR code sync
+The help SHALL give the steps for a sync with the QR code. The steps SHALL name
+the "Share to phone" control on the Snapshots page of the desktop application
+and the "Sync from computer" control of the app. The help SHALL tell the user
+that both devices must use the same Wi-Fi network, and that the QR code works
+for one download only and expires after 10 minutes.
+
+#### Scenario: The user reads the QR code steps
+- **WHEN** the user opens the help tab
+- **THEN** the help shows the numbered steps for the QR code sync
+
+### Requirement: Sample data controls
+The help tab SHALL hold a control that loads the sample dataset, and a control
+that removes it. The help tab SHALL show the load control while the sample
+dataset is absent, and the remove control while it is present.
+
+#### Scenario: The user removes the sample data from the help tab
+- **WHEN** the sample dataset is present and the user taps "Remove sample data"
+- **THEN** the app deletes the sample rows, and the help tab shows the load
+  control again
+
 ### Requirement: Offline help
 The app SHALL show the help content when the device has no network connection.
 

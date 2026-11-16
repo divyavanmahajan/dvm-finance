@@ -406,4 +406,39 @@ public enum AppQueries {
                 .fetchAll(db)
         }
     }
+
+    // MARK: - Sample data
+
+    /// `true` when the database holds the sample set. Wraps
+    /// `SampleDataset.isLoaded`.
+    public static func sampleDataLoaded(appDatabase: AppDatabase) async throws -> Bool {
+        try await appDatabase.dbWriter.read { db in
+            try SampleDataset.isLoaded(db: db)
+        }
+    }
+
+    /// `true` when the database holds no live transaction. Wraps
+    /// `SampleDataset.isDatabaseEmpty`.
+    public static func databaseIsEmpty(appDatabase: AppDatabase) async throws -> Bool {
+        try await appDatabase.dbWriter.read { db in
+            try SampleDataset.isDatabaseEmpty(db: db)
+        }
+    }
+
+    /// Adds the sample set without a change to another row. Wraps
+    /// `SampleDataset.insert`.
+    @discardableResult
+    public static func loadSampleData(appDatabase: AppDatabase) async throws -> SampleDataset.Counts {
+        try await appDatabase.dbWriter.write { db in
+            try SampleDataset.insert(db: db)
+        }
+    }
+
+    /// Deletes the sample set and no other row. Wraps `SampleDataset.remove`.
+    @discardableResult
+    public static func removeSampleData(appDatabase: AppDatabase) async throws -> SampleDataset.Counts {
+        try await appDatabase.dbWriter.write { db in
+            try SampleDataset.remove(db: db)
+        }
+    }
 }

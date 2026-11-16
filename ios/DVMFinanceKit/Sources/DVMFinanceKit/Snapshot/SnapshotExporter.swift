@@ -8,6 +8,22 @@ import GRDB
 public enum SnapshotExporter {
     private static let subdirectoryName = "snapshots"
 
+    /// The reasons the exporter refuses an export. Each case carries a
+    /// message for the user.
+    public enum ExportError: Error, LocalizedError, Equatable {
+        /// The database holds the fictional rows of `SampleDataset`. The
+        /// exporter refuses the export, so that these rows never reach the
+        /// desktop database.
+        case sampleDataPresent
+
+        public var errorDescription: String? {
+            switch self {
+            case .sampleDataPresent:
+                return "The app holds sample data. Remove the sample data in the Help tab, then export again."
+            }
+        }
+    }
+
     /// Builds the full dataset snapshot and writes it, gzipped, to
     /// `<dataDirectory>/snapshots/snapshot-<stamp>.json.gz`, deduping with a
     /// `-1`, `-2`, ... suffix exactly like Python's `export_snapshot` (so two
@@ -22,8 +38,9 @@ public enum SnapshotExporter {
         try FileManager.default.createDirectory(at: snapshotsDirectory, withIntermediateDirectories: true)
 
         let machineId = try MachineID.get(dataDirectory: dataDirectory)
-        let document = try appDatabase.dbWriter.read { db in
-            try SnapshotCodec.build(db: db, machineId: machineId)
+        let document = try appDatabase.dbWriter.read { db -> SnapshotDocument in
+            if try SampleDataset.isLoaded(db: db) { throw ExportError.sampleDataPresent }
+            return try SnapshotCodec.build(db: db, machineId: machineId)
         }
 
         let path = uniquePath(in: snapshotsDirectory, prefix: "snapshot")
@@ -52,6 +69,7 @@ public enum SnapshotExporter {
         // datetime.now()` taken ahead of `build_snapshot`.
         let exportStartedAt = Date()
         let document = try appDatabase.dbWriter.write { db -> SnapshotDocument in
+            if try SampleDataset.isLoaded(db: db) { throw ExportError.sampleDataPresent }
             let document = try SnapshotCodec.build(db: db, machineId: machineId, since: since)
             try ExportStateRecord.setLastDeltaExportAt(db, exportStartedAt)
             return document

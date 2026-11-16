@@ -102,3 +102,14 @@ relax the transport security for the internet.
 - **WHEN** the app downloads a snapshot across plain HTTP from a LAN address
 - **THEN** the request succeeds, and the app still forbids an arbitrary plain
   HTTP load
+
+### Requirement: No export of sample data
+The app SHALL refuse a full export and a delta export while the database holds
+the sample dataset. The refusal SHALL tell the user to remove the sample data
+first. The fictional rows therefore never reach the desktop database.
+
+#### Scenario: The user exports with sample data present
+- **WHEN** the database holds the sample dataset and the user taps an export
+  control
+- **THEN** the app writes no file, and it tells the user to remove the sample
+  data in the help tab
