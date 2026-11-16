@@ -441,4 +441,39 @@ public enum AppQueries {
             try SampleDataset.remove(db: db)
         }
     }
+
+    // MARK: - Delete all data
+
+    /// Deletes each row of each data table in one write transaction (see
+    /// `DataReset`). After the commit, deletes the exported snapshot files in
+    /// `<dataDirectory>/snapshots`. The `machine_id` marker file stays, so a
+    /// later snapshot keeps the same machine identity. Returns the count of
+    /// the deleted transactions.
+    ///
+    /// When an error stops the write, the transaction rolls back, and the
+    /// function deletes no file.
+    @discardableResult
+    public static func deleteAllData(appDatabase: AppDatabase, dataDirectory: URL?) async throws -> Int {
+        try await deleteAllData(appDatabase: appDatabase, dataDirectory: dataDirectory, beforeCommit: nil)
+    }
+
+    /// The testable core of `deleteAllData`. `beforeCommit` runs in the
+    /// write transaction after the deletion. A test makes it throw, to show
+    /// the rollback.
+    static func deleteAllData(
+        appDatabase: AppDatabase,
+        dataDirectory: URL?,
+        beforeCommit: ((Database) throws -> Void)?
+    ) async throws -> Int {
+        let count = try await appDatabase.dbWriter.write { db -> Int in
+            let count = try DataReset.deleteAll(db: db)
+            try beforeCommit?(db)
+            return count
+        }
+        if let dataDirectory {
+            try DataReset.deleteSnapshotFiles(dataDirectory: dataDirectory)
+            try DataReset.deleteDatabaseBackups(dataDirectory: dataDirectory)
+        }
+        return count
+    }
 }

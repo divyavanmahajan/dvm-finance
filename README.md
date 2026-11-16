@@ -43,8 +43,9 @@ The app binds to `127.0.0.1` and has **no authentication** — do not widen the
 bind address on an untrusted network.
 
 An empty install offers three ways in: migrate a legacy database (below), upload
-statement files on the **Upload** tab (MT940/STA, ABN XLS, generic CSV, PayPal
-TXT, Wise CSV, SEB CSV, First Tech OFX), or download directly from the **Download** tab.
+statement files on the **Import** page (MT940/STA, ABN XLS, generic CSV, PayPal
+TXT, Wise CSV, SEB CSV, First Tech OFX), or download directly from the same page.
+To try the app first, click **Load sample data** on the empty Transactions page.
 
 ## Migrating from abn-analyst
 
@@ -59,9 +60,9 @@ Re-running skips already-present rows. A per-table summary is printed.
 
 ## Sharing data with a second person
 
-- **Export** (Snapshots tab): one click writes a versioned, gzipped-JSON snapshot
+- **Export** (the Export page in the **⋮** menu): one click writes a versioned, gzipped-JSON snapshot
   of transactions, rules, budgets and change reports, offered as a download.
-- **Import** (their machine): upload the file on the Snapshots tab. The merge is
+- **Import** (their machine): upload the file on the Export page. The merge is
   **incoming wins** — new records are inserted, conflicting records (including
   manual categorizations and rule edits) are overwritten by the snapshot; local
   records absent from the snapshot are never deleted. The database is backed up
@@ -82,7 +83,7 @@ encrypted**. Exchange them only over a channel you trust.
   playwright install chromium
   ```
 
-  The app works fine without them (upload/rules/trends); the Download page shows
+  The app works fine without them (upload/rules/trends); the Import page shows
   install instructions when they are missing.
 
 - **PayPal**: start Chrome with remote debugging first, log in to PayPal, then

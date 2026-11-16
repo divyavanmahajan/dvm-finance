@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Import — Your Finance{% endblock %}
+{% block content %}
+<div class="mb-4">
+  <h1 class="h2">Import</h1>
+  <p class="text-muted">Download statements from your bank, or upload a statement file.
+     A snapshot from another device goes in on the <a href="/export">Export</a> page.</p>
+</div>
+
+<section id="download" class="mb-5">
+  <h2 class="h4">Download from your bank</h2>
+  <p class="text-muted">Start an ABN AMRO, PayPal, Wise, SEB or First Tech download.
+     Each job runs in the background, and its status updates every 2 seconds.</p>
+  {% include "_download_sources.html" %}
+</section>
+
+<section id="upload" class="mb-5">
+  <h2 class="h4">Upload a statement file</h2>
+  <p class="text-muted">MT940/STA, ABN XLS, generic CSV, PayPal TXT, Wise CSV, SEB CSV, or First Tech OFX.</p>
+  {% include "_upload_form.html" %}
+</section>
+
+{% include "_sample_data.html" %}
+{% endblock %}

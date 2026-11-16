@@ -16,3 +16,4 @@ DerivedData/
 
 # macOS
 .DS_Store
+Config/Signing.local.xcconfig

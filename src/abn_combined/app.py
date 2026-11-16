@@ -23,20 +23,43 @@ _PACKAGE_DIR = Path(__file__).parent
 _TEMPLATES_DIR = _PACKAGE_DIR / "web" / "templates"
 _STATIC_DIR = _PACKAGE_DIR / "web" / "static"
 
-# Nav tabs: (route path, label)
+# Nav tabs in the top bar: (route path, label). The QR icon ("Share to
+# phone") stands before Help; base.html renders it.
 NAV_TABS = [
     ("/", "Transactions"),
     ("/trends", "Trends"),
-    ("/rules", "Rules"),
-    ("/tags", "Tags"),
     ("/budgets", "Budgets"),
     ("/cash-flow", "Cash Flow"),
-    ("/download", "Download"),
-    ("/upload", "Upload"),
+    ("/import", "Import"),
     ("/manual", "Cash"),
-    ("/snapshots", "Snapshots"),
     ("/help", "Help"),
 ]
+
+# Items of the "⋮" menu at the right end of the top bar: (route path, label).
+NAV_MENU = [
+    ("/export", "Export"),
+    ("/rules", "Rules"),
+    ("/tags", "Tags"),
+    ("/merge", "Duplicates"),
+]
+
+# The Bootstrap icon of each navigation label.
+NAV_ICONS = {
+    "Transactions": "bi-list-check",
+    "Trends": "bi-graph-up",
+    "Budgets": "bi-piggy-bank",
+    "Cash Flow": "bi-arrow-down-up",
+    "Import": "bi-box-arrow-in-down",
+    "Cash": "bi-wallet2",
+    "Help": "bi-question-circle",
+    "Export": "bi-box-arrow-up",
+    "Rules": "bi-sliders",
+    "Tags": "bi-tags",
+    "Duplicates": "bi-intersect",
+}
+
+# The QR icon opens the Export page, which then starts a share at once.
+SHARE_TO_PHONE_URL = "/export?share=1"
 
 def _css_id(s: str) -> str:
     """Make an arbitrary string safe for use as a CSS ID selector component.
@@ -67,6 +90,9 @@ def _static_url(path: str) -> str:
 templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 templates.env.globals["static_url"] = _static_url
 templates.env.globals["nav_tabs"] = NAV_TABS
+templates.env.globals["nav_menu"] = NAV_MENU
+templates.env.globals["nav_icons"] = NAV_ICONS
+templates.env.globals["share_to_phone_url"] = SHARE_TO_PHONE_URL
 templates.env.globals["app_version"] = __version__
 templates.env.filters["css_id"] = _css_id
 
@@ -124,7 +150,7 @@ def create_app(settings: Settings) -> FastAPI:
 
         return page
 
-    for path, label in NAV_TABS:
+    for path, label in NAV_TABS + NAV_MENU:
         if path in claimed:
             continue
         app.add_api_route(
@@ -150,9 +176,11 @@ API_ROUTER_MODULES = [
     "manual",
     "cash_flow",
     "downloads",
+    "imports",
     "snapshots",
     "merge",
     "help",
+    "sample_data",
 ]
 
 

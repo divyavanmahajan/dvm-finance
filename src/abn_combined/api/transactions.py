@@ -17,6 +17,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from ..core import sample_data
 from ..core.filters import (
     TransactionFilter,
     build_query,
@@ -190,6 +191,7 @@ def _render_page(request: Request, db: Session, active_path: str) -> HTMLRespons
             "categories": _known_categories(db),
             "tags": _known_tags(db),
             "presets": ["this-month", "last-month", "this-year", "last-year"],
+            "database_empty": sample_data.is_database_empty(db),
         }
     )
     return _templates(request).TemplateResponse(request, "transactions.html", ctx)

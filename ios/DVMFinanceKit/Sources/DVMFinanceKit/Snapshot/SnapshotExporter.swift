@@ -6,7 +6,9 @@ import GRDB
 /// `snapshot_imports` rows directly, not the filesystem; see `ios/docs/
 /// spec.md` "UI").
 public enum SnapshotExporter {
-    private static let subdirectoryName = "snapshots"
+    /// The folder in the data directory that holds the exported files.
+    /// `DataReset.deleteSnapshotFiles` empties it.
+    static let subdirectoryName = "snapshots"
 
     /// The reasons the exporter refuses an export. Each case carries a
     /// message for the user.
@@ -19,7 +21,7 @@ public enum SnapshotExporter {
         public var errorDescription: String? {
             switch self {
             case .sampleDataPresent:
-                return "The app holds sample data. Remove the sample data in the Help tab, then export again."
+                return "The app holds sample data. Remove the sample data in the Import tab or the Help tab, then export again."
             }
         }
     }

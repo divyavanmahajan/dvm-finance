@@ -27,9 +27,11 @@ struct SyncFromComputerView: View {
         case downloading
         case importing
         case done(SnapshotImportRecord)
-        /// `offerSettings` adds an "Open Settings" deep link — set only for
-        /// the Local Network permission case, which the user fixes in the
-        /// app's own Settings pane.
+        /// `offerSettings` adds an "Open Settings" deep link. Only
+        /// `.localNetworkPermissionDenied` sets it, because the user fixes
+        /// that case in the Settings pane of the app. Each other failure
+        /// (`.shareStopped`, `.computerUnreachable`, `.serverUnreachable`)
+        /// shows "Scan Again" only.
         case failed(message: String, offerSettings: Bool)
     }
 
@@ -75,7 +77,7 @@ struct SyncFromComputerView: View {
                 QRScannerView { payload in
                     handleScannedPayload(payload)
                 }
-                Text("On your computer, open the Snapshots page of DVM Finance and click \u{201C}Share to phone\u{201D}. Then point the camera at the QR code.")
+                Text("On your computer, click the QR icon in the top bar of DVM Finance. Then point the camera at the QR code.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

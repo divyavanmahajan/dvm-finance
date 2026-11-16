@@ -35,7 +35,7 @@ def test_flow_a_upload_shows_categorized_transactions(live_app, page):
     db.commit()
     db.close()
 
-    page.goto(live_app.url("/upload"))
+    page.goto(live_app.url("/import"))
     page.set_input_files("#upload-form input[type=file]", str(FIXTURES / "paypal_sample.TXT"))
     page.select_option("#upload-form select[name=format]", "paypal")
     page.click("#upload-form button[type=submit]")

@@ -27,6 +27,11 @@ targets:
     dependencies:
       - package: DVMFinanceKit
         product: DVMFinanceKit
+    # DEVELOPMENT_TEAM comes from Config/Signing.local.xcconfig, which git
+    # ignores. Do not set it here: a target setting overrides the xcconfig.
+    configFiles:
+      Debug: Config/Signing.xcconfig
+      Release: Config/Signing.xcconfig
     settings:
       base:
         PRODUCT_NAME: DVMFinance
@@ -37,11 +42,8 @@ targets:
         # Marketing version (App Store "Version") and build number. Bump
         # CURRENT_PROJECT_VERSION for every upload of the same version.
         MARKETING_VERSION: "1.0.0"
-        CURRENT_PROJECT_VERSION: "1"
+        CURRENT_PROJECT_VERSION: "5"
         CODE_SIGN_STYLE: Automatic
-        # No shared team id is checked in; set your personal team in Xcode's
-        # Signing & Capabilities tab after `xcodegen generate` (see README).
-        DEVELOPMENT_TEAM: ""
         GENERATE_INFOPLIST_FILE: YES
         # Partial plist merged on top of the generated Info.plist — holds the
         # QR-sync keys that have no INFOPLIST_KEY_* build setting (camera
@@ -71,6 +73,9 @@ targets:
       - path: DVMFinanceUITests
     dependencies:
       - target: DVMFinance
+    configFiles:
+      Debug: Config/Signing.xcconfig
+      Release: Config/Signing.xcconfig
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.dvm.finance.uitests

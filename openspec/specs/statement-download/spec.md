@@ -76,7 +76,7 @@ AMRO, PayPal, Wise, SEB, and First Tech.
 
 #### Scenario: A job runs
 - **WHEN** a job runs
-- **THEN** the download page refreshes the status of that source about every 2
+- **THEN** the Import page refreshes the status of that source about every 2
   seconds, until the job reaches a final state
 
 ### Requirement: The account list of ABN AMRO comes from the bank
