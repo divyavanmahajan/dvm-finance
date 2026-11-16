@@ -47,6 +47,10 @@ struct TransactionsListView: View {
     @State private var showCreateSheet = false
     @State private var showFlaggedScreen = false
     @State private var flaggedCount = 0
+    /// `true` when the database holds no live transaction. The list then
+    /// offers the sample data, so that a new user can try the app.
+    @State private var isDatabaseEmpty = false
+    @State private var isLoadingSample = false
 
     init(initialFilter: TransactionFilter = TransactionFilter()) {
         self._filter = State(initialValue: initialFilter)
@@ -54,6 +58,12 @@ struct TransactionsListView: View {
 
     var body: some View {
         List {
+            if isDatabaseEmpty {
+                Section {
+                    emptyDatabaseOffer
+                }
+            }
+
             Section {
                 summaryRow
             }
@@ -171,6 +181,24 @@ struct TransactionsListView: View {
         .font(.footnote)
     }
 
+    /// The offer that the list shows while the database holds no
+    /// transaction: load the sample data, or import real data.
+    private var emptyDatabaseOffer: some View {
+        ContentUnavailableView {
+            Label("No transactions yet", systemImage: "tray")
+        } description: {
+            Text("Import a statement file or a snapshot in the Import tab. Or load sample data to try the app. You can remove the sample data in the Help tab.")
+        } actions: {
+            Button {
+                Task { await loadSampleData() }
+            } label: {
+                Label("Load sample data", systemImage: "wand.and.stars")
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(isLoadingSample)
+        }
+    }
+
     private var loadMoreRow: some View {
         Button {
             Task { await loadMore() }
@@ -224,8 +252,21 @@ struct TransactionsListView: View {
             hasNext = page.hasNext
             currentPage = page.page
             loadErrorMessage = nil
+            isDatabaseEmpty = try await AppQueries.databaseIsEmpty(appDatabase: appDatabase)
         } catch {
             loadErrorMessage = "Couldn't load transactions: \(error.localizedDescription)"
+        }
+    }
+
+    private func loadSampleData() async {
+        guard let appDatabase else { return }
+        isLoadingSample = true
+        defer { isLoadingSample = false }
+        do {
+            try await AppQueries.loadSampleData(appDatabase: appDatabase)
+            await reload()
+        } catch {
+            loadErrorMessage = "Couldn't load the sample data: \(error.localizedDescription)"
         }
     }
 

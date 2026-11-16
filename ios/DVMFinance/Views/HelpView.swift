@@ -1,12 +1,22 @@
 import SwiftUI
+import DVMFinanceKit
 
 /// The Help tab: onboarding for the companion-app model. Explains that this
 /// app pairs with the DVM Finance desktop (Python) app, links to where to get
 /// it, and walks through the two sync directions — importing a snapshot to get
-/// started, and exporting a delta snapshot to push mobile edits back.
+/// started, and exporting a delta snapshot to push mobile edits back. It also
+/// tells the user how to sync with the QR code, and holds the controls that
+/// load and remove the sample data.
 ///
-/// View-only content; no business logic (see `ios/docs/plan.md` "Phase E").
+/// No business logic (see `ios/docs/plan.md` "Phase E"): the sample-data
+/// controls call `AppQueries`.
 struct HelpView: View {
+    @Environment(\.appDatabase) private var appDatabase
+
+    @State private var isSampleLoaded = false
+    @State private var isWorking = false
+    @State private var sampleMessage: String?
+
     /// PyPI project for the desktop app. `uvx dvm-finance` runs it without a
     /// manual install.
     private let pypiURL = URL(string: "https://pypi.org/project/dvm-finance/")!
@@ -16,12 +26,77 @@ struct HelpView: View {
             List {
                 aboutSection
                 desktopAppSection
+                sampleDataSection
                 getStartedSection
+                qrSyncSection
                 pushBackSection
                 notesSection
             }
             .navigationTitle("Help")
+            .task { await refreshSampleState() }
         }
+    }
+
+    // MARK: - Sample data
+
+    private var sampleDataSection: some View {
+        Section {
+            if isSampleLoaded {
+                Button(role: .destructive) {
+                    Task { await removeSampleData() }
+                } label: {
+                    Label("Remove sample data", systemImage: "trash")
+                }
+                .disabled(isWorking)
+            } else {
+                Button {
+                    Task { await loadSampleData() }
+                } label: {
+                    Label("Load sample data", systemImage: "wand.and.stars")
+                }
+                .disabled(isWorking)
+            }
+            if let sampleMessage {
+                Text(sampleMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Label("Try the app with sample data", systemImage: "wand.and.stars")
+        } footer: {
+            Text("The sample data is one year of fictional transactions and five budgets. The app adds it next to your own data and does not change your data. Remove the sample data before you export a snapshot. The removal deletes only the sample data.")
+        }
+    }
+
+    private func refreshSampleState() async {
+        guard let appDatabase else { return }
+        isSampleLoaded = (try? await AppQueries.sampleDataLoaded(appDatabase: appDatabase)) ?? false
+    }
+
+    private func loadSampleData() async {
+        guard let appDatabase else { return }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let counts = try await AppQueries.loadSampleData(appDatabase: appDatabase)
+            sampleMessage = "Loaded \(counts.transactions) transactions and \(counts.budgets) budgets."
+        } catch {
+            sampleMessage = "Couldn't load the sample data: \(error.localizedDescription)"
+        }
+        await refreshSampleState()
+    }
+
+    private func removeSampleData() async {
+        guard let appDatabase else { return }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let counts = try await AppQueries.removeSampleData(appDatabase: appDatabase)
+            sampleMessage = "Removed \(counts.transactions) transactions and \(counts.budgets) budgets."
+        } catch {
+            sampleMessage = "Couldn't remove the sample data: \(error.localizedDescription)"
+        }
+        await refreshSampleState()
     }
 
     // MARK: - About
@@ -84,6 +159,23 @@ struct HelpView: View {
         }
     }
 
+    // MARK: - Sync with the QR code
+
+    private var qrSyncSection: some View {
+        Section {
+            StepRow(1, "Connect your computer and this device to the same Wi-Fi network.")
+            StepRow(2, "On your computer, start the desktop app and open the **Snapshots** page.")
+            StepRow(3, "Click **Share to phone**. A QR code appears on the page.")
+            StepRow(4, "Here, open the **Import** tab and tap **Sync from computer**.")
+            StepRow(5, "Point the camera at the QR code. The app downloads the snapshot and imports it.")
+            StepRow(6, "Review the import summary.")
+        } header: {
+            Label("Sync with a QR code", systemImage: "qrcode.viewfinder")
+        } footer: {
+            Text("The first time, allow access to the camera and to the local network. The QR code works for one download only and expires after 10 minutes. If the app tells you that the link expired, click **Share to phone** again to get a new QR code.")
+        }
+    }
+
     // MARK: - Push changes back (delta export)
 
     private var pushBackSection: some View {
@@ -110,7 +202,7 @@ struct HelpView: View {
                 Image(systemName: "doc.badge.plus").foregroundStyle(Theme.accent)
             }
             Label {
-                Text("Your data stays on your device and syncs only through snapshot files you move yourself. There's no account and no cloud service.")
+                Text("Your data stays on your device. It syncs only through snapshots: a file that you move yourself, or a QR code download over your own Wi-Fi network. There's no account and no cloud service.")
             } icon: {
                 Image(systemName: "lock.shield").foregroundStyle(Theme.accent)
             }

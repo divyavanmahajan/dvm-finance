@@ -93,3 +93,30 @@ system.
 #### Scenario: The app runs on an iPad
 - **WHEN** the app runs on an iPad
 - **THEN** the app can show the transaction list and the detail side by side
+
+### Requirement: Sample data for a new user
+The app SHALL offer a fictional sample dataset, so that a new user can try each
+screen before the user imports real data. The sample dataset SHALL hold one year
+of transactions and a small set of monthly and yearly budgets.
+
+The load SHALL add rows and SHALL NOT change or delete a row of the user. The
+load SHALL skip a sample budget when the user has a budget with the same
+category and period. A second load SHALL add nothing.
+
+The removal SHALL delete each sample transaction and each sample budget, and
+SHALL NOT delete another row.
+
+#### Scenario: The database is empty
+- **WHEN** the database holds no live transaction and the user opens the
+  transaction list
+- **THEN** the list shows an offer to load the sample data, and it tells the
+  user how to import real data
+
+#### Scenario: The user loads the sample data
+- **WHEN** the user taps "Load sample data"
+- **THEN** the app adds the sample transactions and budgets, and each screen
+  shows them
+
+#### Scenario: The user removes the sample data
+- **WHEN** the user taps "Remove sample data" in the help tab
+- **THEN** the app deletes only the sample rows, and the rows of the user stay
