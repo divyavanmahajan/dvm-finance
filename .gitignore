@@ -15,3 +15,6 @@ src/abn_combined/_version.py
 protocol/
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+
+# Local iOS signing settings (team ID); each developer keeps their own
+ios/Config/*.local.xcconfig
