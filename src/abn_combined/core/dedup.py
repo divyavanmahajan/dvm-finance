@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -43,6 +43,32 @@ def normalize_reference(value: str) -> str:
     return _REFERENCE_SEPARATORS.sub("", value).upper()
 
 
+def format_krona(value: Any) -> str:
+    """Return an SEB krona value as id text: 2 decimal places, half up.
+
+    A missing value gives an empty text. The iOS app formats the value in the
+    same manner, and ``tests/fixtures/seb_ids.json`` holds the shared cases.
+    """
+    if value is None or value == "":
+        return ""
+    exact = Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return format(exact, "f")
+
+
+def seb_voucher_key(
+    account: str, voucher: str, booking_date: Any, amount: Any, balance: Any
+) -> str:
+    """Return the id of an SEB transaction.
+
+    SEB gives one voucher number to many card payments. The id therefore also
+    holds the booking date (``YYYY-MM-DD``), the krona amount, and the krona
+    balance. The krona values do not change when the ECB rate changes.
+    """
+    return "_".join(
+        (account, voucher, str(booking_date)[:10], format_krona(amount), format_krona(balance))
+    )
+
+
 class ReservedAccountError(ValueError):
     """An import names the reserved pseudo account of the hand-entered rows."""
 
@@ -51,7 +77,8 @@ def generate_transaction_id(trans: dict[str, Any]) -> str:
     """Generate a deterministic unique ID for a transaction.
 
     PayPal: ``account_paypal_transaction_id``. Wise: ``account_wise_transaction_id``.
-    SEB: ``account_seb_voucher_id``. First Tech: ``account_ftfcu_fitid``.
+    SEB: the SEB voucher key (see :func:`seb_voucher_key`). First Tech:
+    ``account_ftfcu_fitid``.
     Otherwise ``account_date_amount_deschash``.
     """
     account = str(trans.get("accountNumber", ""))
@@ -66,7 +93,13 @@ def generate_transaction_id(trans: dict[str, Any]) -> str:
 
     seb_voucher_id = trans.get("seb_voucher_id")
     if seb_voucher_id:
-        return f"{account}_{seb_voucher_id}"
+        return seb_voucher_key(
+            account,
+            str(seb_voucher_id),
+            trans.get("transactiondate", ""),
+            trans.get("seb_native_amount"),
+            trans.get("seb_native_balance"),
+        )
 
     ftfcu_fitid = trans.get("ftfcu_fitid")
     if ftfcu_fitid:

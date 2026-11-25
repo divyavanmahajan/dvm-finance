@@ -22,9 +22,21 @@ public enum SEBParser {
     private static let ecb90DayURL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml"
     private static let ecbHistURL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.xml"
 
-    public enum SEBParserError: Error, Equatable {
+    public enum SEBParserError: Error, Equatable, LocalizedError {
         case decodingFailed
         case missingColumns
+        /// The parser cannot get an ECB rate for a booking date. The import
+        /// then writes no row (`seb.py` raises `RatesUnavailableError`).
+        case ratesUnavailable
+
+        public var errorDescription: String? {
+            switch self {
+            case .decodingFailed: return "The SEB file cannot be decoded."
+            case .missingColumns: return "The SEB file does not have the expected columns."
+            case .ratesUnavailable:
+                return "The ECB exchange rates are not available. The import stored no transaction. Try again later."
+            }
+        }
     }
 
     public static func parse(fileURL: URL) throws -> [ParsedTransaction] {
@@ -65,8 +77,10 @@ public enum SEBParser {
             let valueDate = parseSEBDate(row["Value date"] ?? "")
             let voucher = (row["Voucher number"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let text = (row["Text"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            let amountSEK = parseSEBDecimal(row["Amount"] ?? "")
-            let balanceSEK = parseSEBDecimal(row["Balance"] ?? "")
+            let amountText = normalizedSEBNumber(row["Amount"] ?? "")
+            let balanceText = normalizedSEBNumber(row["Balance"] ?? "")
+            let amountSEK = amountText.flatMap(Double.init)
+            let balanceSEK = balanceText.flatMap(Double.init)
 
             guard let bookingDate, let amountSEK else { continue }
 
@@ -77,21 +91,15 @@ public enum SEBParser {
             structured.setString("native_currency", nativeCurrency)
             structured.setNumberOrNull("native_balance", balanceSEK)
 
-            let storedAmount: Double
-            let storedBalance: Double?
-            let storedCurrency: String
-
-            if let eurRate = bestRate(rateCache, target: bookingDate), eurRate > 0 {
-                // `round(x, 2)` — Python's round-half-to-even.
-                storedAmount = (amountSEK / eurRate * 100).rounded(.toNearestOrEven) / 100
-                storedBalance = balanceSEK.map { ($0 / eurRate * 100).rounded(.toNearestOrEven) / 100 }
-                storedCurrency = "EUR"
-                structured.setNumber("eur_rate_used", eurRate)
-            } else {
-                storedAmount = amountSEK
-                storedBalance = balanceSEK
-                storedCurrency = nativeCurrency
+            // The parser refuses the file without a rate. It never stores a
+            // krona amount (`seb.py` raises `RatesUnavailableError`).
+            guard let eurRate = bestRate(rateCache, target: bookingDate), eurRate > 0 else {
+                throw SEBParserError.ratesUnavailable
             }
+            // `round(x, 2)` — Python's round-half-to-even.
+            let storedAmount = (amountSEK / eurRate * 100).rounded(.toNearestOrEven) / 100
+            let storedBalance = balanceSEK.map { ($0 / eurRate * 100).rounded(.toNearestOrEven) / 100 }
+            structured.setNumber("eur_rate_used", eurRate)
 
             let transaction = ParsedTransaction(
                 accountNumber: account,
@@ -101,10 +109,12 @@ public enum SEBParser {
                 amount: storedAmount,
                 description: text,
                 descriptionStructured: structured.toJSONString(),
-                currency: storedCurrency,
+                currency: "EUR",
                 sourceFile: fileName,
                 sourceLine: lineNum,
-                sebVoucherId: voucher.isEmpty ? nil : voucher
+                sebVoucherId: voucher.isEmpty ? nil : voucher,
+                sebNativeAmount: amountText,
+                sebNativeBalance: balanceText
             )
             transactions.append(transaction)
         }
@@ -135,9 +145,15 @@ public enum SEBParser {
     // MARK: - seb.py:47-56 `_parse_decimal`
 
     static func parseSEBDecimal(_ value: String) -> Double? {
+        normalizedSEBNumber(value).flatMap(Double.init)
+    }
+
+    /// The exact number text with a period, or nil when the text is not a
+    /// number. The SEB voucher key uses this text, not the `Double`.
+    static func normalizedSEBNumber(_ value: String) -> String? {
         let s = value.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: ",", with: ".")
-        guard !s.isEmpty else { return nil }
-        return Double(s)
+        guard !s.isEmpty, Double(s) != nil else { return nil }
+        return s
     }
 
     // MARK: - seb.py:59-66 `_parse_date`

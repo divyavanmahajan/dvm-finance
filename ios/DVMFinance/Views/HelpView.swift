@@ -144,7 +144,7 @@ struct HelpView: View {
     private var notesSection: some View {
         Section("Good to know") {
             Label {
-                Text("You can also import raw bank statement files (MT940, ABN CSV, PayPal, Wise, SEB) directly from the Import tab.")
+                Text("You can also import raw bank statement files (MT940, ABN CSV, PayPal, Wise, SEB) directly from the Import tab. An SEB file needs the ECB exchange rates, so the device must have network access. Without the rates, the import stores no transaction.")
             } icon: {
                 Image(systemName: "doc.badge.plus").foregroundStyle(Theme.accent)
             }

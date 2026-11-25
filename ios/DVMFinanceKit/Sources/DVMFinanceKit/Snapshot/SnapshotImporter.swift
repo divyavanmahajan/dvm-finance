@@ -469,6 +469,43 @@ public enum SnapshotImporter {
         return backupURL
     }
 
+    // MARK: - Old SEB ids (`core/snapshots.py:upgrade_seb_ids`)
+
+    /// Returns the document with each SEB id of the old form
+    /// `<account>_<voucher>` changed to the SEB voucher key. One map changes
+    /// the id of each transaction and each `transaction_id` of a rule change
+    /// item. A document without an old SEB id comes back as it is.
+    static func upgradeSEBIDs(_ document: SnapshotDocument) -> SnapshotDocument {
+        var mapping: [String: String] = [:]
+        for transaction in document.transactions {
+            if let newId = TransactionID.upgradedSEBID(
+                id: transaction.id,
+                accountNumber: transaction.accountNumber,
+                bookingDate: transaction.transactiondate,
+                descriptionStructured: transaction.descriptionStructured
+            ) {
+                mapping[transaction.id] = newId
+            }
+        }
+        guard !mapping.isEmpty else { return document }
+        var upgraded = document
+        upgraded.transactions = document.transactions.map { transaction in
+            var transaction = transaction
+            transaction.id = mapping[transaction.id] ?? transaction.id
+            return transaction
+        }
+        upgraded.ruleChangeReports = document.ruleChangeReports.map { report in
+            var report = report
+            report.items = report.items.map { item in
+                var item = item
+                item.transactionId = mapping[item.transactionId] ?? item.transactionId
+                return item
+            }
+            return report
+        }
+        return upgraded
+    }
+
     // MARK: - import_snapshot
 
     /// Port of `core/snapshots.py:import_snapshot`.
@@ -492,6 +529,7 @@ public enum SnapshotImporter {
             _ = try backupDatabaseFile(appDatabase: appDatabase, databaseURL: databaseURL)
         }
 
+        let document = upgradeSEBIDs(document)
         return try appDatabase.dbWriter.write { db -> SnapshotImportRecord in
             let ruleResult = try mergeRules(db: db, incomingRules: document.rules)
             let transactionResult = try mergeTransactions(

@@ -24,8 +24,9 @@ EUR conversion strategy
 -----------------------
 Every transaction is stored in EUR, as for SEB. The native USD amount is
 preserved in description_structured. The EUR/USD reference rates come from the
-ECB feed; see ``parsers/fx.py``. If all fetches fail, transactions are stored
-in USD as best-effort.
+ECB feed; see ``parsers/fx.py``. If the parser cannot get a rate for each
+transaction date, it refuses the file with :class:`~.fx.RatesUnavailableError`.
+It never stores a USD amount.
 
 Deduplication
 -------------
@@ -43,7 +44,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from .fx import best_rate, build_rate_cache, to_eur
+from .fx import RatesUnavailableError, best_rate, build_rate_cache, to_eur
 
 _ACCOUNT_PREFIX = "ftfcu:"
 _FID = "3169"
@@ -92,9 +93,12 @@ def parse_ftfcu_file(file_path: Path) -> list[dict[str, Any]]:
 
     Returns:
         List of transaction dicts matching the standard transaction schema.
-        All transactions are converted from USD to EUR where a rate is
-        available. Native amounts and the rate used are stored in
-        description_structured.
+        All transactions are converted from USD to EUR. Native amounts and
+        the rate used are stored in description_structured.
+
+    Raises:
+        RatesUnavailableError: The parser cannot get a rate for a transaction
+            date.
     """
     file_path = Path(file_path)
     if file_path.suffix.lower() == ".qfx":
@@ -147,23 +151,21 @@ def parse_ftfcu_file(file_path: Path) -> list[dict[str, Any]]:
                 "native_currency": native_currency,
             }
 
-            rate = None
-            if native_currency != "EUR":
-                rate = best_rate(rate_caches.get(native_currency, {}), posted)
-            if rate and rate > 0:
-                stored_amount = to_eur(amount, rate)
-                stored_currency = "EUR"
-                structured["eur_rate_used"] = rate
-            else:
+            if native_currency == "EUR":
                 stored_amount = float(amount)
-                stored_currency = native_currency
+            else:
+                rate = best_rate(rate_caches.get(native_currency, {}), posted)
+                if not rate or rate <= 0:
+                    raise RatesUnavailableError()
+                stored_amount = to_eur(amount, rate)
+                structured["eur_rate_used"] = rate
 
             transactions.append({
                 "accountNumber": f"{_ACCOUNT_PREFIX}{last4}",
                 "transactiondate": posted,
                 "valuedate": posted,
                 "amount": stored_amount,
-                "currency": stored_currency,
+                "currency": "EUR",
                 "description": name or memo,
                 "description_structured": json.dumps(structured, ensure_ascii=False),
                 "endsaldo": None,

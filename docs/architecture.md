@@ -55,6 +55,24 @@ Dropped: users/auth tables, LLM/vector artifacts.
 
 - Effective category = `manual_category or category`; same for tags. Rule reapplication never overwrites manual values.
 - Transaction id: deterministic `account + date + amount + description_hash` (PayPal: `account + paypal_transaction_id`).
+- The SEB id is the SEB voucher key:
+  `<account>_<voucher>_<YYYY-MM-DD>_<krona amount>_<krona balance>`, for example
+  `seb:divyavanmahajan_5400000001_2026-10-02_-412.30_1234.56`. SEB gives one
+  voucher number to many card payments, so the voucher number alone does not
+  identify a transaction. Each krona value has exactly 2 decimal places, half
+  up. A missing balance gives an empty text. The id holds the krona values, so a
+  new ECB rate does not change the id. `core/dedup.py:seb_voucher_key` builds
+  the id. The iOS app builds the same id, and `tests/fixtures/seb_ids.json`
+  holds the shared cases.
+- The Alembic migration `f5c3a8e2b710` changed each stored SEB id of the old
+  form `<account>_<voucher>` to the SEB voucher key. It takes the values from
+  `description_structured` and `transactiondate`. It changes
+  `transactions.merged_into` and `rule_change_items.transaction_id` in the same
+  transaction. Before it changes a row, it copies the database file to
+  `abn_combined.db.before-seb-ids-<timestamp>`. The snapshot import changes an
+  incoming SEB id of the old form in the same manner.
+- An import does not replace a stored amount when the incoming currency is not
+  the stored currency. The import counts such a row as a duplicate.
   A hand-entered transaction (`is_manual` true) is the one exception: its id is a
   UUID, because a content-derived id cannot survive an edit. See
   [Hand-entered transactions](#hand-entered-transactions-cash-is_manual-deleted_at).

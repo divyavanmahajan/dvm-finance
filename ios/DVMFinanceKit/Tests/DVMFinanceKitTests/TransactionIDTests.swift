@@ -165,6 +165,7 @@ final class TransactionIDTests: XCTestCase {
         XCTAssertEqual(TransactionID.generateTransactionID(wiseOnly), "acct_W1")
 
         let sebOnly = ParsedTransaction(accountNumber: "acct", sebVoucherId: "S1")
-        XCTAssertEqual(TransactionID.generateTransactionID(sebOnly), "acct_S1")
+        // The SEB voucher key also holds the date and the krona values.
+        XCTAssertEqual(TransactionID.generateTransactionID(sebOnly), "acct_S1_None__")
     }
 }

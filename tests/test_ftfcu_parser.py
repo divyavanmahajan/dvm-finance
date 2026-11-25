@@ -106,12 +106,11 @@ def test_usd_converted_to_eur_with_ecb_rate(fixed_rates):
     assert txns["20261019-100001-500-2805"]["amount"] == -4.55
 
 
-def test_without_rates_amounts_stay_in_usd(no_rates):
-    txns = _by_fitid(parse_ftfcu_file(FIXTURE))
-    t = txns["20261105-100002-123456-7650"]
-    assert t["currency"] == "USD"
-    assert t["amount"] == 1234.56
-    assert "eur_rate_used" not in json.loads(t["description_structured"])
+def test_without_rates_the_file_is_refused(no_rates):
+    from abn_combined.parsers.fx import RatesUnavailableError
+
+    with pytest.raises(RatesUnavailableError, match="Try again later"):
+        parse_ftfcu_file(FIXTURE)
 
 
 def test_description_and_memo(fixed_rates):

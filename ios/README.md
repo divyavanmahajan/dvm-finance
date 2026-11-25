@@ -84,7 +84,9 @@ Xcode does not stay. Put the team id in a local file that git ignores:
   with a file or with the QR code, and the controls that load and remove
   the sample data.
 - **Import** — statement file import (MT940/.sta/.940, ABN CSV, PayPal,
-  Wise, SEB — with dedup, automatic rule application and an audit report),
+  Wise, SEB — with dedup, automatic rule application and an audit report;
+  an SEB file needs the ECB rates, so the device must have network access,
+  and without the rates the import stores no transaction),
   snapshot import (incoming-wins merge with a pre-import DB backup),
   "Sync from computer" (see below) and snapshot export via the share
   sheet, plus the audit history of imports and categorization changes, the

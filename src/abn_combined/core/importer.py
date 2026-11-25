@@ -21,6 +21,7 @@ from ..parsers import (
 )
 from .categorizer import apply_rules
 from .dedup import (
+    DEFAULT_CURRENCY,
     ReservedAccountError,
     check_duplicates,
     generate_transaction_id,
@@ -87,6 +88,8 @@ def correct_amounts(db: Session, duplicates: list[dict]) -> list[dict[str, Any]]
     that amount, a new content hash and ``updated_at``, and keeps each other
     field. It skips a flagged row, an equal amount, and a duplicate whose id
     has no stored row (a match through the reference or the counterparty).
+    It also skips a row when the incoming currency is not the stored currency.
+    An amount in one currency must not replace an amount in another currency.
     It handles each id once.
     """
     corrections: list[dict[str, Any]] = []
@@ -99,6 +102,10 @@ def correct_amounts(db: Session, duplicates: list[dict]) -> list[dict[str, Any]]
         new_amount = trans.get("amount")
         row = db.get(Transaction, trans_id)
         if row is None or row.deleted_at is not None or new_amount is None:
+            continue
+        if (trans.get("currency") or DEFAULT_CURRENCY) != (row.currency or DEFAULT_CURRENCY):
+            logger.warning("amount_correction_skipped_currency", transaction_id=trans_id,
+                           stored_currency=row.currency, incoming_currency=trans.get("currency"))
             continue
         if round(float(row.amount), 2) == round(float(new_amount), 2):
             continue

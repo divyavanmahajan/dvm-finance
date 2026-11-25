@@ -40,7 +40,7 @@ from ..constants import CASH_ACCOUNT, is_reserved_account
 from ..logging_config import get_logger
 from . import sample_data
 from .categorizer import rule_snapshot
-from .dedup import extract_end_to_end_reference
+from .dedup import extract_end_to_end_reference, seb_voucher_key
 from .models import (
     Budget,
     CategorizationRule,
@@ -661,6 +661,69 @@ def _merge_reports(
     return counter
 
 
+def _seb_id_map(transactions: list[dict[str, Any]]) -> dict[str, str]:
+    """Return the new id of each incoming SEB id in the old form.
+
+    The old form ``<account>_<voucher>`` comes from an app version before the
+    SEB voucher key. The function takes the voucher number, the krona amount,
+    and the krona balance from the structured description of the row, and the
+    date from ``transactiondate``. A row without these values keeps its id.
+    """
+    mapping: dict[str, str] = {}
+    for data in transactions:
+        account = str(data.get("accountNumber") or "")
+        if not account.startswith("seb:"):
+            continue
+        structured = data.get("description_structured")
+        try:
+            values = json.loads(structured) if isinstance(structured, str) else structured
+        except ValueError:
+            continue
+        if not isinstance(values, dict):
+            continue
+        voucher = values.get("voucher_number")
+        if not voucher or values.get("native_amount") is None:
+            continue
+        old_id = data.get("id")
+        if old_id != f"{account}_{voucher}" or not data.get("transactiondate"):
+            continue
+        mapping[old_id] = seb_voucher_key(
+            account, str(voucher), data["transactiondate"],
+            values["native_amount"], values.get("native_balance"),
+        )
+    return mapping
+
+
+def upgrade_seb_ids(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Return the snapshot with each old SEB id changed to the SEB voucher key.
+
+    One map changes the id of each transaction, each ``merged_into``, and each
+    ``transaction_id`` of a rule change item. A snapshot without an old SEB id
+    comes back as it is.
+    """
+    mapping = _seb_id_map(snapshot.get("transactions") or [])
+    if not mapping:
+        return snapshot
+    transactions = []
+    for data in snapshot["transactions"]:
+        data = dict(data)
+        data["id"] = mapping.get(data.get("id"), data.get("id"))
+        if data.get("merged_into") in mapping:
+            data["merged_into"] = mapping[data["merged_into"]]
+        transactions.append(data)
+    reports = []
+    for report in snapshot.get("rule_change_reports") or []:
+        report = dict(report)
+        report["items"] = [
+            dict(item, transaction_id=mapping.get(item.get("transaction_id"),
+                                                  item.get("transaction_id")))
+            for item in report.get("items") or []
+        ]
+        reports.append(report)
+    logger.info("snapshot_seb_ids_upgraded", count=len(mapping))
+    return {**snapshot, "transactions": transactions, "rule_change_reports": reports}
+
+
 def import_snapshot(db: Session, snapshot: dict[str, Any], db_path: Path) -> SnapshotImport:
     """Merge a validated snapshot payload into the local database.
 
@@ -672,6 +735,7 @@ def import_snapshot(db: Session, snapshot: dict[str, Any], db_path: Path) -> Sna
     categorization state (including ``categorization_source``) is authoritative.
     """
     header = snapshot["header"]
+    snapshot = upgrade_seb_ids(snapshot)
     if db_path.exists():
         _backup_db(db_path)
 

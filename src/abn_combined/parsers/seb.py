@@ -10,15 +10,18 @@ EUR conversion strategy
 -----------------------
 Every transaction is stored in EUR. The native SEK amount is preserved in
 description_structured. The EUR/SEK reference rates come from the ECB feed;
-see ``parsers/fx.py`` for the feed and the rate lookup order. If all fetches
-fail, transactions are stored in SEK as best-effort.
+see ``parsers/fx.py`` for the feed and the rate lookup order. If the parser
+cannot get a rate for each booking date, it refuses the file with
+:class:`~.fx.RatesUnavailableError`. It never stores a SEK amount.
 
 Deduplication
 -------------
-Voucher numbers are unique per transaction at SEB. They are stored in
-`seb_voucher_id` on the transaction dict so _generate_transaction_id in
-database.py uses account + voucher_number as the primary key, identical to
-how wise_transaction_id works.
+SEB gives one voucher number to many card payments, so the voucher number
+alone does not identify a transaction. The parser puts the voucher number in
+``seb_voucher_id``, and the exact SEK amount and SEK balance in
+``seb_native_amount`` and ``seb_native_balance``. The function
+``core.dedup.generate_transaction_id`` builds the SEB voucher key from these
+values and the booking date.
 """
 
 import csv
@@ -28,22 +31,27 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
-from .fx import best_rate, build_rate_cache, parse_ecb_xml
+from .fx import RatesUnavailableError, best_rate, build_rate_cache, parse_ecb_xml
 
 _ACCOUNT = "seb:divyavanmahajan"
 _NATIVE_CURRENCY = "SEK"
 
 
-def _parse_decimal(value: str) -> float | None:
+def _parse_exact(value: str) -> Decimal | None:
     if not value or not isinstance(value, str):
         return None
     s = value.strip().replace(",", ".")
     if not s:
         return None
     try:
-        return float(Decimal(s))
+        return Decimal(s)
     except (InvalidOperation, ValueError):
         return None
+
+
+def _parse_decimal(value: str) -> float | None:
+    exact = _parse_exact(value)
+    return float(exact) if exact is not None else None
 
 
 def _parse_date(value: str) -> date | None:
@@ -79,9 +87,11 @@ def parse_seb_file(file_path: Path) -> list[dict[str, Any]]:
 
     Returns:
         List of transaction dicts matching the standard transaction schema.
-        All transactions are converted from SEK to EUR where a rate is
-        available. Native amounts and the rate used are stored in
-        description_structured.
+        All transactions are converted from SEK to EUR. Native amounts and
+        the rate used are stored in description_structured.
+
+    Raises:
+        RatesUnavailableError: The parser cannot get a rate for a booking date.
     """
     file_path = Path(file_path)
     transactions: list[dict[str, Any]] = []
@@ -128,8 +138,10 @@ def parse_seb_file(file_path: Path) -> list[dict[str, Any]]:
         value_date = _parse_date(row.get("Value date", ""))
         voucher = (row.get("Voucher number") or "").strip()
         text = (row.get("Text") or "").strip()
-        amount_sek = _parse_decimal(row.get("Amount", ""))
-        balance_sek = _parse_decimal(row.get("Balance", ""))
+        amount_exact = _parse_exact(row.get("Amount", ""))
+        balance_exact = _parse_exact(row.get("Balance", ""))
+        amount_sek = float(amount_exact) if amount_exact is not None else None
+        balance_sek = float(balance_exact) if balance_exact is not None else None
 
         if booking_date is None or amount_sek is None:
             continue
@@ -144,28 +156,26 @@ def parse_seb_file(file_path: Path) -> list[dict[str, Any]]:
 
         # EUR conversion
         eur_rate = _best_rate(rate_cache, booking_date)
-        if eur_rate and eur_rate > 0:
-            stored_amount = round(amount_sek / eur_rate, 2)
-            stored_balance = round(balance_sek / eur_rate, 2) if balance_sek is not None else None
-            stored_currency = "EUR"
-            structured["eur_rate_used"] = eur_rate
-        else:
-            stored_amount = amount_sek
-            stored_balance = balance_sek
-            stored_currency = _NATIVE_CURRENCY
+        if not eur_rate or eur_rate <= 0:
+            raise RatesUnavailableError()
+        stored_amount = round(amount_sek / eur_rate, 2)
+        stored_balance = round(balance_sek / eur_rate, 2) if balance_sek is not None else None
+        structured["eur_rate_used"] = eur_rate
 
         transactions.append({
             "accountNumber": _ACCOUNT,
             "transactiondate": booking_date,
             "valuedate": value_date or booking_date,
             "amount": stored_amount,
-            "currency": stored_currency,
+            "currency": "EUR",
             "description": text,
             "description_structured": json.dumps(structured, ensure_ascii=False),
             "endsaldo": stored_balance,
             "source_file": file_path.name,
             "source_line": line_num,
             "seb_voucher_id": voucher if voucher else None,
+            "seb_native_amount": amount_exact,
+            "seb_native_balance": balance_exact,
         })
 
     return transactions

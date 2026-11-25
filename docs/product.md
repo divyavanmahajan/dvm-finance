@@ -1,12 +1,12 @@
 # Product
 
-`dvm-finance` merges abn-download (statement downloaders) and abn-analyst (categorizer/viewer) into one local web app, distributed on PyPI as `dvm-finance` and run via `uvx dvm-finance`.
+`dvm-finance` is one local web app that downloads, categorizes, and shows bank statements. It is distributed on PyPI as `dvm-finance` and runs via `uvx dvm-finance`.
 
 ## Goals
 
 - Download (ABN AMRO, PayPal, Wise, SEB, First Tech Federal Credit Union) and upload (MT940/XLS/CSV/PayPal/Wise/SEB/First Tech OFX) statements from the web UI; auto-import with dedup and rule application.
 - The First Tech download gets one OFX file for all accounts. Log in to First Tech in the debug Chrome when the job asks. The job attaches to Chrome only after the login, because the Cloudflare check on the login page fails while an automation client is attached. The bank gives at most two years of history.
-- The SEB and First Tech parsers convert each amount to the euro with the ECB reference rates. The PayPal parser uses the EUR funding row of a foreign-currency payment, and the ECB rate when no funding row exists. The transactions table shows the original amount and currency before the euro amount of each converted transaction (SEB, Wise, PayPal, First Tech). The detail view also shows the rate.
+- The SEB and First Tech parsers convert each amount to the euro with the ECB reference rates. If the app cannot get the ECB rates, the import refuses the SEB or First Tech file and stores no transaction. The upload and the download job then show the message "The ECB exchange rates are not available. The import stored no transaction. Try again later." The app never stores an SEB or a First Tech amount in krona or in US dollars. The PayPal parser uses the EUR funding row of a foreign-currency payment, and the ECB rate when no funding row exists. The transactions table shows the original amount and currency before the euro amount of each converted transaction (SEB, Wise, PayPal, First Tech). The detail view also shows the rate.
 - Rule-based categorization with conditions, priorities, tags; fast "create rule from transaction"; preview before saving; stored change reports after every rule change.
 - Two main tabs: **Transactions** (redesigned simple filter bar, URL-encoded filters; include and **exclude** category filters with subtree semantics; **transfer exclusion by default**) and **Category Trends** (table with cell/row click-through to filtered transactions). Plus Budgets, Cash Flow, Import (bank downloads and file upload on one page), Cash, and Help in the top bar. A QR icon in the top bar starts a share to the phone. The **⋮** menu holds Export (snapshots), Rules, Tags, and Duplicates.
 - Sample data: an empty Transactions page offers a fictional dataset. The Import page and the Help page load or remove it. The app refuses an export or a share while the sample data is present.
@@ -226,15 +226,21 @@ budgets for one category. An older phone app cannot import such a snapshot.
 
 ## Amount correction on import
 
-A PayPal, a Wise, or an SEB transaction keeps its id when its amount changes,
-because the id holds the transaction number of the provider and not the
-amount. If a parser stored a wrong amount, a new import of the same file
+A PayPal or a Wise transaction keeps its id when its amount changes, because
+the id holds the transaction number of the provider and not the amount. An SEB
+transaction keeps its id when its euro amount changes. Its id holds the voucher
+number, the booking date, the krona amount, and the krona balance, but not the
+euro amount. If a parser stored a wrong amount, a new import of the same file
 corrects it.
 
 When an imported row has the id of a stored transaction and a different amount,
 the import replaces the stored amount. The import keeps each other field, for
 example a manual category and manual tags. The import does not change a flagged
 transaction.
+
+The import does not replace a stored amount when the incoming currency is not
+the stored currency. The import counts that row as a duplicate. A file without
+the ECB rates therefore cannot write a krona amount over a euro amount.
 
 The upload summary shows the count of the corrected amounts. It also shows a
 table with the id, the old amount, and the new amount of each corrected

@@ -8,7 +8,8 @@ rule management, and the main database.
 
 The two stay in sync exclusively through **snapshot files** — the same
 `.json.gz` snapshots described above. There's no account and no cloud service;
-you move the files yourself (AirDrop, Files, iCloud Drive, or email).
+you move the files yourself (AirDrop, Files, iCloud Drive, or email), or the
+iOS app downloads one over your own Wi-Fi network with a QR code.
 
 ## Sync with the QR code
 
@@ -57,7 +58,9 @@ The QR code works for one download only, and it expires after 10 minutes.
 ## Good to know
 
 - The iOS app can also import raw statement files (MT940, ABN CSV, PayPal, Wise,
-  SEB) directly, just like the upload form on the desktop **Import** page.
+  SEB) directly, just like the upload form on the desktop **Import** page. An
+  SEB file needs the ECB exchange rates, so the device must have network
+  access. Without the rates, the import stores no transaction.
 - A delta snapshot carries only what changed, so it stays small and won't
   overwrite unrelated desktop data. Use a full **Export snapshot** when you want
   to hand off everything.
