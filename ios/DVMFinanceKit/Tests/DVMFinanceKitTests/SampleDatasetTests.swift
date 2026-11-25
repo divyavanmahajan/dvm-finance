@@ -150,6 +150,9 @@ final class SampleDatasetTests: XCTestCase {
             try SnapshotExporter.exportSnapshot(appDatabase: appDatabase, dataDirectory: directory)
         ) { error in
             XCTAssertEqual(error as? SnapshotExporter.ExportError, .sampleDataPresent)
+            let text = error.localizedDescription
+            XCTAssertTrue(text.contains("Import tab"), text)
+            XCTAssertTrue(text.contains("Help tab"), text)
         }
         XCTAssertThrowsError(
             try SnapshotExporter.exportDeltaSnapshot(appDatabase: appDatabase, dataDirectory: directory, since: today)
@@ -159,5 +162,45 @@ final class SampleDatasetTests: XCTestCase {
 
         try appDatabase.dbWriter.write { db in _ = try SampleDataset.remove(db: db) }
         XCTAssertNoThrow(try SnapshotExporter.exportSnapshot(appDatabase: appDatabase, dataDirectory: directory))
+    }
+
+    // MARK: - Parity with the Python port
+
+    /// Fixes the first and the last inserted row for a fixed "today" of
+    /// 2026-11-16. `core/sample_data.py` has a parity test with the same
+    /// values, so the two datasets cannot drift apart. "First" and "last"
+    /// mean the lowest and the highest sequence number in the id, not the
+    /// order of the ids as text.
+    func testParityWithThePythonPortForAFixedToday() throws {
+        let appDatabase = try makeDatabase()
+        let fixedToday = DatabaseDateFormat.dateOnly.date(from: "2026-11-16")!
+        let counts = try appDatabase.dbWriter.write { db in
+            try SampleDataset.insert(db: db, today: fixedToday, localCalendar: DateMath.calendar)
+        }
+
+        XCTAssertEqual(counts, SampleDataset.Counts(transactions: 186, budgets: 5))
+
+        let amountFormatter = NumberFormatter()
+        amountFormatter.locale = Locale(identifier: "en_US_POSIX")
+        amountFormatter.numberStyle = .decimal
+        amountFormatter.usesGroupingSeparator = false
+        amountFormatter.minimumFractionDigits = 2
+        amountFormatter.maximumFractionDigits = 2
+
+        func row(_ sequence: Int) throws -> [String] {
+            let record = try XCTUnwrap(appDatabase.dbWriter.read { db in
+                try TransactionRecord.fetchOne(db, key: "\(SampleDataset.idPrefix)\(sequence)")
+            })
+            return [
+                record.id,
+                DatabaseDateFormat.dateOnly.string(from: record.transactiondate),
+                amountFormatter.string(from: record.amount as NSDecimalNumber) ?? "",
+                record.description ?? "",
+                record.category ?? "",
+            ]
+        }
+
+        XCTAssertEqual(try row(0), ["sample-0", "2026-11-02", "-40.07", "Albert Heijn", "groceries"])
+        XCTAssertEqual(try row(counts.transactions - 1), ["sample-185", "2025-12-18", "-21.33", "Apotheek", "health"])
     }
 }

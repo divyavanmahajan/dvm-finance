@@ -36,7 +36,7 @@ def _seed_txn(db, txn_id="t1", **kw):
 
 
 def test_snapshots_page_renders(client):
-    resp = client.get("/snapshots")
+    resp = client.get("/export")
     assert resp.status_code == 200
     assert "Export" in resp.text
     assert "Import" in resp.text
@@ -54,7 +54,7 @@ def test_export_returns_download_and_lists_file(client, settings, db):
     # File persisted to <data_dir>/snapshots/ and listed on the page.
     files = list(settings.snapshots_dir.glob("*.json.gz"))
     assert len(files) == 1
-    page = client.get("/snapshots")
+    page = client.get("/export")
     assert files[0].name in page.text
 
 
@@ -163,5 +163,30 @@ def test_export_delta_defaults_to_last_marker(client, settings, db):
     _seed_txn(db, "t1", updated_at=datetime(2026, 6, 5))
     # First delta with an explicit early boundary sets the marker.
     client.post("/snapshots/export-delta", data={"since": datetime(2026, 1, 1).isoformat()})
-    page = client.get("/snapshots")
+    page = client.get("/export")
     assert "Defaults to your last delta export" in page.text
+
+
+def test_export_page_has_the_new_name(client):
+    resp = client.get("/export")
+    assert resp.status_code == 200
+    assert '<h1 class="h2">Export</h1>' in resp.text
+    assert "<title>Export" in resp.text
+
+
+def test_old_snapshots_path_redirects_and_keeps_the_query(client):
+    resp = client.get("/snapshots", follow_redirects=False)
+    assert resp.status_code == 307
+    assert resp.headers["location"] == "/export"
+    resp = client.get("/snapshots?share=1", follow_redirects=False)
+    assert resp.headers["location"] == "/export?share=1"
+
+
+def test_share_query_renders_the_trigger_but_starts_no_share(client):
+    from abn_combined.core.share import get_active_share
+
+    resp = client.get("/export?share=1")
+    assert 'hx-trigger="load"' in resp.text
+    assert "history.replaceState" in resp.text
+    assert get_active_share() is None
+    assert 'hx-trigger="load"' not in client.get("/export").text

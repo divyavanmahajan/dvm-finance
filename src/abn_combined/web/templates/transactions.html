@@ -9,6 +9,32 @@
   <p class="text-muted">Filter, sort and categorize. The full filter state lives in the URL — bookmark or share any view.</p>
 </div>
 
+{% if database_empty and not chips %}
+<!-- Offer for an empty database: load the sample data, or import real data. -->
+<div id="empty-offer" class="card shadow-sm mb-3 text-center">
+  <div class="card-body py-4">
+    <i class="bi bi-inbox fs-1 text-muted" aria-hidden="true"></i>
+    <h2 class="h5 mt-2">No transactions yet</h2>
+    <p class="text-muted mb-3">
+      Import a statement on the <a href="/import">Import</a> page. Or load
+      sample data to try the app. You can remove the sample data on the Import
+      page or the Help page.
+    </p>
+    <p class="text-muted small">
+      To import the history from a legacy abn-analyst database, run
+      <code>dvm-finance migrate-legacy /path/to/abn_analyst.db</code>.
+    </p>
+    <form hx-post="/sample-data/load" hx-swap="none" action="/sample-data/load"
+          method="post" hx-disabled-elt="button">
+      <input type="hidden" name="refresh" value="1">
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-magic"></i> Load sample data
+      </button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
 <!-- Filter bar (card with form inside) -->
 <div class="card shadow-sm mb-3">
   <div class="card-body">

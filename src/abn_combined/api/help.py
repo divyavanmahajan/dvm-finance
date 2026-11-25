@@ -13,8 +13,12 @@ from functools import cache
 from pathlib import Path
 
 import markdown
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
+from sqlalchemy.orm import Session
+
+from ..db import get_db
+from .sample_data import sample_data_context
 
 router = APIRouter()
 
@@ -37,7 +41,7 @@ def _render_doc(name: str) -> str:
 
 
 @router.get("/help", response_class=HTMLResponse, include_in_schema=False)
-def help_page(request: Request) -> HTMLResponse:
+def help_page(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
     from ..app import templates
 
     ctx = {
@@ -46,5 +50,6 @@ def help_page(request: Request) -> HTMLResponse:
         "title": "Help",
         "features_html": _render_doc("features"),
         "ios_html": _render_doc("ios-app"),
+        **sample_data_context(db),
     }
     return templates.TemplateResponse(request, "help.html", ctx)

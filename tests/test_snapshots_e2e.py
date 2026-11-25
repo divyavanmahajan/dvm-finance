@@ -107,23 +107,23 @@ def test_snapshot_sharing_between_two_machines(tmp_path, page):
         # Uses the pytest-playwright `page` fixture (headless Chromium) so this test
         # coexists with the other e2e flows in one session.
         # Machine A: export via the button (a real browser download).
-        page.goto(f"http://127.0.0.1:{port_a}/snapshots")
+        page.goto(f"http://127.0.0.1:{port_a}/export")
         with page.expect_download() as dl_info:
             page.click("form[action='/snapshots/export'] button")
         snapshot_file = tmp_path / dl_info.value.suggested_filename
         dl_info.value.save_as(snapshot_file)
         assert snapshot_file.stat().st_size > 0
 
-        page.goto(f"http://127.0.0.1:{port_a}/snapshots")
+        page.goto(f"http://127.0.0.1:{port_a}/export")
         assert page.locator("table.snapshot-exports tbody tr").count() == 1
         page.screenshot(path=str(SCREENSHOT_DIR / "export-list.png"), full_page=True)
 
         # Machine B: import the file via the upload form.
-        page.goto(f"http://127.0.0.1:{port_b}/snapshots")
+        page.goto(f"http://127.0.0.1:{port_b}/export")
         page.set_input_files("form.snapshot-import-form input[type=file]",
                              str(snapshot_file))
         page.click("form.snapshot-import-form button")
-        page.wait_for_url("**/snapshots?imported=*")
+        page.wait_for_url("**/export?imported=*")
         assert page.locator(".snapshot-report.just-imported").count() == 1
         page.screenshot(path=str(SCREENSHOT_DIR / "import-report.png"),
                         full_page=True)
