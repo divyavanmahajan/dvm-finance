@@ -40,6 +40,11 @@ public struct ParsedTransaction: Equatable {
     public var paypalTransactionId: String?
     public var wiseTransactionId: String?
     public var sebVoucherId: String?
+    /// The exact krona amount and krona balance of an SEB row, as text with a
+    /// period (for example `-412.300`). The SEB voucher key holds them,
+    /// because SEB gives one voucher number to many card payments.
+    public var sebNativeAmount: String?
+    public var sebNativeBalance: String?
 
     public init(
         accountNumber: String,
@@ -63,7 +68,9 @@ public struct ParsedTransaction: Equatable {
         categorizationSource: String? = nil,
         paypalTransactionId: String? = nil,
         wiseTransactionId: String? = nil,
-        sebVoucherId: String? = nil
+        sebVoucherId: String? = nil,
+        sebNativeAmount: String? = nil,
+        sebNativeBalance: String? = nil
     ) {
         self.accountNumber = accountNumber
         self.transactiondate = transactiondate
@@ -87,6 +94,8 @@ public struct ParsedTransaction: Equatable {
         self.paypalTransactionId = paypalTransactionId
         self.wiseTransactionId = wiseTransactionId
         self.sebVoucherId = sebVoucherId
+        self.sebNativeAmount = sebNativeAmount
+        self.sebNativeBalance = sebNativeBalance
     }
 }
 
@@ -142,7 +151,9 @@ public enum TransactionID {
         sebVoucherId: String?,
         dateComponent: String,
         amountComponent: String,
-        descriptionComponent: String
+        descriptionComponent: String,
+        sebAmount: String? = nil,
+        sebBalance: String? = nil
     ) -> String {
         if let paypal = paypalTransactionId, !paypal.isEmpty {
             return "\(account)_\(paypal)"
@@ -151,7 +162,10 @@ public enum TransactionID {
             return "\(account)_\(wise)"
         }
         if let seb = sebVoucherId, !seb.isEmpty {
-            return "\(account)_\(seb)"
+            return sebVoucherKey(
+                account: account, voucher: seb, bookingDate: dateComponent,
+                amount: sebAmount, balance: sebBalance
+            )
         }
         let descHash = md5Hex16(descriptionComponent)
         return "\(account)_\(dateComponent)_\(amountComponent)_\(descHash)"
@@ -168,8 +182,75 @@ public enum TransactionID {
             sebVoucherId: transaction.sebVoucherId,
             dateComponent: pythonDateString(transaction.transactiondate),
             amountComponent: pythonFloatString(transaction.amount),
-            descriptionComponent: pythonNoneAware(transaction.description)
+            descriptionComponent: pythonNoneAware(transaction.description),
+            sebAmount: transaction.sebNativeAmount,
+            sebBalance: transaction.sebNativeBalance
         )
+    }
+
+    // MARK: - SEB voucher key (`core/dedup.py:seb_voucher_key`)
+
+    /// Returns the id of an SEB transaction:
+    /// `<account>_<voucher>_<YYYY-MM-DD>_<krona amount>_<krona balance>`.
+    /// SEB gives one voucher number to many card payments, so the id also
+    /// holds the booking date, the krona amount, and the krona balance. The
+    /// shared fixture `Fixtures/seb_ids.json` holds the cases that the
+    /// desktop app and this app must agree on.
+    public static func sebVoucherKey(
+        account: String, voucher: String, bookingDate: String, amount: String?, balance: String?
+    ) -> String {
+        [account, voucher, String(bookingDate.prefix(10)), formatKrona(amount), formatKrona(balance)]
+            .joined(separator: "_")
+    }
+
+    /// Writes a krona value with exactly 2 decimal places, a period, and a
+    /// leading `-` for a negative value. The value is rounded half up (away
+    /// from zero), as Python's `ROUND_HALF_UP`. A missing value gives an
+    /// empty text.
+    public static func formatKrona(_ text: String?) -> String {
+        guard let text, !text.isEmpty,
+              let value = Decimal(string: text, locale: Locale(identifier: "en_US_POSIX"))
+        else { return "" }
+        var cents = value * 100
+        var rounded = Decimal()
+        NSDecimalRound(&rounded, &cents, 0, .plain)
+        let negative = rounded < 0
+        var digits = (negative ? -rounded : rounded).description
+        while digits.count < 3 { digits = "0" + digits }
+        let split = digits.index(digits.endIndex, offsetBy: -2)
+        return (negative ? "-" : "") + digits[..<split] + "." + digits[split...]
+    }
+
+    /// Returns the SEB voucher key for a stored SEB row that has an id in the
+    /// old form `<account>_<voucher>`, or nil when the row needs no change.
+    /// The values come from the structured description of the row. The
+    /// GRDB migration `v7` and the snapshot import use this function.
+    public static func upgradedSEBID(
+        id: String, accountNumber: String, bookingDate: String?, descriptionStructured: String?
+    ) -> String? {
+        guard accountNumber.hasPrefix("seb:"),
+              let bookingDate, !bookingDate.isEmpty,
+              let structured = descriptionStructured,
+              let object = try? JSONSerialization.jsonObject(with: Data(structured.utf8)),
+              let values = object as? [String: Any],
+              let voucher = values["voucher_number"] as? String, !voucher.isEmpty,
+              id == "\(accountNumber)_\(voucher)",
+              let amount = kronaText(values["native_amount"])
+        else { return nil }
+        return sebVoucherKey(
+            account: accountNumber, voucher: voucher, bookingDate: bookingDate,
+            amount: amount, balance: kronaText(values["native_balance"])
+        )
+    }
+
+    /// Renders a JSON number the way Python's `str(float)` does, so that a
+    /// value such as `-412.3` keeps its exact decimal text.
+    private static func kronaText(_ value: Any?) -> String? {
+        switch value {
+        case let text as String: return text
+        case let number as NSNumber: return "\(number.doubleValue)"
+        default: return nil
+        }
     }
 
     /// MD5 hex digest of the UTF-8 description, first 16 hex characters —

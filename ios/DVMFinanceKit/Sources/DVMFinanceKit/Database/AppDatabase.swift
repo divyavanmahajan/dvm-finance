@@ -335,6 +335,40 @@ public struct AppDatabase {
             )
         }
 
+        // Alembic f5c3a8e2b710: SEB gives one voucher number to many card
+        // payments, so each stored SEB id of the old form
+        // `<account>_<voucher>` changes to the SEB voucher key. The
+        // migration changes each reference in the same transaction and keeps
+        // each other field. A row without the values keeps its id.
+        migrator.registerMigration("v7") { db in
+            let rows = try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT id, accountNumber, transactiondate, description_structured
+                    FROM transactions WHERE accountNumber LIKE 'seb:%'
+                    """
+            )
+            for row in rows {
+                let oldId: String = row["id"]
+                guard let newId = TransactionID.upgradedSEBID(
+                    id: oldId,
+                    accountNumber: row["accountNumber"],
+                    bookingDate: row["transactiondate"],
+                    descriptionStructured: row["description_structured"]
+                ) else { continue }
+                let arguments: StatementArguments = [newId, oldId]
+                try db.execute(sql: "UPDATE transactions SET id = ? WHERE id = ?", arguments: arguments)
+                try db.execute(
+                    sql: "UPDATE transactions SET merged_into = ? WHERE merged_into = ?",
+                    arguments: arguments
+                )
+                try db.execute(
+                    sql: "UPDATE rule_change_items SET transaction_id = ? WHERE transaction_id = ?",
+                    arguments: arguments
+                )
+            }
+        }
+
         return migrator
     }
 }

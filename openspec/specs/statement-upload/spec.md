@@ -80,11 +80,12 @@ import nothing.
   explicit format
 
 ### Requirement: Correction of a stored amount
-When an incoming transaction has the id of a stored transaction and a different
-amount, the import SHALL replace the stored amount with the incoming amount.
-The import SHALL keep each other field of the stored transaction. The import
-SHALL count the transaction as corrected, and not as a duplicate. The import
-SHALL NOT change a flagged transaction.
+When an incoming transaction has the id of a stored transaction, the same
+currency, and a different amount, the import SHALL replace the stored amount
+with the incoming amount. The import SHALL keep each other field of the stored
+transaction. The import SHALL count the transaction as corrected, and not as a
+duplicate. The import SHALL NOT change a flagged transaction. The import SHALL
+NOT change the amount when the currencies are different.
 
 #### Scenario: A report is imported again after a parser fix
 - **WHEN** the database holds a PayPal transaction with the amount -1234, and
@@ -111,3 +112,9 @@ SHALL NOT change a flagged transaction.
 - **WHEN** the import finds a stored transaction through the end-to-end
   reference or the counterparty, and not through the id
 - **THEN** the import counts it as a duplicate and does not change the amount
+
+#### Scenario: The currencies are different
+- **WHEN** the database holds a transaction of -36.52 EUR, and the import gives
+  the same id the amount -412.30 SEK
+- **THEN** the import counts it as a duplicate, and the stored amount stays
+  -36.52 EUR

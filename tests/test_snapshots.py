@@ -800,3 +800,54 @@ def test_incoming_budget_replaces_an_overlapping_local_budget(db_a, db_b):
     assert deleted["key"] == {"category": "groceries", "period": "month",
                               "start_date": "2026-07-01"}
     assert "deleted" in deleted["fields"]
+
+
+# ---------------------------------------------------------------------------
+# Old SEB ids in a snapshot (the SEB voucher key)
+# ---------------------------------------------------------------------------
+
+_SEB_OLD = "seb:divyavanmahajan_5400000001"
+_SEB_NEW = "seb:divyavanmahajan_5400000001_2026-10-02_-412.30_1234.56"
+_SEB_STRUCTURED = json.dumps({
+    "format": "seb", "voucher_number": "5400000001", "native_amount": -412.3,
+    "native_currency": "SEK", "native_balance": 1234.56, "eur_rate_used": 11.29,
+})
+
+
+def _seb_txn(txn_id: str, **kw) -> Transaction:
+    return make_txn(
+        txn_id, accountNumber="seb:divyavanmahajan", transactiondate=date(2026, 10, 2),
+        amount=Decimal("-36.52"), description="MARKET A", description_structured=_SEB_STRUCTURED,
+        **kw,
+    )
+
+
+def test_snapshot_with_an_old_seb_id_matches_the_new_id(db_a, db_b):
+    (a, a_path), (b, b_path) = db_a, db_b
+    a.add(_seb_txn(_SEB_OLD, manual_category="groceries"))
+    a.add(make_txn("merged-row", accountNumber="seb:divyavanmahajan", merged_into=_SEB_OLD))
+    report = RuleChangeReport(action="recategorize", created_at=datetime(2026, 11, 1))
+    report.items.append(RuleChangeItem(transaction_id=_SEB_OLD, new_category="groceries"))
+    a.add(report)
+    a.commit()
+    b.add(_seb_txn(_SEB_NEW))
+    b.commit()
+    snap = _export_bytes(a, a_path.parent)
+
+    result = import_snapshot(b, snap, b_path)
+
+    assert result.counts["transactions"]["inserted"] == 1  # the merged row only
+    assert b.get(Transaction, _SEB_OLD) is None
+    assert b.get(Transaction, _SEB_NEW).manual_category == "groceries"
+    assert b.get(Transaction, "merged-row").merged_into == _SEB_NEW
+    item_ids = {i.transaction_id for i in b.query(RuleChangeItem).all()}
+    assert _SEB_OLD not in item_ids
+    assert _SEB_NEW in item_ids
+
+
+def test_snapshot_with_the_new_seb_ids_is_unchanged():
+    snap = {"transactions": [{
+        "id": _SEB_NEW, "accountNumber": "seb:divyavanmahajan",
+        "transactiondate": "2026-10-02", "description_structured": _SEB_STRUCTURED,
+    }], "rule_change_reports": []}
+    assert snap_mod.upgrade_seb_ids(snap) is snap

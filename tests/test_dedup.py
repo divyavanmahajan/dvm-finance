@@ -63,7 +63,11 @@ def test_paypal_id_recipe():
 
 def test_wise_and_seb_id_recipe():
     assert generate_transaction_id(_txn(wise_transaction_id="W1")).endswith("_W1")
-    assert generate_transaction_id(_txn(seb_voucher_id="V9")).endswith("_V9")
+    tid = generate_transaction_id(_txn(
+        accountNumber="seb:me", transactiondate="2026-10-02", seb_voucher_id="V9",
+        seb_native_amount="-412.300", seb_native_balance="1234.560",
+    ))
+    assert tid == "seb:me_V9_2026-10-02_-412.30_1234.56"
 
 
 def test_ftfcu_id_recipe():

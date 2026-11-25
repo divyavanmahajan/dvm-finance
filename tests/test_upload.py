@@ -23,6 +23,25 @@ def _db(app):
     return get_session_factory()()
 
 
+def _fixed_rates(monkeypatch, rate=11.29):
+    """Replace the ECB fetch of the SEB and the First Tech parsers."""
+    import abn_combined.parsers.ftfcu as ftfcu_mod
+    import abn_combined.parsers.seb as seb_mod
+
+    monkeypatch.setattr(seb_mod, "_build_rate_cache", lambda dates: {d: rate for d in dates})
+    monkeypatch.setattr(
+        ftfcu_mod, "build_rate_cache", lambda dates, currency: {d: rate for d in dates}
+    )
+
+
+def _no_rates(monkeypatch):
+    import abn_combined.parsers.ftfcu as ftfcu_mod
+    import abn_combined.parsers.seb as seb_mod
+
+    monkeypatch.setattr(seb_mod, "_build_rate_cache", lambda dates: {})
+    monkeypatch.setattr(ftfcu_mod, "build_rate_cache", lambda dates, currency: {})
+
+
 # --- import_file (unit over the pipeline) --------------------------------
 
 @pytest.mark.parametrize(
@@ -31,9 +50,7 @@ def _db(app):
 )
 def test_import_each_format(app, settings, fixture, fmt, monkeypatch):
     # Keep the EUR conversion offline (SEB and First Tech fetch ECB rates).
-    import abn_combined.parsers.ftfcu as ftfcu_mod
-
-    monkeypatch.setattr(ftfcu_mod, "build_rate_cache", lambda dates, currency: {})
+    _fixed_rates(monkeypatch)
     db = _db(app)
     try:
         summary = import_file(
@@ -337,3 +354,74 @@ def test_api_upload_htmx_partial_lists_corrections(client, app):
 def test_api_upload_htmx_partial_hides_corrections_when_none(client):
     resp = _upload_period(client, **{"HX-Request": "true"})
     assert "amounts corrected" not in resp.text
+
+
+def test_correct_amounts_skips_a_different_currency(app, settings):
+    """An amount in SEK must not replace a stored amount in EUR."""
+    from datetime import date, datetime
+
+    from abn_combined.core.dedup import generate_transaction_id
+    from abn_combined.core.importer import correct_amounts
+    from abn_combined.core.models import Transaction
+
+    incoming = {
+        "accountNumber": "seb:divyavanmahajan",
+        "transactiondate": date(2026, 10, 2),
+        "amount": -412.30,
+        "currency": "SEK",
+        "description": "CARD PAYMENT",
+        "seb_voucher_id": "5400000001",
+    }
+    trans_id = generate_transaction_id(incoming)
+    db = _db(app)
+    try:
+        db.add(Transaction(
+            id=trans_id, accountNumber="seb:divyavanmahajan",
+            transactiondate=date(2026, 10, 2), valuedate=date(2026, 10, 2),
+            amount=-36.52, currency="EUR", description="CARD PAYMENT",
+            transaction_hash="h", updated_at=datetime.now(),
+        ))
+        db.commit()
+        assert correct_amounts(db, [incoming]) == []
+        db.expire_all()
+        row = db.get(Transaction, trans_id)
+        assert (float(row.amount), row.currency) == (-36.52, "EUR")
+    finally:
+        db.close()
+
+
+@pytest.mark.parametrize("fixture,fmt", [(SEB, "seb"), (FTFCU, "ftfcu")])
+def test_import_without_rates_writes_no_row(app, settings, fixture, fmt, monkeypatch):
+    from abn_combined.core.models import Transaction
+
+    _no_rates(monkeypatch)
+    db = _db(app)
+    try:
+        with pytest.raises(ImportError_, match="ECB exchange rates are not available"):
+            import_file(db, fixture.read_bytes(), fixture.name, settings.statements_dir, fmt=fmt)
+        assert db.query(Transaction).count() == 0
+    finally:
+        db.close()
+
+
+def test_seb_import_stores_each_card_payment_of_one_voucher(app, settings, monkeypatch):
+    from abn_combined.core.models import Transaction
+
+    _fixed_rates(monkeypatch)
+    content = (
+        b"Booking date;Value date;Voucher number;Text;Amount;Balance\n"
+        b"2026-10-19;2026-10-19;5400000001;KIOSKEN AB  /26-10-18;-149.000;2200.750\n"
+        b"2026-10-19;2026-10-19;5400000001;KIOSKEN AB  /26-10-18;-149.000;2349.750\n"
+        b"2026-10-02;2026-10-02;5400000001;MARKET A    /26-10-01;-412.300;1234.560\n"
+    )
+    db = _db(app)
+    try:
+        first = import_file(db, content, "seb.csv", settings.statements_dir, fmt="seb")
+        assert (first.new, first.duplicates) == (3, 0)
+        assert db.query(Transaction).filter(
+            Transaction.accountNumber == "seb:divyavanmahajan"
+        ).count() == 3
+        again = import_file(db, content, "seb.csv", settings.statements_dir, fmt="seb")
+        assert (again.new, again.duplicates, again.corrected) == (0, 3, 0)
+    finally:
+        db.close()

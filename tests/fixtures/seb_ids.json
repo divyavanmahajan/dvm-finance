@@ -1,0 +1,20 @@
+{
+  "description": "Shared SEB voucher key cases. The desktop tests and the iOS TransactionIDTests read this file. Each amount and balance is the krona value as text; a null balance means that the row has no balance.",
+  "account": "seb:divyavanmahajan",
+  "cases": [
+    {"voucher_number": "5400000001", "booking_date": "2026-10-02", "amount": "-412.3", "balance": "1234.56",
+     "expected_id": "seb:divyavanmahajan_5400000001_2026-10-02_-412.30_1234.56"},
+    {"voucher_number": "5490990543", "booking_date": "2026-05-25", "amount": "1050.25", "balance": "1050.25",
+     "expected_id": "seb:divyavanmahajan_5490990543_2026-05-25_1050.25_1050.25"},
+    {"voucher_number": "5490990527", "booking_date": "2026-06-30", "amount": "0.1", "balance": "15.1",
+     "expected_id": "seb:divyavanmahajan_5490990527_2026-06-30_0.10_15.10"},
+    {"voucher_number": "5490990789", "booking_date": "2026-08-01", "amount": "-11248", "balance": "-0.005",
+     "expected_id": "seb:divyavanmahajan_5490990789_2026-08-01_-11248.00_-0.01"},
+    {"voucher_number": "5484116607", "booking_date": "2026-06-08", "amount": "-139.005", "balance": null,
+     "expected_id": "seb:divyavanmahajan_5484116607_2026-06-08_-139.01_"},
+    {"voucher_number": "5400000001", "booking_date": "2026-10-19", "amount": "-149", "balance": "3100.25",
+     "expected_id": "seb:divyavanmahajan_5400000001_2026-10-19_-149.00_3100.25"},
+    {"voucher_number": "5400000001", "booking_date": "2026-10-19", "amount": "-149", "balance": "2200.75",
+     "expected_id": "seb:divyavanmahajan_5400000001_2026-10-19_-149.00_2200.75"}
+  ]
+}

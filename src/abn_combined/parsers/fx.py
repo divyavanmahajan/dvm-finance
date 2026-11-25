@@ -14,7 +14,9 @@ Rate lookup order:
   1. Exact date from the ECB feed
   2. Most recent earlier business day in the cache (the ECB does not publish
      on weekends or holidays)
-  3. If all fetches fail, the parser stores the native currency
+  3. If all fetches fail, the SEB and the First Tech parsers refuse the file
+     (:class:`RatesUnavailableError`). The PayPal parser stores the native
+     currency.
 """
 
 import urllib.request
@@ -25,6 +27,18 @@ from decimal import ROUND_HALF_UP, Decimal
 _ECB_NS = "http://www.ecb.int/vocabulary/2002-08-01/eurofxref"
 _ECB_90D_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml"
 _ECB_HIST_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.xml"
+
+RATES_UNAVAILABLE_MESSAGE = (
+    "The ECB exchange rates are not available. "
+    "The import stored no transaction. Try again later."
+)
+
+
+class RatesUnavailableError(ValueError):
+    """The parser cannot get an ECB rate for each transaction of the file."""
+
+    def __init__(self, message: str = RATES_UNAVAILABLE_MESSAGE) -> None:
+        super().__init__(message)
 
 
 def parse_ecb_xml(url: str, currency: str) -> dict[date, float]:

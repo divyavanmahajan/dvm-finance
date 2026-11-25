@@ -232,6 +232,13 @@ def run_seb_job(
                         logger.warning("seb_import_failed", file=path.name, error=str(exc))
                         failed_files.append(f"{path.name}: {exc}")
 
+                # The import refused each file, for example because the ECB
+                # rates are not available. The job shows the parse error and
+                # keeps the old bookmark.
+                if failed_files and not summaries:
+                    _fail(f"Import failed for {failed_files[0]}")
+                    return
+
                 # Bookmark uses DD-MM-YYYY like the other sources.
                 _update_download_state(
                     db, source, None, datetime.now().date().strftime("%d-%m-%Y")
