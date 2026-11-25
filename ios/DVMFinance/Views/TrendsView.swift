@@ -23,6 +23,9 @@ struct TrendsView: View {
     /// The key of the category cell whose full name the popover shows (see
     /// `cellKey`), or `nil` when no popover shows.
     @State private var fullNameCellKey: String?
+    /// The horizontal offset of the value columns. The pinned header strip
+    /// moves by this amount, so each month header stays above its column.
+    @State private var horizontalOffset: CGFloat = 0
     @State private var availableAccounts: [String] = []
     @State private var loadErrorMessage: String?
     @State private var showAccountPicker = false
@@ -275,6 +278,11 @@ struct TrendsView: View {
     /// view and the grid together, so it does not change this value. This
     /// works on iOS 17; `onScrollGeometryChange` needs iOS 18.
     ///
+    /// The header row is outside the vertical `ScrollView`, so it stays
+    /// visible while the rows scroll (see `headerRow`). Its month headers
+    /// move by `horizontalOffset`, the same offset that sets the category
+    /// width.
+    ///
     /// The app does not use a `PreferenceKey` here. In this nested scroll
     /// view, `onPreferenceChange` did not fire during a scroll on the iOS 26
     /// simulator.
@@ -284,23 +292,26 @@ struct TrendsView: View {
         let categoryWidth = isCategoryColumnNarrow && !keepCategoryWide
             ? sizes.narrowCategoryWidth
             : sizes.wideCategoryWidth
-        return ScrollView(.vertical) {
-            HStack(spacing: 0) {
-                frozenCategoryColumn(table, rows: rows, sizes: sizes, width: categoryWidth)
-                ScrollView(.horizontal) {
-                    valueColumns(table, rows: rows, sizes: sizes)
-                        .background(
-                            GeometryReader { proxy in
-                                let minX = proxy.frame(in: .named(Self.valueScrollSpace)).minX
-                                Color.clear
-                                    .onAppear { updateCategoryWidth(offset: -minX) }
-                                    .onChange(of: minX) { _, newValue in
-                                        updateCategoryWidth(offset: -newValue)
-                                    }
-                            }
-                        )
+        return VStack(spacing: 0) {
+            headerRow(table, sizes: sizes, categoryWidth: categoryWidth)
+            ScrollView(.vertical) {
+                HStack(spacing: 0) {
+                    frozenCategoryColumn(table, rows: rows, sizes: sizes, width: categoryWidth)
+                    ScrollView(.horizontal) {
+                        valueColumns(table, rows: rows, sizes: sizes)
+                            .background(
+                                GeometryReader { proxy in
+                                    let minX = proxy.frame(in: .named(Self.valueScrollSpace)).minX
+                                    Color.clear
+                                        .onAppear { updateCategoryWidth(offset: -minX) }
+                                        .onChange(of: minX) { _, newValue in
+                                            updateCategoryWidth(offset: -newValue)
+                                        }
+                                }
+                            )
+                    }
+                    .coordinateSpace(name: Self.valueScrollSpace)
                 }
-                .coordinateSpace(name: Self.valueScrollSpace)
             }
         }
         .background(
@@ -326,6 +337,9 @@ struct TrendsView: View {
     /// than `narrowAfterOffset`, and wide again when it is less than
     /// `wideBeforeOffset`. Between the two values, the width does not change.
     private func updateCategoryWidth(offset: CGFloat) {
+        // The header strip follows the offset exactly, also during a bounce,
+        // so that each month header stays above its column.
+        horizontalOffset = offset
         let narrow: Bool
         if offset > Self.narrowAfterOffset {
             narrow = true
@@ -358,13 +372,18 @@ struct TrendsView: View {
         return result
     }
 
-    private func frozenCategoryColumn(
+    /// The header row of the matrix, above the vertical `ScrollView`, so it
+    /// stays visible while the rows scroll. The "Category" header has the
+    /// width of the category column. The strip of month headers and the
+    /// "Total" header moves by `horizontalOffset` and clips at its edges, so
+    /// each header stays above its value column. A drag on the strip does not
+    /// scroll the months.
+    private func headerRow(
         _ table: TrendsBuilder.TrendsTable,
-        rows: [(row: TrendsBuilder.TrendRow, isChild: Bool)],
         sizes: MatrixMetrics,
-        width: CGFloat
+        categoryWidth width: CGFloat
     ) -> some View {
-        VStack(spacing: 0) {
+        HStack(spacing: 0) {
             // A tap keeps the column wide, and a second tap returns it to the
             // automatic width (design D2a).
             Button {
@@ -390,6 +409,46 @@ struct TrendsView: View {
             .accessibilityValue(keepCategoryWide ? "Shows all names" : "Automatic width")
             .accessibilityHint("Shows all category names in full, or returns to the automatic width.")
             .accessibilityIdentifier("trendsCategoryHeader")
+            .background(Color(.systemBackground))
+            .zIndex(1)
+            .shadow(color: .black.opacity(0.08), radius: 3, x: 2, y: 0)
+
+            // The strip is wider than the screen. A clear view takes the
+            // space that the row gives it, and the strip lies on top of it
+            // and clips, so the strip cannot make the row wider.
+            Color.clear
+                .overlay(alignment: .leading) {
+                    HStack(spacing: 0) {
+                        ForEach(table.periods, id: \.key) { period in
+                            valueCell(
+                                Text(Self.headerLines(period).joined(separator: "\n")),
+                                sizes: sizes,
+                                height: sizes.headerHeight,
+                                lines: 2
+                            )
+                            .font(.caption.bold())
+                            .accessibilityLabel(period.label)
+                            .accessibilityIdentifier("trendsPeriodHeader-\(period.key)")
+                        }
+                        valueCell(Text("Total"), sizes: sizes, height: sizes.headerHeight)
+                            .font(.caption.bold())
+                    }
+                    .fixedSize()
+                    .offset(x: -horizontalOffset)
+                }
+                .clipped()
+                .background(Color(.secondarySystemBackground))
+        }
+        .frame(height: sizes.headerHeight)
+    }
+
+    private func frozenCategoryColumn(
+        _ table: TrendsBuilder.TrendsTable,
+        rows: [(row: TrendsBuilder.TrendRow, isChild: Bool)],
+        sizes: MatrixMetrics,
+        width: CGFloat
+    ) -> some View {
+        VStack(spacing: 0) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, entry in
                 categoryCell(entry.row, isChild: entry.isChild, width: width, height: sizes.rowHeight)
             }
@@ -423,22 +482,6 @@ struct TrendsView: View {
         sizes: MatrixMetrics
     ) -> some View {
         Grid(alignment: .trailing, horizontalSpacing: 0, verticalSpacing: 0) {
-            GridRow {
-                ForEach(table.periods, id: \.key) { period in
-                    valueCell(
-                        Text(Self.headerLines(period).joined(separator: "\n")),
-                        sizes: sizes,
-                        height: sizes.headerHeight,
-                        lines: 2
-                    )
-                    .font(.caption.bold())
-                    .background(Color(.secondarySystemBackground))
-                    .accessibilityLabel(period.label)
-                }
-                valueCell(Text("Total"), sizes: sizes, height: sizes.headerHeight)
-                    .font(.caption.bold())
-                    .background(Color(.secondarySystemBackground))
-            }
             ForEach(Array(rows.enumerated()), id: \.offset) { _, entry in
                 GridRow {
                     ForEach(table.periods, id: \.key) { period in
@@ -545,6 +588,7 @@ struct TrendsView: View {
         }
         .buttonStyle(.plain)
         .disabled(value == 0)
+        .accessibilityIdentifier("trendsCell-\(period.key)")
     }
 
     // MARK: - Accounts sheet
