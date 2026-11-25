@@ -126,7 +126,7 @@ report of the change to the effective category and tags of each transaction.
 
 #### Scenario: An import ends
 - **WHEN** an import ends
-- **THEN** the system returns the user to the snapshots page, which shows the
+- **THEN** the system returns the user to the Export page, which shows the
   counts and the overwrites of that import
 
 #### Scenario: The file was a delta
@@ -134,7 +134,7 @@ report of the change to the effective category and tags of each transaction.
 - **THEN** the import record notes the delta and the boundary that it covered
 
 #### Scenario: The user opens the snapshots page
-- **WHEN** the user opens the snapshots page
+- **WHEN** the user opens the Export page
 - **THEN** the page lists the most recent imports, with the newest first
 
 ### Requirement: Overlap of an incoming budget

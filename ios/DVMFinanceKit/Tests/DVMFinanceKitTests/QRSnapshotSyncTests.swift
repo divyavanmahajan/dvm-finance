@@ -164,20 +164,6 @@ final class QRSnapshotSyncTests: XCTestCase {
         }
     }
 
-    func testConnectionFailureToLocalHostMapsToLocalNetworkPermission() async {
-        // -1004 is URLError.cannotConnectToHost's raw value; the LAN address
-        // is exactly the field-reported symptom (Local Network permission off).
-        let downloader = SnapshotURLDownloader { _ in
-            throw URLError(URLError.Code(rawValue: -1004))
-        }
-        do {
-            _ = try await downloader.download(from: URL(string: "http://192.168.1.23:54321/tok")!)
-            XCTFail("expected localNetworkPermissionDenied")
-        } catch {
-            XCTAssertEqual(error as? QRSyncError, .localNetworkPermissionDenied)
-        }
-    }
-
     func testSameConnectionFailureToPublicHostMapsToServerUnreachable() async {
         let downloader = SnapshotURLDownloader { _ in
             throw URLError(URLError.Code(rawValue: -1004))
@@ -190,16 +176,161 @@ final class QRSnapshotSyncTests: XCTestCase {
         }
     }
 
-    func testTimeoutToLocalHostAlsoMapsToLocalNetworkPermission() async {
-        let downloader = SnapshotURLDownloader { _ in
-            throw URLError(.timedOut)
-        }
+    // MARK: - Local-network failure classification (design D1)
+
+    private static let lanURL = URL(string: "http://192.168.1.23:54321/tok")!
+
+    /// A downloader whose transport throws `error`, with a fixed probe.
+    private func failingDownloader(
+        _ error: URLError,
+        permissionDenied: Bool = false
+    ) -> SnapshotURLDownloader {
+        SnapshotURLDownloader(
+            transport: { _ in throw error },
+            permissionProbe: { _ in permissionDenied }
+        )
+    }
+
+    private func classify(
+        _ error: URLError,
+        url: URL = lanURL,
+        permissionDenied: Bool = false,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async -> QRSyncError? {
         do {
-            _ = try await downloader.download(from: URL(string: "http://mac.local:8080/tok")!)
-            XCTFail("expected localNetworkPermissionDenied")
+            _ = try await failingDownloader(error, permissionDenied: permissionDenied).download(from: url)
+            XCTFail("expected a QRSyncError", file: file, line: line)
+            return nil
         } catch {
-            XCTAssertEqual(error as? QRSyncError, .localNetworkPermissionDenied)
+            return error as? QRSyncError
         }
+    }
+
+    /// The shape that iOS gives for a refused TCP connection: the POSIX
+    /// code in `_kCFStreamErrorCodeKey`, and an underlying error.
+    private static func refusedWithStreamCode() -> URLError {
+        URLError(.cannotConnectToHost, userInfo: [
+            "_kCFStreamErrorCodeKey": 61,
+            "_kCFStreamErrorDomainKey": 1,
+        ])
+    }
+
+    /// The other known shape: an underlying POSIX error with code 61, one
+    /// level down in the chain.
+    private static func refusedWithUnderlyingPOSIXError() -> URLError {
+        let posix = NSError(domain: NSPOSIXErrorDomain, code: 61)
+        let cfNetwork = NSError(domain: "kCFErrorDomainCFNetwork", code: -1004, userInfo: [NSUnderlyingErrorKey: posix])
+        return URLError(.cannotConnectToHost, userInfo: [NSUnderlyingErrorKey: cfNetwork])
+    }
+
+    func testRefusedConnectionWithStreamCodeMapsToShareStopped() async {
+        let result = await classify(Self.refusedWithStreamCode())
+        XCTAssertEqual(result, .shareStopped)
+    }
+
+    func testRefusedConnectionWithUnderlyingPOSIXErrorMapsToShareStopped() async {
+        let result = await classify(Self.refusedWithUnderlyingPOSIXError())
+        XCTAssertEqual(result, .shareStopped)
+    }
+
+    func testRefusedConnectionWithPermissionAllowedIsNotThePermissionMessage() async {
+        // The field report: the permission is on and the share expired.
+        let result = await classify(Self.refusedWithStreamCode(), permissionDenied: false)
+        XCTAssertEqual(result, .shareStopped)
+        XCTAssertNotEqual(result, .localNetworkPermissionDenied)
+    }
+
+    func testProbeThatReportsDeniedWinsOverRefused() async {
+        let result = await classify(Self.refusedWithStreamCode(), permissionDenied: true)
+        XCTAssertEqual(result, .localNetworkPermissionDenied)
+    }
+
+    func testProbeThatReportsDeniedMapsTimeoutToPermission() async {
+        let result = await classify(URLError(.timedOut), permissionDenied: true)
+        XCTAssertEqual(result, .localNetworkPermissionDenied)
+    }
+
+    func testLocalNetworkProhibitedPathTextMapsToPermission() async {
+        let error = URLError(.notConnectedToInternet, userInfo: [
+            "_NSURLErrorNWPathKey": "unsatisfied (Local network prohibited), interface: en0[802.11], ipv4, ipv6",
+        ])
+        let result = await classify(error, permissionDenied: false)
+        XCTAssertEqual(result, .localNetworkPermissionDenied)
+    }
+
+    func testCannotConnectWithoutRefusedCodeMapsToComputerUnreachable() async {
+        // -1004 with no POSIX code: the cause is not known, so the app
+        // gives the network text, not the permission text.
+        let result = await classify(URLError(URLError.Code(rawValue: -1004)))
+        XCTAssertEqual(result, .computerUnreachable)
+    }
+
+    func testOtherPOSIXCodeMapsToComputerUnreachable() async {
+        // 65 is EHOSTUNREACH ("no route to host").
+        let error = URLError(.cannotConnectToHost, userInfo: ["_kCFStreamErrorCodeKey": 65])
+        let result = await classify(error)
+        XCTAssertEqual(result, .computerUnreachable)
+    }
+
+    func testTimeoutToLocalHostMapsToComputerUnreachable() async {
+        let result = await classify(URLError(.timedOut), url: URL(string: "http://mac.local:8080/tok")!)
+        XCTAssertEqual(result, .computerUnreachable)
+    }
+
+    func testLostConnectionToLocalHostMapsToComputerUnreachable() async {
+        let result = await classify(URLError(.networkConnectionLost))
+        XCTAssertEqual(result, .computerUnreachable)
+    }
+
+    func testRefusedConnectionToPublicHostMapsToServerUnreachable() async {
+        // The probe does not run for a public host, so a "denied" answer has
+        // no effect.
+        let result = await classify(
+            Self.refusedWithStreamCode(),
+            url: URL(string: "https://example.com/tok")!,
+            permissionDenied: true
+        )
+        XCTAssertEqual(result, .serverUnreachable)
+    }
+
+    func testProbeIsNotCalledForPublicHost() async {
+        let called = ProbeCallFlag()
+        let downloader = SnapshotURLDownloader(
+            transport: { _ in throw URLError(.timedOut) },
+            permissionProbe: { _ in called.set(); return true }
+        )
+        _ = try? await downloader.download(from: URL(string: "https://example.com/tok")!)
+        XCTAssertFalse(called.value)
+    }
+
+    func testProbeIsNotCalledOnSuccess() async throws {
+        let called = ProbeCallFlag()
+        let downloader = SnapshotURLDownloader(
+            transport: { request in
+                (Data("bytes".utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+            },
+            permissionProbe: { _ in called.set(); return true }
+        )
+        _ = try await downloader.download(from: Self.lanURL)
+        XCTAssertFalse(called.value)
+    }
+
+    func testEachFailureCaseHasItsOwnText() {
+        let stopped = QRSyncError.shareStopped.errorDescription ?? ""
+        XCTAssertTrue(stopped.contains("expired or was already used"), stopped)
+        XCTAssertTrue(stopped.contains("new QR code"), stopped)
+        XCTAssertFalse(stopped.contains("Settings"), stopped)
+
+        let unreachable = QRSyncError.computerUnreachable.errorDescription ?? ""
+        for word in ["same Wi-Fi network", "VPN", "guest network", "firewall"] {
+            XCTAssertTrue(unreachable.contains(word), "missing '\(word)' in: \(unreachable)")
+        }
+        XCTAssertFalse(unreachable.contains("Settings"), unreachable)
+
+        let permission = QRSyncError.localNetworkPermissionDenied.errorDescription ?? ""
+        XCTAssertTrue(permission.contains("Local Network"), permission)
+        XCTAssertTrue(permission.contains("Settings"), permission)
     }
 
     func testUnrelatedURLErrorPropagatesUnmapped() async {
@@ -263,5 +394,22 @@ final class QRSnapshotSyncTests: XCTestCase {
         } catch {
             XCTAssertEqual(error as? SnapshotError, .corruptGzip)
         }
+    }
+}
+
+/// Records whether a test probe ran. The probe is `@Sendable`, so the flag
+/// uses a lock.
+private final class ProbeCallFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var called = false
+
+    var value: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return called
+    }
+
+    func set() {
+        lock.lock(); defer { lock.unlock() }
+        called = true
     }
 }

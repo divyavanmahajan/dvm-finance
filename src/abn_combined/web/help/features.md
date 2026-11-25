@@ -154,7 +154,7 @@ cannot undo a purge.
 
 Your bank can write one payment in two description forms. A database from an
 older version can therefore hold one payment two times. The **Duplicates** page
-finds these pairs. Open it from the menu at the right end of the navigation
+finds these pairs. Open it from the **⋮** menu at the right end of the navigation
 bar.
 
 1. Open **Duplicates**. The page shows each group and changes nothing.
@@ -170,9 +170,12 @@ rows the same category, then merge again.
 
 ## Getting statements in
 
+The **Import** page holds two ways to get statements in. The download sources
+are at the top, and the upload form is below them.
+
 ### Download
 
-The **Download** tab gets statements directly from **ABN AMRO**, **PayPal**,
+The download sources get statements directly from **ABN AMRO**, **PayPal**,
 **Wise**, **SEB**, and **First Tech**. ABN AMRO opens its own browser. For the
 other banks, start Chrome with remote debugging, as the page shows. Log in to
 the bank in the browser when the job asks. The app then imports the statements
@@ -180,7 +183,7 @@ with dedup and rule application, and shows a summary.
 
 ### Upload
 
-The **Upload** tab imports statement files you already have. Supported formats:
+The upload form imports statement files you already have. Supported formats:
 **MT940**, **XLS/XLSX**, **CSV**, **PayPal**, **Wise**, **SEB**, and **First
 Tech OFX**. Files are de-duplicated on import, so re-uploading an overlapping
 export won't create double entries.
@@ -197,7 +200,26 @@ these payments as its own transaction.
 
 ---
 
-## Snapshots — sharing & backup
+### Sample data
+
+To try the app before you import real data, load the sample data. The sample
+data is one year of fictional transactions and five budgets.
+
+- When the database holds no transaction, the **Transactions** page shows a
+  **Load sample data** button.
+- The **Import** page and this **Help** page show **Load sample data** or
+  **Remove sample data**.
+- The load adds rows next to your data. It does not change your data.
+- The removal deletes only the sample rows.
+- Remove the sample data before you export a snapshot. The app does not export
+  or share a snapshot while the sample data is present.
+
+---
+
+## Export — sharing & backup
+
+Open the **Export** page from the **⋮** menu at the right end of the top bar.
+The **⋮** menu also holds **Rules**, **Tags**, and **Duplicates**.
 
 A **snapshot** is a compressed (`.json.gz`) copy of your data. Snapshots let you
 back up, move between machines, or share with one other person.
@@ -206,9 +228,9 @@ back up, move between machines, or share with one other person.
 - **Export delta snapshot** — writes a smaller snapshot containing only the
   transactions changed since a date you choose. Ideal for pushing a small set of
   edits without moving everything.
-- **Share to phone** — shows a QR code. Scan it in the iOS app to get a
-  snapshot over your own Wi-Fi network. The QR code works for one download
-  only and expires after 10 minutes.
+- **Share to phone** — shows a QR code. The **QR icon** in the top bar opens it
+  too. Scan it in the iOS app to get a snapshot over your own Wi-Fi network.
+  The QR code works for one download only and expires after 10 minutes.
 - **Import snapshot** — merges a snapshot in. The merge is **incoming-wins**:
   values from the imported file overwrite the local ones, your database is
   backed up first, and you get a merge report. Every import is recorded.

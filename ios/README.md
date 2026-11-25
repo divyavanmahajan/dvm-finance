@@ -41,10 +41,15 @@ holds only SwiftUI views and app wiring.
 
 ## Signing for your personal team
 
-1. Open `DVMFinance.xcodeproj` in Xcode.
-2. Select the `DVMFinance` target → **Signing & Capabilities**.
-3. Set **Team** to your personal Apple ID team (Automatic signing is
-   already configured in `project.yml`).
+`xcodegen generate` rebuilds the Xcode project, so a team that you set in
+Xcode does not stay. Put the team id in a local file that git ignores:
+
+1. Find your 10-character team id: App Store Connect › Membership, or
+   **Xcode › Settings › Accounts**.
+2. Create `Config/Signing.local.xcconfig` with one line:
+   `DEVELOPMENT_TEAM = <your team id>`.
+3. Run `xcodegen generate`. Both targets now sign with your team. Automatic
+   signing is already configured in `project.yml`.
 4. Xcode will assign a unique bundle identifier suffix automatically if
    `com.dvm.finance` collides with another provisioning profile on your
    account; adjust `PRODUCT_BUNDLE_IDENTIFIER` in `project.yml` and
@@ -84,14 +89,19 @@ holds only SwiftUI views and app wiring.
   and without the rates the import stores no transaction),
   snapshot import (incoming-wins merge with a pre-import DB backup),
   "Sync from computer" (see below) and snapshot export via the share
-  sheet, plus the audit history of imports and categorization changes.
+  sheet, plus the audit history of imports and categorization changes, the
+  sample data controls, and, as the last section, a red **Delete all data**
+  button. A confirmation prompt comes before the deletion. The deletion
+  empties each data table in one transaction and deletes the exported
+  snapshot files. It keeps the schema, the machine identity, and the
+  pre-import database backups.
 
 ## Sample data
 
 A new user can try the app before importing real data. When the database
 holds no transaction, the Transactions tab shows **Load sample data**. The
-Help tab holds the same control, and **Remove sample data** when the sample
-data is present.
+Import tab and the Help tab hold the same control, and **Remove sample data**
+when the sample data is present.
 
 - The sample data (`DVMFinanceKit/.../Query/SampleDataset.swift`) is one year
   of fictional transactions and five budgets.

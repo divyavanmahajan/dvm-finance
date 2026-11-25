@@ -50,17 +50,15 @@ struct TransactionDetailView: View {
                     }
 
                     Section("Categorization") {
-                        HStack {
+                        VStack(alignment: .leading, spacing: 6) {
                             Text("Effective category").foregroundStyle(.secondary)
-                            Spacer(minLength: 12)
-                            CategoryChip(category: TransactionQuery.effectiveCategory(transaction))
+                            CategoryChip(category: TransactionQuery.effectiveCategory(transaction), wraps: true)
                         }
                         .font(.subheadline)
                         if let tags = TransactionQuery.effectiveTags(transaction), !tags.isEmpty {
-                            HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 6) {
                                 Text("Effective tags").foregroundStyle(.secondary)
-                                Spacer(minLength: 12)
-                                HStack(spacing: 6) { TagChips(tags: tags) }
+                                FlowLayout { TagChips(tags: tags, wraps: true) }
                             }
                             .font(.subheadline)
                         }

@@ -1,13 +1,6 @@
-{% extends "base.html" %}
-{% block title %}Upload — Your Finance{% endblock %}
-{% block content %}
-<div class="mb-4">
-  <h1 class="h2">Upload a statement</h1>
-  <p class="text-muted">MT940/STA, ABN XLS, generic CSV, PayPal TXT, Wise CSV, SEB CSV, or First Tech OFX.</p>
-</div>
-
-<div class="row justify-content-md-center">
-  <div class="col-md-6">
+{# Statement upload form. The Import page includes this partial. #}
+<div class="row">
+  <div class="col-lg-8">
     <div class="card">
       <div class="card-body">
         <form
@@ -48,4 +41,3 @@
 </div>
 
 <div id="upload-result" class="mt-4"></div>
-{% endblock %}

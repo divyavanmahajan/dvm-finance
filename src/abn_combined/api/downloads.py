@@ -100,15 +100,12 @@ def _paypal_default_dates(db: Session) -> tuple[str, str]:
 
 
 # ---------------------------------------------------------------------------
-# Download page
+# Download sources (rendered on the Import page, see api/imports.py)
 # ---------------------------------------------------------------------------
 
 
-@router.get("/download", response_class=HTMLResponse, include_in_schema=False)
-def download_page(
-    request: Request,
-    db: Session = Depends(get_db),
-) -> HTMLResponse:
+def download_context(db: Session) -> dict:
+    """The template context of the download sources on the Import page."""
     registry = get_registry()
 
     abn_from, abn_to = _abn_default_dates(db)
@@ -118,29 +115,23 @@ def download_page(
 
     from ..downloaders.browser import DEFAULT_CDP_URL, chrome_launch_command
 
-    return _templates(request).TemplateResponse(
-        request,
-        "download.html",
-        {
-            "active_path": "/download",
-            "title": "Download",
-            "abn_job": registry.get("abn"),
-            "paypal_job": registry.get("paypal"),
-            "wise_job": registry.get("wise"),
-            "seb_job": registry.get("seb"),
-            "ftfcu_job": registry.get("ftfcu"),
-            "abn_from": abn_from,
-            "abn_to": abn_to,
-            "pp_from": pp_from,
-            "pp_to": pp_to,
-            "wise_from": wise_from,
-            "wise_to": wise_to,
-            "ftfcu_from": ftfcu_from,
-            "ftfcu_to": ftfcu_to,
-            "chrome_launch_command": chrome_launch_command(),
-            "default_cdp_url": DEFAULT_CDP_URL,
-        },
-    )
+    return {
+        "abn_job": registry.get("abn"),
+        "paypal_job": registry.get("paypal"),
+        "wise_job": registry.get("wise"),
+        "seb_job": registry.get("seb"),
+        "ftfcu_job": registry.get("ftfcu"),
+        "abn_from": abn_from,
+        "abn_to": abn_to,
+        "pp_from": pp_from,
+        "pp_to": pp_to,
+        "wise_from": wise_from,
+        "wise_to": wise_to,
+        "ftfcu_from": ftfcu_from,
+        "ftfcu_to": ftfcu_to,
+        "chrome_launch_command": chrome_launch_command(),
+        "default_cdp_url": DEFAULT_CDP_URL,
+    }
 
 
 # ---------------------------------------------------------------------------

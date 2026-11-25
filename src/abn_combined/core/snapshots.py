@@ -38,6 +38,7 @@ from sqlalchemy.orm import Session
 
 from ..constants import CASH_ACCOUNT, is_reserved_account
 from ..logging_config import get_logger
+from . import sample_data
 from .categorizer import rule_snapshot
 from .dedup import extract_end_to_end_reference, seb_voucher_key
 from .models import (
@@ -60,6 +61,20 @@ _ENTITY_KEYS = ("transactions", "rules", "budgets", "rule_change_reports")
 
 class SnapshotError(ValueError):
     """A snapshot file was rejected (corrupt, malformed, or wrong schema version)."""
+
+
+class SampleDataPresent(RuntimeError):
+    """The database holds the fictional sample data, so the export stops.
+
+    The iOS app refuses an export for the same reason: the fictional rows must
+    never reach another device.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            "The database holds sample data. Remove the sample data on the "
+            "Import page or the Help page, then export again."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -218,6 +233,8 @@ def export_snapshot(
     :func:`build_snapshot`) and advances the ``export_state`` marker to the
     export time, so the next delta defaults to "changes since this one".
     """
+    if sample_data.is_loaded(db):
+        raise SampleDataPresent()
     snapshots_dir = data_dir / "snapshots"
     snapshots_dir.mkdir(parents=True, exist_ok=True)
     export_started_at = datetime.now()

@@ -17,13 +17,20 @@ CLI entry ── uvicorn ── FastAPI
    │
    ├─ web/          Jinja2 pages + htmx partials
    ├─ api/          transactions, rules, tags, budgets, cash_flow, trends,
-   │                upload, downloads, snapshots, migration, manual
+   │                imports (Import page), upload, downloads, snapshots
+   │                (Export page), sample_data, migration, manual
    ├─ core/         rule engine + preview + change reports, dedup,
    │                snapshot export/import, legacy migration, models,
-   │                manual_txn (hand-entered transactions)
+   │                manual_txn (hand-entered transactions), sample_data
+   │                (port of the iOS SampleDataset)
    ├─ parsers/      mt940, xls, csv, paypal, wise, seb, ftfcu (OFX via ofxtools), fx (ECB rates), description
    └─ downloaders/  abn, paypal, wise, seb, ftfcu (all CDP via browser.py) — background jobs
 ```
+
+Navigation: `app.py` holds `NAV_TABS` (the top bar), `NAV_MENU` (the "⋮" menu),
+and `NAV_ICONS`. `base.html` puts the QR icon (`/export?share=1`) before Help.
+The old page paths `/download`, `/upload`, and `/snapshots` return a 307
+redirect to `/import` or `/export`, and keep the query string.
 
 ## Data model (delta vs abn-analyst)
 

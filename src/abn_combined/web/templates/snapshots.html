@@ -1,12 +1,18 @@
 {% extends "base.html" %}
-{% block title %}Snapshots — Your Finance{% endblock %}
+{% block title %}Export — Your Finance{% endblock %}
 {% block content %}
 <div class="mb-4">
-  <h1 class="h2">Snapshots</h1>
+  <h1 class="h2">Export</h1>
   <p class="text-muted">Share the dataset with another machine: export a snapshot file here, import it there.
      Import merges with incoming-wins on conflicts, never deletes local data, and backs up
      the database first.</p>
 </div>
+
+{% if export_error %}
+<div class="alert alert-warning" role="alert">
+  <strong>Export stopped:</strong> {{ export_error }}
+</div>
+{% endif %}
 
 {% if error %}
 <div class="alert alert-danger" role="alert">
@@ -37,6 +43,14 @@
           </button>
         </form>
         <div id="share-qr"></div>
+        {% if auto_share %}
+        {# The QR icon of the navigation opens /export?share=1. This element
+           starts the share with the same POST as the button. The script then
+           removes share=1 from the address, so a reload starts no share. #}
+        <div hx-post="/snapshots/share" hx-trigger="load" hx-target="#share-qr"
+             hx-swap="innerHTML"></div>
+        <script>history.replaceState(null, "", "/export");</script>
+        {% endif %}
 
         <hr class="my-3">
 

@@ -1,0 +1,9 @@
+// Signing settings for each target. The repository holds no team id.
+// Put your team id in Config/Signing.local.xcconfig (git ignores that file):
+//
+//     DEVELOPMENT_TEAM = ABCDE12345
+//
+// `xcodegen generate` rebuilds the Xcode project but keeps this include, so a
+// new project still signs with your team. Without the local file, the build
+// asks for a team, as before.
+#include? "Signing.local.xcconfig"

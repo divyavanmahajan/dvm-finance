@@ -56,7 +56,7 @@ def no_worker(monkeypatch):
 
 
 def test_download_page_renders(client) -> None:
-    resp = client.get("/download")
+    resp = client.get("/import")
     assert resp.status_code == 200
     html = resp.text
     assert "ABN AMRO" in html
@@ -93,7 +93,7 @@ def test_download_page_prefills_dates_from_download_state(client, app) -> None:
         )
         db.commit()
 
-    resp = client.get("/download")
+    resp = client.get("/import")
     assert resp.status_code == 200
     assert 'value="2026-06-21"' in resp.text
 
@@ -111,7 +111,7 @@ def test_download_page_dates_clamped_when_bookmark_is_today(client, app) -> None
             db.add(DownloadState(source=source, account=None, last_range_end=today))
         db.commit()
 
-    resp = client.get("/download")
+    resp = client.get("/import")
     assert resp.status_code == 200
     assert today.strftime("%Y-%m-%d") in resp.text
     # Tomorrow must not appear as a prefilled from-date anywhere.
@@ -125,7 +125,7 @@ def test_download_page_shows_running_job_status(client, fresh_registry) -> None:
     """A running job renders its status (with polling) on the page itself."""
     fresh_registry.create("abn")
     fresh_registry.update_state("abn", JobState.DOWNLOADING, "Downloading MT940 files…")
-    resp = client.get("/download")
+    resp = client.get("/import")
     html = resp.text
     assert "download-status" in html
     assert 'hx-trigger="every 2s"' in html
@@ -244,7 +244,7 @@ def test_download_page_uses_matching_cdp_default(client) -> None:
     the actual default the backend/launch command use."""
     from abn_combined.downloaders.browser import DEFAULT_CDP_URL
 
-    resp = client.get("/download")
+    resp = client.get("/import")
     assert DEFAULT_CDP_URL in resp.text
     assert "9222" not in resp.text
 
@@ -342,7 +342,7 @@ def test_start_seb_download_conflict_while_running(client, no_worker, fresh_regi
 
 
 def test_download_page_has_ftfcu_card(client) -> None:
-    html = client.get("/download").text
+    html = client.get("/import").text
     assert "First Tech Federal Credit Union" in html
     assert "Start First Tech download" in html
     assert 'hx-post="/api/download/ftfcu"' in html
@@ -439,7 +439,7 @@ def test_download_page_render_has_no_oob_attrs(client, fresh_registry) -> None:
     """Full-page render must not emit hx-swap-oob (it would duplicate ids)."""
     fresh_registry.create("abn")
     fresh_registry.update_state("abn", JobState.DONE, "Done")
-    resp = client.get("/download")
+    resp = client.get("/import")
     assert "hx-swap-oob" not in resp.text
 
 

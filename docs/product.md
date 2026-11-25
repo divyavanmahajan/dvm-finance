@@ -8,7 +8,8 @@
 - The First Tech download gets one OFX file for all accounts. Log in to First Tech in the debug Chrome when the job asks. The job attaches to Chrome only after the login, because the Cloudflare check on the login page fails while an automation client is attached. The bank gives at most two years of history.
 - The SEB and First Tech parsers convert each amount to the euro with the ECB reference rates. If the app cannot get the ECB rates, the import refuses the SEB or First Tech file and stores no transaction. The upload and the download job then show the message "The ECB exchange rates are not available. The import stored no transaction. Try again later." The app never stores an SEB or a First Tech amount in krona or in US dollars. The PayPal parser uses the EUR funding row of a foreign-currency payment, and the ECB rate when no funding row exists. The transactions table shows the original amount and currency before the euro amount of each converted transaction (SEB, Wise, PayPal, First Tech). The detail view also shows the rate.
 - Rule-based categorization with conditions, priorities, tags; fast "create rule from transaction"; preview before saving; stored change reports after every rule change.
-- Two main tabs: **Transactions** (redesigned simple filter bar, URL-encoded filters; include and **exclude** category filters with subtree semantics; **transfer exclusion by default**) and **Category Trends** (table with cell/row click-through to filtered transactions). Plus Rules, Tags, Budgets, Cash Flow, Download/Upload, Snapshots.
+- Two main tabs: **Transactions** (redesigned simple filter bar, URL-encoded filters; include and **exclude** category filters with subtree semantics; **transfer exclusion by default**) and **Category Trends** (table with cell/row click-through to filtered transactions). Plus Budgets, Cash Flow, Import (bank downloads and file upload on one page), Cash, and Help in the top bar. A QR icon in the top bar starts a share to the phone. The **⋮** menu holds Export (snapshots), Rules, Tags, and Duplicates.
+- Sample data: an empty Transactions page offers a fictional dataset. The Import page and the Help page load or remove it. The app refuses an export or a share while the sample data is present.
 - **Transfer exclusion**: Transfers (inter-account movements) excluded from all views by default to focus financial reporting on actual spending. Toggles on Transactions, Trends, and Cash Flow pages allow opting-in per-session.
 - Budgets per category on **Monthly** and **Yearly** tabs, with budget-vs-actual. A budget repeats, and the **Create budgets** page proposes the recent average from a selected month or year (see [Budgets](#budgets)).
 - Share data with one other person via export/import snapshots (incoming wins).
@@ -24,7 +25,7 @@ Removed on purpose: graphs, LLM categorization, MCP servers, login.
 
 ## Key flows
 
-1. Download tab → launch/connect to your Chrome (CDP) → authenticate → statements imported → summary.
+1. Import page → launch/connect to your Chrome (CDP) → authenticate → statements imported → summary.
 2. Filter Uncategorized → create rule from a transaction → preview matches → save → change report.
 3. Trends cell click → filtered transaction list for that category/period.
 4. Edit rule → preview impact → save → audit history per rule.
@@ -134,7 +135,7 @@ from before the end-to-end reference check can therefore hold one payment twice.
 
 The import now joins the two forms by the end-to-end reference of the payment.
 The **Duplicates** page folds each pair that the database already holds. The
-utility menu of the navigation bar holds the link, beside **Snapshots**.
+**⋮** menu of the navigation bar holds the link, beside **Export**.
 
 ### Merge the duplicate transactions
 

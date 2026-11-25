@@ -41,6 +41,16 @@ final class AppEnvironment: ObservableObject {
             // data when launched with `-UITestSeed`. Never runs in Release.
             if ProcessInfo.processInfo.arguments.contains("-UITestSeed") {
                 try? SampleData.populate(into: self.database)
+                if ProcessInfo.processInfo.arguments.contains("-UITestManyCategories") {
+                    do {
+                        try SampleData.applyManyCategories(to: self.database)
+                    } catch {
+                        print("UITestManyCategories failed: \(error)")
+                    }
+                }
+                if ProcessInfo.processInfo.arguments.contains("-UITestLongNames") {
+                    try? SampleData.applyLongNames(to: self.database)
+                }
             }
             #endif
         } catch {

@@ -9,14 +9,8 @@ import DVMFinanceKit
 /// load and remove the sample data.
 ///
 /// No business logic (see `ios/docs/plan.md` "Phase E"): the sample-data
-/// controls call `AppQueries`.
+/// controls are `SampleDataSection`, which calls `AppQueries`.
 struct HelpView: View {
-    @Environment(\.appDatabase) private var appDatabase
-
-    @State private var isSampleLoaded = false
-    @State private var isWorking = false
-    @State private var sampleMessage: String?
-
     /// PyPI project for the desktop app. `uvx dvm-finance` runs it without a
     /// manual install.
     private let pypiURL = URL(string: "https://pypi.org/project/dvm-finance/")!
@@ -26,77 +20,15 @@ struct HelpView: View {
             List {
                 aboutSection
                 desktopAppSection
-                sampleDataSection
+                SampleDataSection(footer: "The sample data is one year of fictional transactions and five budgets. The app adds it next to your own data and does not change your data. Remove the sample data before you export a snapshot. The removal deletes only the sample data. The Import tab holds the same controls.")
                 getStartedSection
                 qrSyncSection
+                qrTroubleshootingSection
                 pushBackSection
                 notesSection
             }
             .navigationTitle("Help")
-            .task { await refreshSampleState() }
         }
-    }
-
-    // MARK: - Sample data
-
-    private var sampleDataSection: some View {
-        Section {
-            if isSampleLoaded {
-                Button(role: .destructive) {
-                    Task { await removeSampleData() }
-                } label: {
-                    Label("Remove sample data", systemImage: "trash")
-                }
-                .disabled(isWorking)
-            } else {
-                Button {
-                    Task { await loadSampleData() }
-                } label: {
-                    Label("Load sample data", systemImage: "wand.and.stars")
-                }
-                .disabled(isWorking)
-            }
-            if let sampleMessage {
-                Text(sampleMessage)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-        } header: {
-            Label("Try the app with sample data", systemImage: "wand.and.stars")
-        } footer: {
-            Text("The sample data is one year of fictional transactions and five budgets. The app adds it next to your own data and does not change your data. Remove the sample data before you export a snapshot. The removal deletes only the sample data.")
-        }
-    }
-
-    private func refreshSampleState() async {
-        guard let appDatabase else { return }
-        isSampleLoaded = (try? await AppQueries.sampleDataLoaded(appDatabase: appDatabase)) ?? false
-    }
-
-    private func loadSampleData() async {
-        guard let appDatabase else { return }
-        isWorking = true
-        defer { isWorking = false }
-        do {
-            let counts = try await AppQueries.loadSampleData(appDatabase: appDatabase)
-            sampleMessage = "Loaded \(counts.transactions) transactions and \(counts.budgets) budgets."
-        } catch {
-            sampleMessage = "Couldn't load the sample data: \(error.localizedDescription)"
-        }
-        await refreshSampleState()
-    }
-
-    private func removeSampleData() async {
-        guard let appDatabase else { return }
-        isWorking = true
-        defer { isWorking = false }
-        do {
-            let counts = try await AppQueries.removeSampleData(appDatabase: appDatabase)
-            sampleMessage = "Removed \(counts.transactions) transactions and \(counts.budgets) budgets."
-        } catch {
-            sampleMessage = "Couldn't remove the sample data: \(error.localizedDescription)"
-        }
-        await refreshSampleState()
     }
 
     // MARK: - About
@@ -147,7 +79,7 @@ struct HelpView: View {
 
     private var getStartedSection: some View {
         Section {
-            StepRow(1, "In the desktop app, open the **Snapshots** page.")
+            StepRow(1, "In the desktop app, open the **Export** page. The **⋮** menu in the top bar holds it.")
             StepRow(2, "Click **Export snapshot**. This downloads a compressed snapshot file (ending in `.json.gz`).")
             StepRow(3, "Get the file onto your device — AirDrop, iCloud Drive, Files, or email all work.")
             StepRow(4, "Here, open the **Import** tab and tap **Import snapshot**, then choose the file.")
@@ -164,15 +96,30 @@ struct HelpView: View {
     private var qrSyncSection: some View {
         Section {
             StepRow(1, "Connect your computer and this device to the same Wi-Fi network.")
-            StepRow(2, "On your computer, start the desktop app and open the **Snapshots** page.")
-            StepRow(3, "Click **Share to phone**. A QR code appears on the page.")
+            StepRow(2, "On your computer, start the desktop app.")
+            StepRow(3, "Click the **QR icon** in the top bar of the desktop app. The **Export** page opens and shows a QR code.")
             StepRow(4, "Here, open the **Import** tab and tap **Sync from computer**.")
             StepRow(5, "Point the camera at the QR code. The app downloads the snapshot and imports it.")
             StepRow(6, "Review the import summary.")
         } header: {
             Label("Sync with a QR code", systemImage: "qrcode.viewfinder")
         } footer: {
-            Text("The first time, allow access to the camera and to the local network. The QR code works for one download only and expires after 10 minutes. If the app tells you that the link expired, click **Share to phone** again to get a new QR code.")
+            Text("The first time, allow access to the camera and to the local network. The QR code works for one download only and expires after 10 minutes.")
+        }
+    }
+
+    // MARK: - QR code troubleshooting
+
+    private var qrTroubleshootingSection: some View {
+        Section {
+            TroubleshootingRow("Make a new QR code. Click the **QR icon** on your computer again. Each QR code works for one download only and expires after 10 minutes.")
+            TroubleshootingRow("Make sure that this device and your computer use the same Wi-Fi network. A guest network can stop the connection between devices.")
+            TroubleshootingRow("Turn off a VPN on this device. A VPN can send the download away from your local network.")
+            TroubleshootingRow("Make sure that the firewall of your computer lets DVM Finance accept connections.")
+            TroubleshootingRow("Open the link of the QR code in Safari on this device. If Safari cannot open it either, the problem is the network, not the app.")
+            TroubleshootingRow("If the app asks for Local Network access, open **Settings ▸ DVM Finance** and turn on **Local Network**.")
+        } header: {
+            Label("If the QR code sync fails", systemImage: "wrench.and.screwdriver")
         }
     }
 
@@ -184,7 +131,7 @@ struct HelpView: View {
             StepRow(2, "Under **Export changes since…**, pick the date you last synced. It defaults to your previous delta export.")
             StepRow(3, "Tap **Export delta snapshot**. This builds a small file with only the transactions you changed since that date.")
             StepRow(4, "Share the file back to your computer (AirDrop, Files, iCloud Drive, email).")
-            StepRow(5, "In the desktop app's **Snapshots** page, import that file to apply your mobile edits.")
+            StepRow(5, "In the desktop app, open the **Export** page and import that file to apply your mobile edits.")
         } header: {
             Label("Push mobile changes back", systemImage: "square.and.arrow.up.badge.clock")
         } footer: {
@@ -232,6 +179,25 @@ private struct StepRow: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.vertical, 2)
+    }
+}
+
+/// One troubleshooting step with a check-mark icon. The text supports
+/// Markdown, as in `StepRow`.
+private struct TroubleshootingRow: View {
+    let text: LocalizedStringKey
+
+    init(_ text: LocalizedStringKey) {
+        self.text = text
+    }
+
+    var body: some View {
+        Label {
+            Text(text)
+                .fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: "checkmark.circle").foregroundStyle(Theme.accent)
+        }
     }
 }
 

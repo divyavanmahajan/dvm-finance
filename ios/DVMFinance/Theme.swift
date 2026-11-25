@@ -47,17 +47,23 @@ enum Theme {
 struct CategoryChip: View {
     let category: String?
     var uncategorizedLabel = "Uncategorized"
+    /// `true` lets a long name wrap onto more lines. `false` keeps one line,
+    /// for a picker or a budget row.
+    var wraps = false
 
     var body: some View {
         let isUncategorized = (category?.isEmpty ?? true)
         let color = isUncategorized ? Color.secondary : Theme.categoryColor(category)
         Text(isUncategorized ? uncategorizedLabel : category!)
             .font(.caption.weight(.medium))
-            .lineLimit(1)
+            .lineLimit(wraps ? nil : 1)
+            .fixedSize(horizontal: false, vertical: wraps)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(
-                Capsule().fill(color.opacity(0.15))
+                // On one line this looks like a capsule. On two lines it
+                // stays a tidy rounded rectangle.
+                RoundedRectangle(cornerRadius: 10, style: .continuous).fill(color.opacity(0.15))
             )
             .foregroundStyle(color)
     }
@@ -66,6 +72,8 @@ struct CategoryChip: View {
 /// A small tag pill (outlined, neutral) for the comma-joined effective tags.
 struct TagChips: View {
     let tags: String
+    /// `true` lets a long tag wrap onto more lines.
+    var wraps = false
 
     private var parts: [String] {
         tags.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
@@ -75,12 +83,75 @@ struct TagChips: View {
         ForEach(parts, id: \.self) { tag in
             Text(tag)
                 .font(.caption2.weight(.medium))
+                .lineLimit(wraps ? nil : 1)
+                .fixedSize(horizontal: false, vertical: wraps)
                 .padding(.horizontal, 7)
                 .padding(.vertical, 2)
                 .overlay(
-                    Capsule().stroke(Color.secondary.opacity(0.35), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .stroke(Color.secondary.opacity(0.35), lineWidth: 1)
                 )
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+/// Puts its subviews in rows from the leading edge, and starts a new row when
+/// the next subview does not fit. A subview that is wider than the row gets
+/// the full row width, so that a wrapping chip can wrap its text.
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 6
+    var lineSpacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? .infinity
+        let rows = arrange(subviews, width: width)
+        let height = rows.map(\.height).reduce(0, +) + lineSpacing * CGFloat(max(rows.count - 1, 0))
+        let usedWidth = rows.map(\.width).max() ?? 0
+        return CGSize(width: proposal.width ?? usedWidth, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in arrange(subviews, width: bounds.width) {
+            var x = bounds.minX
+            for item in row.items {
+                subviews[item.index].place(
+                    at: CGPoint(x: x, y: y),
+                    proposal: ProposedViewSize(width: item.size.width, height: item.size.height)
+                )
+                x += item.size.width + spacing
+            }
+            y += row.height + lineSpacing
+        }
+    }
+
+    private struct Row {
+        var items: [(index: Int, size: CGSize)] = []
+        var width: CGFloat = 0
+        var height: CGFloat = 0
+    }
+
+    private func arrange(_ subviews: Subviews, width: CGFloat) -> [Row] {
+        var rows: [Row] = []
+        var row = Row()
+        for index in subviews.indices {
+            var size = subviews[index].sizeThatFits(.unspecified)
+            if size.width > width {
+                // Too wide for any row: give it the full width, so it wraps.
+                size = subviews[index].sizeThatFits(ProposedViewSize(width: width, height: nil))
+                size.width = min(size.width, width)
+            }
+            let needed = row.items.isEmpty ? size.width : row.width + spacing + size.width
+            if !row.items.isEmpty && needed > width {
+                rows.append(row)
+                row = Row()
+            }
+            row.width = row.items.isEmpty ? size.width : row.width + spacing + size.width
+            row.height = max(row.height, size.height)
+            row.items.append((index, size))
+        }
+        if !row.items.isEmpty { rows.append(row) }
+        return rows
     }
 }
