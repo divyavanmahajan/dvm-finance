@@ -8,7 +8,8 @@ rule management, and the main database.
 
 The two stay in sync exclusively through **snapshot files** — the same
 `.json.gz` snapshots described above. There's no account and no cloud service;
-you move the files yourself (AirDrop, Files, iCloud Drive, or email).
+you move the files yourself (AirDrop, Files, iCloud Drive, or email), or the
+iOS app downloads one over your own Wi-Fi network with a QR code.
 
 ## Getting started: desktop → phone
 
@@ -19,6 +20,18 @@ you move the files yourself (AirDrop, Files, iCloud Drive, or email).
    choose the file.
 5. Review the import summary — your transactions, categories, rules, and budgets
    are now on your device.
+
+## Sync over Wi-Fi with a QR code
+
+1. Connect your computer and the device to the same Wi-Fi network.
+2. In this app, open the **Snapshots** page and click **Share to phone**. A
+   QR code appears.
+3. In the iOS app, open the **Import** tab and tap **Sync from computer**.
+4. Point the camera at the QR code. The iOS app downloads the snapshot and
+   imports it.
+
+The first time, allow access to the camera and to the local network. The QR
+code works for one download only and expires after 10 minutes.
 
 ## Pushing changes back: phone → desktop
 
@@ -34,7 +47,9 @@ you move the files yourself (AirDrop, Files, iCloud Drive, or email).
 ## Good to know
 
 - The iOS app can also import raw statement files (MT940, ABN CSV, PayPal, Wise,
-  SEB) directly, just like the desktop **Upload** tab.
+  SEB) directly, just like the desktop **Upload** tab. An SEB file needs the
+  ECB exchange rates, so the device must have network access. Without the
+  rates, the import stores no transaction.
 - A delta snapshot carries only what changed, so it stays small and won't
   overwrite unrelated desktop data. Use a full **Export snapshot** when you want
   to hand off everything.

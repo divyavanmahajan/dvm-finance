@@ -1,6 +1,6 @@
 # Product
 
-`dvm-finance` merges abn-download (statement downloaders) and abn-analyst (categorizer/viewer) into one local web app, distributed on PyPI as `dvm-finance` and run via `uvx dvm-finance`.
+`dvm-finance` is one local web app that downloads, categorizes, and shows bank statements. It is distributed on PyPI as `dvm-finance` and runs via `uvx dvm-finance`.
 
 ## Goals
 
@@ -225,15 +225,21 @@ budgets for one category. An older phone app cannot import such a snapshot.
 
 ## Amount correction on import
 
-A PayPal, a Wise, or an SEB transaction keeps its id when its amount changes,
-because the id holds the transaction number of the provider and not the
-amount. If a parser stored a wrong amount, a new import of the same file
+A PayPal or a Wise transaction keeps its id when its amount changes, because
+the id holds the transaction number of the provider and not the amount. An SEB
+transaction keeps its id when its euro amount changes. Its id holds the voucher
+number, the booking date, the krona amount, and the krona balance, but not the
+euro amount. If a parser stored a wrong amount, a new import of the same file
 corrects it.
 
 When an imported row has the id of a stored transaction and a different amount,
 the import replaces the stored amount. The import keeps each other field, for
 example a manual category and manual tags. The import does not change a flagged
 transaction.
+
+The import does not replace a stored amount when the incoming currency is not
+the stored currency. The import counts that row as a duplicate. A file without
+the ECB rates therefore cannot write a krona amount over a euro amount.
 
 The upload summary shows the count of the corrected amounts. It also shows a
 table with the id, the old amount, and the new amount of each corrected

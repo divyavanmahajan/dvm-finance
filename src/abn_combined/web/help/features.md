@@ -22,6 +22,9 @@ description, amount, effective category, and tags.
   others out of view, with the same subtree semantics.
 - **Transfers are hidden by default** — inter-account movements don't count as
   spending, so they're excluded from the list until you toggle them on.
+- **Original currency** — a transaction that the app converted to the euro
+  (SEB, Wise, PayPal, First Tech) shows the original amount and currency before
+  the euro amount. The detail view also shows the exchange rate.
 - **Edit a transaction** — open any row to set a manual category, add or remove
   tags, and see how it was categorized. A manual category is never overwritten
   by a later rule run.
@@ -124,21 +127,73 @@ a transfer-exclusion toggle so you're looking at real income and spending.
 
 ---
 
+## Cash
+
+The **Cash** tab records a payment that no bank statement reports, for example
+a payment in cash. The app keeps each hand-entered transaction in the account
+`CASH`.
+
+1. Open the **Cash** tab.
+2. Type the date, the amount, and the description. Write a payment as a
+   negative amount.
+3. Type a category and tags if you want them.
+4. Select **Add the transaction**.
+
+Give the bank withdrawal that funds your cash a transfer category. If you do
+not, the app counts the same money two times.
+
+To remove a cash transaction, open it and flag it. A flagged transaction leaves
+every list and every total. Restore it on the **The flagged transactions** page.
+
+Caution: check each row before you purge the flagged transactions. The app
+cannot undo a purge.
+
+---
+
+## Duplicates
+
+Your bank can write one payment in two description forms. A database from an
+older version can therefore hold one payment two times. The **Duplicates** page
+finds these pairs. Open it from the menu at the right end of the navigation
+bar.
+
+1. Open **Duplicates**. The page shows each group and changes nothing.
+2. Check each group. The page names the row that stays.
+3. Select the confirmation, then select **Merge now**.
+
+The merge keeps your manual categories and tags. It flags each extra row and
+deletes nothing. Select **Undo** beside a group to bring its rows back. The
+page refuses a group whose rows have two different manual categories. Give the
+rows the same category, then merge again.
+
+---
+
 ## Getting statements in
 
 ### Download
 
-The **Download** tab fetches statements directly from supported providers
-(ABN AMRO, PayPal). It opens a browser for you to authenticate; once you're in,
-statements are imported automatically with dedup and rule application, and you
-get a summary.
+The **Download** tab gets statements directly from **ABN AMRO**, **PayPal**,
+**Wise**, **SEB**, and **First Tech**. ABN AMRO opens its own browser. For the
+other banks, start Chrome with remote debugging, as the page shows. Log in to
+the bank in the browser when the job asks. The app then imports the statements
+with dedup and rule application, and shows a summary.
 
 ### Upload
 
 The **Upload** tab imports statement files you already have. Supported formats:
-**MT940**, **XLS/XLSX**, **CSV**, **PayPal**, **Wise**, and **SEB**. Files are
-de-duplicated on import, so re-uploading an overlapping export won't create
-double entries.
+**MT940**, **XLS/XLSX**, **CSV**, **PayPal**, **Wise**, **SEB**, and **First
+Tech OFX**. Files are de-duplicated on import, so re-uploading an overlapping
+export won't create double entries.
+
+### Amounts in another currency
+
+The app converts SEB and First Tech amounts to the euro with the ECB reference
+rates. If the app cannot get the rates, it refuses the file and stores no
+transaction. The message says "The ECB exchange rates are not available."
+Try the import again later.
+
+SEB can give one voucher number to many card payments. The app stores each of
+these payments as its own transaction.
 
 ---
 
@@ -151,6 +206,9 @@ back up, move between machines, or share with one other person.
 - **Export delta snapshot** — writes a smaller snapshot containing only the
   transactions changed since a date you choose. Ideal for pushing a small set of
   edits without moving everything.
+- **Share to phone** — shows a QR code. Scan it in the iOS app to get a
+  snapshot over your own Wi-Fi network. The QR code works for one download
+  only and expires after 10 minutes.
 - **Import snapshot** — merges a snapshot in. The merge is **incoming-wins**:
   values from the imported file overwrite the local ones, your database is
   backed up first, and you get a merge report. Every import is recorded.

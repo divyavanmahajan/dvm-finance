@@ -2,7 +2,7 @@
 
 # Core Beliefs
 
-1. **Port, don't rewrite.** The rule engine, parsers, dedup logic, and downloader internals in abn-analyst/abn-download are proven. Copy them (with their tests) and adapt; never reimplement matching or parsing semantics from scratch.
+1. **Port, don't rewrite.** The rule engine, parsers, dedup logic, and downloader internals of the predecessor apps are proven. Copy them (with their tests) and adapt; never reimplement matching or parsing semantics from scratch.
 2. **Manual edits are sacred.** `manual_category`/`manual_tags` always take precedence and are never overwritten by rule reapplication. Only snapshot import (incoming-wins, by explicit user action) may replace them.
 3. **No LLM, no MCP, no auth, no charts, no Docker.** These were deliberately removed. Do not add API keys, login screens, chart libraries, or Dockerfiles.
 4. **Local-only by default.** Bind to 127.0.0.1. There is no auth layer, so never widen the bind address silently.

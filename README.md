@@ -1,9 +1,8 @@
 # dvm-finance
 
 Integrated personal-finance app: download, parse, categorize, and review bank
-statements locally. Merges the abn-analyst analyzer and the abn-download
-downloaders into a single, local, single-user web application. No login, no
-charts, no LLM — rules + manual categorization, tables, and an audit trail.
+statements locally, in a single, local, single-user web application. No login,
+no charts, no LLM — rules + manual categorization, tables, and an audit trail.
 
 ## Install & run (PyPI)
 
@@ -23,7 +22,7 @@ uvx dvm-finance
 For development from a local checkout / wheel:
 
 ```bash
-uvx --from /path/to/abn-combined dvm-finance
+uvx --from /path/to/your/checkout dvm-finance
 uvx --from dist/dvm_finance-0.1.0-py3-none-any.whl dvm-finance
 ```
 
@@ -35,9 +34,10 @@ dvm-finance             # serves http://127.0.0.1:8000 and prints the URL
 
 On first start the app creates its data directory (SQLite DB, downloaded
 statements, snapshot exports) and migrates the schema automatically. Defaults to
-the platform user-data dir (macOS: `~/Library/Application Support/dvm-finance/`);
-override with `--data-dir` or `DVM_FINANCE_DATA_DIR`. Other flags: `--port`
-(default 8000) and `--host` (default `127.0.0.1`).
+the platform user-data dir; the startup line prints the folder in use. Override
+it with `--data-dir` or `DVM_FINANCE_DATA_DIR`. Other flags: `--port`
+(default 8000), `--host` (default `127.0.0.1`) and `--no-browser` (do not open
+the browser at the start).
 
 The app binds to `127.0.0.1` and has **no authentication** — do not widen the
 bind address on an untrusted network.
@@ -85,14 +85,20 @@ encrypted**. Exchange them only over a channel you trust.
   The app works fine without them (upload/rules/trends); the Download page shows
   install instructions when they are missing.
 
-- **PayPal**: start Chrome with remote debugging first, log in to PayPal, then
-  click "Start PayPal download":
+- **PayPal, Wise, SEB and First Tech**: start Chrome with remote debugging
+  first, then click the start button of the bank. Log in to the bank in that
+  Chrome window when the job asks. SEB needs the BankID login. First Tech gives
+  one OFX file for all accounts and at most two years of history. For PayPal:
 
   ```bash
   /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
     --remote-debugging-port=9226 --user-data-dir=~/.chrome/debugdir \
     https://www.paypal.com/reports/dlog
   ```
+
+SEB and First Tech amounts are converted to the euro with the ECB reference
+rates. If the app cannot get the rates, it refuses the file and stores no
+transaction. Try the import again later.
 
 ## Development
 
