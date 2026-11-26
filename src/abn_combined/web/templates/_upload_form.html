@@ -19,14 +19,14 @@
           <div class="mb-3">
             <label for="upload-format" class="form-label">Format</label>
             <select id="upload-format" class="form-select" name="format">
-              <option value="auto">Auto-detect (MT940 / XLS / CSV)</option>
+              <option value="auto">Auto-detect (MT940 / XLS / CSV / SEB)</option>
               <option value="paypal">PayPal activity report (.TXT)</option>
               <option value="wise">Wise transaction history (.csv)</option>
               <option value="seb">SEB kontoutdrag (.csv)</option>
               <option value="ftfcu">First Tech Federal Credit Union (.ofx)</option>
               <option value="csv">Generic CSV</option>
             </select>
-            <small class="form-text text-muted d-block mt-2">PayPal, Wise, SEB and First Tech files must select their format explicitly.</small>
+            <small class="form-text text-muted d-block mt-2">Auto-detect finds an SEB file from its header row. Select the format for a PayPal, Wise or First Tech file.</small>
           </div>
 
           <div class="d-flex gap-2">
