@@ -1,0 +1,12 @@
+{
+  "name": "home-finance",
+  "description": "Analyze the transactions, trends, budgets, and cash flow in the dvm-finance database, and give advice on the home finances.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Divya van Mahajan"
+  },
+  "homepage": "https://github.com/divyavanmahajan/dvm-finance",
+  "repository": "https://github.com/divyavanmahajan/dvm-finance",
+  "license": "MIT",
+  "keywords": ["finance", "budget", "cash-flow", "sqlite", "dvm-finance"]
+}

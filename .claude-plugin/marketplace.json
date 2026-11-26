@@ -1,0 +1,14 @@
+{
+  "name": "dvm-finance",
+  "description": "Skills for the dvm-finance home finance app.",
+  "owner": {
+    "name": "Divya van Mahajan"
+  },
+  "plugins": [
+    {
+      "name": "home-finance",
+      "source": "./plugins/home-finance",
+      "description": "Analyze the transactions, trends, budgets, and cash flow in the dvm-finance database, and give advice on the home finances."
+    }
+  ]
+}

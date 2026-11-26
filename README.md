@@ -101,6 +101,61 @@ SEB and First Tech amounts are converted to the euro with the ECB reference
 rates. If the app cannot get the rates, it refuses the file and stores no
 transaction. Try the import again later.
 
+## Claude Code skill: home finance analysis
+
+The repository holds the skill `home-finance` for Claude Code. With the skill,
+Claude reads the dvm-finance database and answers questions about your
+transactions, trends, budgets, and cash flow. It also gives advice on how to
+manage the home finances. The app itself does not use an LLM. The skill runs in
+Claude Code only.
+
+The skill opens the database read-only. It makes each change through the app,
+and it asks you first.
+
+### Install the skill
+
+Add this repository as a plugin marketplace, then install the plugin. In a
+Claude Code session, type:
+
+```text
+/plugin marketplace add divyavanmahajan/dvm-finance
+/plugin install home-finance@dvm-finance
+```
+
+From the shell, use these commands:
+
+```bash
+claude plugin marketplace add divyavanmahajan/dvm-finance
+claude plugin install home-finance@dvm-finance
+```
+
+To install the skill from a local clone, give the path of the clone:
+
+```text
+/plugin marketplace add ./path/to/dvm-finance
+```
+
+To install the skill without the plugin system, copy the skill folder into
+your personal skills folder:
+
+```bash
+mkdir -p ~/.claude/skills
+cp -r plugins/home-finance/skills/home-finance ~/.claude/skills/
+```
+
+### Use the skill
+
+Start a new Claude Code session after the installation. Then ask a question,
+for example:
+
+- "How much did we spend on groceries each month this year?"
+- "Which budgets are over the limit this month?"
+- "Show the cash flow and the savings rate for the last 12 months."
+- "Find the subscriptions that I still pay for."
+
+If the data folder is not in the default location, set
+`DVM_FINANCE_DATA_DIR`, or tell Claude the path.
+
 ## Development
 
 ```bash
