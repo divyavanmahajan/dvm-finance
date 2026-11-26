@@ -13,7 +13,7 @@ import pytest
 import abn_combined.parsers.seb as seb_mod
 from abn_combined.core.dedup import generate_transaction_id, seb_voucher_key
 from abn_combined.parsers.fx import RATES_UNAVAILABLE_MESSAGE, RatesUnavailableError
-from abn_combined.parsers.seb import parse_seb_file
+from abn_combined.parsers.seb import is_seb_file, parse_seb_file
 
 FIXTURES = Path(__file__).parent / "fixtures"
 FIXTURE = FIXTURES / "seb_sample.csv"
@@ -120,3 +120,14 @@ def test_ios_copy_of_the_shared_fixture_is_the_same():
         / "ios/DVMFinanceKit/Tests/DVMFinanceKitTests/Fixtures/seb_ids.json"
     )
     assert ios_copy.read_bytes() == SEB_IDS.read_bytes()
+
+
+def test_is_seb_file_recognizes_the_seb_header():
+    assert is_seb_file(FIXTURE)
+
+
+def test_is_seb_file_rejects_another_csv(tmp_path):
+    other = tmp_path / "other.csv"
+    other.write_text("date,amount,description\n2026-11-25,-1.00,X\n")
+    assert not is_seb_file(other)
+    assert not is_seb_file(FIXTURES / "wise_sample.csv")

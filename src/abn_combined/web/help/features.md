@@ -188,6 +188,9 @@ The upload form imports statement files you already have. Supported formats:
 Tech OFX**. Files are de-duplicated on import, so re-uploading an overlapping
 export won't create double entries.
 
+The format **Auto-detect** finds an SEB file from its header row. Select the
+format for a PayPal, Wise, or First Tech file.
+
 ### Amounts in another currency
 
 The app converts SEB and First Tech amounts to the euro with the ECB reference

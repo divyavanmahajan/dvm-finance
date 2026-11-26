@@ -33,7 +33,8 @@ from .utils import calculate_transaction_hash_components
 
 logger = get_logger(__name__)
 
-# Explicit format overrides (auto = detect by extension via parse_statement_file).
+# Explicit format overrides (auto = detect by extension, and by the SEB header
+# row for a .csv file, via parse_statement_file).
 VALID_FORMATS = ("auto", "paypal", "wise", "seb", "ftfcu", "csv")
 
 

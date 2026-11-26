@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from abn_combined.core.importer import ImportError_, import_file
-from abn_combined.core.models import CategorizationRule
+from abn_combined.core.models import CategorizationRule, Transaction
 from abn_combined.db import get_session_factory
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -60,6 +60,22 @@ def test_import_each_format(app, settings, fixture, fmt, monkeypatch):
         assert summary.source_file == fixture.name
         # File was stored under statements/.
         assert any(settings.statements_dir.glob(f"*_{fixture.name}"))
+    finally:
+        db.close()
+
+
+def test_auto_format_detects_an_seb_file(app, settings, monkeypatch):
+    # The SEB file has the extension .csv, but the generic CSV parser cannot read it.
+    _fixed_rates(monkeypatch)
+    db = _db(app)
+    try:
+        auto = import_file(db, SEB.read_bytes(), SEB.name, settings.statements_dir)
+        assert auto.new > 0
+        accounts = {t.accountNumber for t in db.query(Transaction).filter(
+            Transaction.id.in_(auto.new_ids))}
+        assert accounts == {"seb:divyavanmahajan"}
+        again = import_file(db, SEB.read_bytes(), SEB.name, settings.statements_dir, fmt="seb")
+        assert again.new == 0
     finally:
         db.close()
 

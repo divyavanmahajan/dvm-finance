@@ -35,6 +35,7 @@ from .fx import RatesUnavailableError, best_rate, build_rate_cache, parse_ecb_xm
 
 _ACCOUNT = "seb:divyavanmahajan"
 _NATIVE_CURRENCY = "SEK"
+_EXPECTED_HEADERS = {"Booking date", "Value date", "Voucher number", "Text", "Amount", "Balance"}
 
 
 def _parse_exact(value: str) -> Decimal | None:
@@ -62,6 +63,17 @@ def _parse_date(value: str) -> date | None:
         return datetime.strptime(s, "%Y-%m-%d").date()
     except ValueError:
         return None
+
+
+def is_seb_file(file_path: Path) -> bool:
+    """Return True when the header row of the file is the SEB header row."""
+    try:
+        with open(file_path, "rb") as f:
+            first_line = f.readline()
+    except OSError:
+        return False
+    header = first_line.decode("utf-8-sig", errors="replace").strip()
+    return set(header.split(";")) >= _EXPECTED_HEADERS
 
 
 def _parse_ecb_xml(url: str) -> dict[date, float]:
@@ -115,9 +127,8 @@ def parse_seb_file(file_path: Path) -> list[dict[str, Any]]:
         return transactions
 
     # Validate expected headers
-    expected = {"Booking date", "Value date", "Voucher number", "Text", "Amount", "Balance"}
     actual = set(reader.fieldnames or [])
-    missing = expected - actual
+    missing = _EXPECTED_HEADERS - actual
     if missing:
         raise ValueError(
             f"SEB CSV missing expected columns: {missing}. "
